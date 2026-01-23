@@ -1,0 +1,9 @@
+{
+  "name": "DevFreelancer v2",
+  "description": "A professional SaaS application for freelancers to manage clients, create quotes, generate invoices, track expenses, and view business analytics, with AI-powered features.",
+  "requestFramePermissions": [],
+  "env": {
+    "VITE_SUPABASE_URL": "https://umqsjycqypxvhbhmidma.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtcXNqeWNxeXB4dmhiaG1pZG1hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MTcwNTksImV4cCI6MjA3ODI5MzA1OX0.YmlHDqxoQa9DRuONwxYenmU-Rj05sVjlMstG3oyCM8I"
+  }
+}

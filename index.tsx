@@ -1,0 +1,1 @@
+// ELIMINADO: Este archivo ya no es necesario. El punto de entrada es main.tsx.

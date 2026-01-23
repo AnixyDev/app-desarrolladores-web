@@ -1,0 +1,1 @@
+// ELIMINADO: Movido a pages/auth/LoginPage.tsx
