@@ -1,26 +1,25 @@
-// pages/ProposalsPage.tsx
-import React, { useState, lazy, Suspense } from 'react';
-
-import { useAppStore } from '../hooks/useAppStore';
-import { useToast } from '../hooks/useToast';
-
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
-import Input from '../components/ui/Input';
-import StatusChip from '../components/ui/StatusChip';
-
-import { formatCurrency } from '../lib/utils';
+// pages/portal/PortalProposalViewPage.tsx
+import React, { useState, lazy, Suspense, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
-import { SparklesIcon, RefreshCwIcon } from '../components/icons/Icon';
-import { generateProposalText, AI_CREDIT_COSTS } from '../services/geminiService';
+import { useAppStore } from '../../hooks/useAppStore';
+import { useToast } from '../../hooks/useToast';
+
+import Card, { CardContent, CardHeader } from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import Modal from '../../components/ui/Modal';
+import Input from '../../components/ui/Input';
+import StatusChip from '../../components/ui/StatusChip';
+
+import { formatCurrency } from '../../lib/utils';
+import { SparklesIcon, RefreshCwIcon } from '../../components/icons/Icon';
+import { generateProposalText, AI_CREDIT_COSTS } from '../../services/geminiService';
 
 const BuyCreditsModal = lazy(
-  () => import('../components/modals/BuyCreditsModal')
+  () => import('../../components/modals/BuyCreditsModal')
 );
 
-const ProposalsPage: React.FC = () => {
+const PortalProposalViewPage: React.FC = () => {
   const {
     proposals,
     clients,
@@ -36,12 +35,15 @@ const ProposalsPage: React.FC = () => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
 
-  const initialProposalState = {
-    client_id: clients[0]?.id ?? '',
-    title: '',
-    content: '',
-    amount_cents: 0,
-  };
+  const initialProposalState = useMemo(
+    () => ({
+      client_id: clients[0]?.id ?? '',
+      title: '',
+      content: '',
+      amount_cents: 0,
+    }),
+    [clients]
+  );
 
   const [newProposal, setNewProposal] = useState(initialProposalState);
 
@@ -78,10 +80,7 @@ const ProposalsPage: React.FC = () => {
     if (!profile) return;
 
     if (!newProposal.title.trim()) {
-      addToast(
-        'Escribe un título para dar contexto a la IA.',
-        'error'
-      );
+      addToast('Escribe un título para dar contexto a la IA.', 'error');
       return;
     }
 
@@ -115,9 +114,9 @@ const ProposalsPage: React.FC = () => {
         content: String(generatedText),
       }));
 
-      consumeCredits(AI_CREDIT_COSTS.generateProposal);
+      await consumeCredits(AI_CREDIT_COSTS.generateProposal);
       addToast('Propuesta generada con éxito.', 'success');
-    } catch (error) {
+    } catch {
       addToast('Error al generar la propuesta.', 'error');
     } finally {
       setIsAiLoading(false);
@@ -128,7 +127,7 @@ const ProposalsPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-white">
-          Propuestas
+          Propuestas del Portal
         </h1>
         <Button onClick={() => setIsModalOpen(true)}>
           Crear Propuesta
@@ -142,7 +141,7 @@ const ProposalsPage: React.FC = () => {
           </h2>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="hidden md:block">
+          <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="border-b border-gray-800">
                 <tr>
@@ -164,10 +163,7 @@ const ProposalsPage: React.FC = () => {
                     </td>
                     <td className="p-4 text-primary-400">
                       <Link to={`/clients/${proposal.client_id}`}>
-                        {String(
-                          getClientById(proposal.client_id)?.name ??
-                            'Cliente'
-                        )}
+                        {getClientById(proposal.client_id)?.name ?? 'Cliente'}
                       </Link>
                     </td>
                     <td className="p-4 text-gray-300">
@@ -284,4 +280,4 @@ const ProposalsPage: React.FC = () => {
   );
 };
 
-export default ProposalsPage;
+export default PortalProposalViewPage;
