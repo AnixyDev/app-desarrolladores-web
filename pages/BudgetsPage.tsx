@@ -1,19 +1,19 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react';
 // FIX: Remove .tsx and .ts extensions from imports to fix module resolution errors.
-import { useAppStore } from '../hooks/useAppStore';
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
-import Input from '../components/ui/Input';
+import { useAppStore } from '/hooks/useAppStore';
+import Card, { CardContent, CardHeader } from '/components/ui/Card';
+import Button from '/components/ui/Button';
+import Modal from '/components/ui/Modal';
+import Input from '/components/ui/Input';
 import { Budget, InvoiceItem } from '../types';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency } from '/lib/utils';
 import { PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, MessageSquareIcon, SparklesIcon } from '../components/icons/Icon';
-import StatusChip from '../components/ui/StatusChip';
-import EmptyState from '../components/ui/EmptyState';
-import { generateItemsForDocument, AI_CREDIT_COSTS } from '../services/geminiService';
-import { useToast } from '../hooks/useToast';
+import StatusChip from '/components/ui/StatusChip';
+import EmptyState from '/components/ui/EmptyState';
+import { generateItemsForDocument, AI_CREDIT_COSTS } from '/services/geminiService';
+import { useToast } from '/hooks/useToast';
 
-const BuyCreditsModal = lazy(() => import('../components/modals/BuyCreditsModal'));
+const BuyCreditsModal = lazy(() => import('/components/modals/BuyCreditsModal'));
 
 
 const BudgetsPage: React.FC = () => {
