@@ -2,21 +2,21 @@
 import React, { useState, lazy, Suspense, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 
-import { useAppStore } from '../../hooks/useAppStore';
-import { useToast } from '../../hooks/useToast';
+import { useAppStore } from '../hooks/useAppStore';
+import { useToast } from '../hooks/useToast';
 
-import Card, { CardContent, CardHeader } from '../../components/ui/Card';
-import Button from '../../components/ui/Button';
-import Modal from '../../components/ui/Modal';
-import Input from '../../components/ui/Input';
-import StatusChip from '../../components/ui/StatusChip';
+import Card, { CardContent, CardHeader } from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
+import Input from '../components/ui/Input';
+import StatusChip from '../components/ui/StatusChip';
 
-import { formatCurrency } from '../../lib/utils';
-import { SparklesIcon, RefreshCwIcon } from '../../components/icons/Icon';
-import { generateProposalText, AI_CREDIT_COSTS } from '../../services/geminiService';
+import { formatCurrency } from '../lib/utils';
+import { SparklesIcon, RefreshCwIcon } from '../components/icons/Icon';
+import { generateProposalText, AI_CREDIT_COSTS } from '../services/geminiService';
 
 const BuyCreditsModal = lazy(
-  () => import('../../components/modals/BuyCreditsModal')
+  () => import('../components/modals/BuyCreditsModal')
 );
 
 const PortalProposalViewPage: React.FC = () => {
