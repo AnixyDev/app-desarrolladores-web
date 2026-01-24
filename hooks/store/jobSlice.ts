@@ -1,7 +1,7 @@
 import { StateCreator } from 'zustand';
 import { Job, JobApplication } from '../../types.ts';
 import { AppState } from '../useAppStore.tsx';
-import { supabase } from '../../lib/supabaseClient.ts';
+import { supabase } from '../lib/supabaseClient.ts';
 
 export interface JobSlice {
   jobs: Job[];
