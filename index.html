@@ -1,44 +1,29 @@
 <!DOCTYPE html>
 <html lang="es" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
     <title>DevFreelancer - Gestión Pro para Desarrolladores</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZX0Cb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImxvZ29HcmFkaWVudCIgeDE9IjAiIHkxPSIwIiB4Mj0iMzIiIHkyPSIzMiIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPjxzdG9wIHN0b3AtY29sb3I9IiNGMDAwQjgiLz48c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiM5RDAwRkYiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48dGV4dCB4PSI1MCUiIHk9IjUyJSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1zaXplPSIyMiIgZm9udC1mYW1pbHk9IkludGVyLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIiBmaWxsPSJ1cmwoI2xvZ29HcmFkaWVudCkiPkRGPC90ZXh0Pjwvc3ZnPg==">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Stripe (OK cargar externo) -->
     <script src="https://js.stripe.com/v3/" async></script>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.12.0",
-    "@react-oauth/google": "https://esm.sh/@react-oauth/google@^0.13.4",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "zustand": "https://esm.sh/zustand@^5.0.10",
-    "zustand/": "https://esm.sh/zustand@^5.0.10/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
-    "recharts": "https://esm.sh/recharts@^3.7.0",
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
-    "jspdf": "https://esm.sh/jspdf@^4.0.0",
-    "jspdf-autotable": "https://esm.sh/jspdf-autotable@^5.0.7",
-    "uuid": "https://esm.sh/uuid@^13.0.0",
-    "@stripe/stripe-js": "https://esm.sh/@stripe/stripe-js@^8.6.3",
-    "marked": "https://esm.sh/marked@^17.0.1",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.91.0",
-    "@stripe/react-stripe-js": "https://esm.sh/@stripe/react-stripe-js@^5.4.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "vite": "https://esm.sh/vite@^7.3.1",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
-<body class="bg-gray-950 text-white selection:bg-primary-500/30">
+  </head>
+
+  <body class="bg-gray-950 text-white selection:bg-primary-500/30">
     <div id="root"></div>
-    <script type="module" src="/main.tsx"></script>
-<script type="module" src="/index.tsx"></script>
-</body>
+
+    <!-- ÚNICO punto de entrada -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
