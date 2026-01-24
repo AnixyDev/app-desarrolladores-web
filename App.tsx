@@ -1,13 +1,35 @@
-// App.tsx
-import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
-import Routes from './routes';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import LoginPage from './pages/auth/LoginPage';
+import RegisterPage from './pages/auth/RegisterPage';
+import DashboardPage from './pages/DashboardPage';
+import Layout from './components/layout/Layout';
+import { useAppStore } from './hooks/useAppStore';
 
-const App: React.FC = () => {
+const App = () => {
+  const { isAuthenticated, isProfileLoading } = useAppStore();
+
+  if (isProfileLoading) {
+    return <div className="text-white p-8">Cargando…</div>;
+  }
+
   return (
-    <BrowserRouter>
-      <Routes />
-    </BrowserRouter>
+    <Routes>
+      {/* PUBLIC */}
+      <Route path="/auth/login" element={<LoginPage />} />
+      <Route path="/auth/register" element={<RegisterPage />} />
+
+      {/* PRIVATE */}
+      <Route
+        path="/*"
+        element={
+          isAuthenticated ? (
+            <Layout />
+          ) : (
+            <Navigate to="/auth/login" replace />
+          )
+        }
+      />
+    </Routes>
   );
 };
 
