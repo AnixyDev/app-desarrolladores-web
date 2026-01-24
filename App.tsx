@@ -1,35 +1,30 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import LoginPage from './pages/auth/LoginPage';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+
+import AppLayout from './components/layout/AppLayout';
+
+// Pages
+import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
-import Layout from './components/layout/Layout';
-import { useAppStore } from './hooks/useAppStore';
+// importa aquí el resto de páginas protegidas…
 
-const App = () => {
-  const { isAuthenticated, isProfileLoading } = useAppStore();
-
-  if (isProfileLoading) {
-    return <div className="text-white p-8">Cargando…</div>;
-  }
-
+const App: React.FC = () => {
   return (
-    <Routes>
-      {/* PUBLIC */}
-      <Route path="/auth/login" element={<LoginPage />} />
-      <Route path="/auth/register" element={<RegisterPage />} />
+    <BrowserRouter>
+      <Routes>
+        {/* Public routes */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
 
-      {/* PRIVATE */}
-      <Route
-        path="/*"
-        element={
-          isAuthenticated ? (
-            <Layout />
-          ) : (
-            <Navigate to="/auth/login" replace />
-          )
-        }
-      />
-    </Routes>
+        {/* Protected app */}
+        <Route element={<AppLayout />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          {/* aquí van TODAS las páginas con sidebar */}
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 };
 
