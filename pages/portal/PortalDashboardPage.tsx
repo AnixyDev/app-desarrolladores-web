@@ -1,9 +1,9 @@
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
-import Card, { CardContent, CardHeader } from '../../components/ui/Card';
-import { useAppStore } from '../../hooks/useAppStore';
-import { formatCurrency } from '../../lib/utils';
-import { BriefcaseIcon, FileTextIcon } from '../../components/icons/Icon';
+import Card, { CardContent, CardHeader } from '../components/ui/Card';
+import { useAppStore } from '../hooks/useAppStore';
+import { formatCurrency } from '../lib/utils';
+import { BriefcaseIcon, FileTextIcon } from '../components/icons/Icon';
 
 const PortalDashboardPage: React.FC = () => {
     const { clientId } = useParams<{ clientId: string }>();
