@@ -1,1 +1,2 @@
-// ELIMINADO: Movido a pages/auth/LoginPage.tsx
+// pages/LoginPage.tsx
+export { default } from './auth/LoginPage';
