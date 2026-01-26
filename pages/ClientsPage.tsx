@@ -1,19 +1,19 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 // FIX: Remove .tsx and .ts extensions from imports to resolve module resolution errors.
-import { useAppStore } from '../hooks/useAppStore';
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
-import Input from '../components/ui/Input';
-import { Client, NewClient } from '../types';
+import { useAppStore } from '@/hooks/useAppStore';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import Input from '@/components/ui/Input';
+import { Client, NewClient } from '@/types';
 // FIX: Aliased Users to UsersIcon to match usage.
-import { EditIcon, TrashIcon, PhoneIcon, MailIcon, Users as UsersIcon } from '../components/icons/Icon';
-import { useToast } from '../hooks/useToast';
-import EmptyState from '../components/ui/EmptyState';
+import { EditIcon, TrashIcon, PhoneIcon, MailIcon, Users as UsersIcon } from '@/components/icons/Icon';
+import { useToast } from '@/hooks/useToast';
+import EmptyState from '@/components/ui/EmptyState';
 
-const UpgradePromptModal = lazy(() => import('../components/modals/UpgradePromptModal'));
-const ConfirmationModal = lazy(() => import('../components/modals/ConfirmationModal'));
+const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
+const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
 
 const initialClientState: NewClient = {
