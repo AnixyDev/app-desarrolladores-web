@@ -2,17 +2,17 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 // FIX: Remove .tsx and .ts extensions from imports to resolve module resolution errors.
-import { useAppStore } from '../hooks/useAppStore';
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
-import { formatCurrency } from '../lib/utils';
-import { Project, Task, InvoiceItem } from '../types';
-import { PlusIcon, TrashIcon, ClockIcon, FileTextIcon, MessageSquareIcon, DollarSignIcon } from '../components/icons/Icon';
-import EmptyState from '../components/ui/EmptyState';
+import { useAppStore } from '@/hooks/useAppStore';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import { formatCurrency } from '@/lib/utils';
+import { Project, Task, InvoiceItem } from '@/types';
+import { PlusIcon, TrashIcon, ClockIcon, FileTextIcon, MessageSquareIcon, DollarSignIcon } from '@/components/icons/Icon';
+import EmptyState from '@/components/ui/EmptyState';
 
-const ProjectChat = lazy(() => import('../components/ProjectChat'));
-const ConfirmationModal = lazy(() => import('../components/modals/ConfirmationModal'));
+const ProjectChat = lazy(() => import('@/components/ProjectChat'));
+const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
 const ProjectDetailPage: React.FC = () => {
     const { projectId } = useParams<{ projectId: string }>();
