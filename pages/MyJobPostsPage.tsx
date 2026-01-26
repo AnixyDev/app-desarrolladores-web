@@ -1,13 +1,13 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { useAppStore } from '../hooks/useAppStore.tsx';
-import Card, { CardContent, CardHeader } from '../components/ui/Card.tsx';
+import { useAppStore } from '@/hooks/useAppStore';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import { Building, Briefcase, EditIcon, TrashIcon, Users } from 'lucide-react';
-import { Job } from '../types.ts';
-import EmptyState from '../components/ui/EmptyState.tsx';
-import Button from '../components/ui/Button.tsx';
+import { Job } from '@/types';
+import EmptyState from '@/components/ui/EmptyState';
+import Button from '@/components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
 
-const UpgradePromptModal = lazy(() => import('../components/modals/UpgradePromptModal.tsx'));
+const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
 
 const MyJobPostsPage: React.FC = () => {
     const { jobs, applications, profile } = useAppStore();
