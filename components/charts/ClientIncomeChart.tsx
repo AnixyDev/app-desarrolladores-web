@@ -1,6 +1,6 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import type { Invoice } from '../../types';
+import type { Invoice } from '@/types';
 
 interface ChartProps {
   invoices: Invoice[];
