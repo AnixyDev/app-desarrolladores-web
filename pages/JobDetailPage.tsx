@@ -1,14 +1,14 @@
 // pages/JobDetailPage.tsx
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useAppStore } from '../hooks/useAppStore.tsx';
-import Card, { CardContent, CardHeader } from '../components/ui/Card.tsx';
-import Button from '../components/ui/Button.tsx';
+import { useAppStore } from '@/hooks/useAppStore';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Button from '@/components/ui/Button.tsx';
 import { DollarSign, Clock, Zap, Star, Briefcase } from 'lucide-react';
-import { Job } from '../types.ts';
+import { Job } from '@/types';
 
-const ProposalGeneratorModal = lazy(() => import('../components/modals/ProposalGeneratorModal.tsx'));
-const UpgradePromptModal = lazy(() => import('../components/modals/UpgradePromptModal.tsx'));
+const ProposalGeneratorModal = lazy(() => import('@/components/modals/ProposalGeneratorModal.tsx'));
+const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal.tsx'));
 
 const JobDetailPage: React.FC = () => {
     const { jobId } = useParams<{ jobId: string }>();
