@@ -1,17 +1,17 @@
 
 import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useAppStore } from '../hooks/useAppStore';
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
-import Input from '../components/ui/Input';
-import { Project, NewProject, NewClient } from '../types';
-import { formatCurrency } from '../lib/utils';
-import StatusChip from '../components/ui/StatusChip';
-import EmptyState from '../components/ui/EmptyState';
-import { BriefcaseIcon, PlusIcon, SearchIcon, Filter, Users } from '../components/icons/Icon';
-import { useToast } from '../hooks/useToast';
+import { useAppStore } from '@/hooks/useAppStore';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import Input from '@/components/ui/Input';
+import { Project, NewProject, NewClient } from '@/types';
+import { formatCurrency } from '@/lib/utils';
+import StatusChip from '@/components/ui/StatusChip';
+import EmptyState from '@/components/ui/EmptyState';
+import { BriefcaseIcon, PlusIcon, SearchIcon, Filter, Users } from '@/components/icons/Icon';
+import { useToast } from '@/hooks/useToast';
 
 const ProjectsPage: React.FC = () => {
     const { projects, clients, tasks, addProject, getClientById, addClient } = useAppStore();
