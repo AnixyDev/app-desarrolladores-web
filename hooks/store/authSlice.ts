@@ -1,7 +1,7 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../useAppStore';
-import { Profile } from '../../types';
-import { supabase } from '../../lib/supabaseClient';
+import { Profile } from '@/types';
+import { supabase } from '@/lib/supabaseClient';
 
 const initialProfile: Profile = {
     id: '',
