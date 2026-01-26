@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Clock, CheckCircle, ListTodo, Calendar, Pause, Play, Plus, GitBranch } from 'lucide-react';
-import { useAppStore } from '../hooks/useAppStore.tsx';
-import { useToast } from '../hooks/useToast.ts';
-import { TimeEntry, Task } from '../types.ts';
+import { useAppStore } from '@/hooks/useAppStore';
+import { useToast } from '@/hooks/useToast';
+import { TimeEntry, Task } from '@/types';
 
 
 interface ManualEntry {
