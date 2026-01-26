@@ -1,12 +1,12 @@
 import React, { lazy, Suspense, useState, useEffect } from 'react';
-import { useAppStore } from '../hooks/useAppStore';
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Skeleton, { CardSkeleton } from '../components/ui/Skeleton';
-import { formatCurrency } from '../lib/utils';
+import { useAppStore } from '@/hooks/useAppStore';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Skeleton, { CardSkeleton } from '@/components/ui/Skeleton';
+import { formatCurrency } from '@/lib/utils';
 import { Link } from 'react-router-dom';
-import { DollarSignIcon, ClockIcon, BriefcaseIcon, FileTextIcon } from '../components/icons/Icon';
+import { DollarSignIcon, ClockIcon, BriefcaseIcon, FileTextIcon } from '@/components/icons/Icon';
 
-const IncomeExpenseChart = lazy(() => import('../components/charts/IncomeExpenseChart'));
+const IncomeExpenseChart = lazy(() => import('@/components/charts/IncomeExpenseChart'));
 
 const StatCard: React.FC<{ icon: React.ElementType; title: string; value: string | number; link?: string; isLoading?: boolean }> = ({ icon: Icon, title, value, link, isLoading }) => {
     const content = (
