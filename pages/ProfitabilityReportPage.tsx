@@ -2,12 +2,12 @@
 import React, { useMemo, useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 
-import { useAppStore } from '../hooks/useAppStore';
-import { useToast } from '../hooks/useToast';
+import { useAppStore } from '@/hooks/useAppStore';
+import { useToast } from '@/hooks/useToast';
 
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import EmptyState from '../components/ui/EmptyState';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Button from '@/Components/ui/Button';
+import EmptyState from '@/components/ui/EmptyState';
 
 import {
   ArrowUpCircleIcon,
@@ -18,12 +18,12 @@ import {
   BriefcaseIcon,
   SparklesIcon,
   RefreshCwIcon,
-} from '../components/icons/Icon';
+} from '@/components/icons/Icon';
 
 import { formatCurrency } from '../lib/utils';
-import { analyzeProfitability, AI_CREDIT_COSTS } from '../services/geminiService';
+import { analyzeProfitability, AI_CREDIT_COSTS } from '@/services/geminiService';
 
-const BuyCreditsModal = lazy(() => import('../components/modals/BuyCreditsModal'));
+const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
 
 interface ProfitabilityData {
   projectId: string;
