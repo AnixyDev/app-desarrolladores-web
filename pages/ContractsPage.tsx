@@ -1,16 +1,16 @@
 
 import React, { useState, useMemo } from 'react';
 // FIX: Remove .tsx and .ts extensions from imports to fix module resolution errors.
-import { useAppStore } from '../hooks/useAppStore';
-import Card, { CardContent } from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
-import Input from '../components/ui/Input';
-import { Contract } from '../types';
-import { formatCurrency } from '../lib/utils';
+import { useAppStore } from @/hooks/useAppStore';
+import Card, { CardContent } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import Input from '@/components/ui/Input';
+import { Contract } from '@/types';
+import { formatCurrency } from '@/lib/utils';
 import { SendIcon, EditIcon, TrashIcon, DownloadIcon, CheckCircleIcon, SignatureIcon } from '../components/icons/Icon';
-import StatusChip from '../components/ui/StatusChip';
-import { useToast } from '../hooks/useToast';
+import StatusChip from '@/components/ui/StatusChip';
+import { useToast } from '@/hooks/useToast';
 
 const CONTRACT_TEMPLATE = `CONTRATO DE PRESTACIÓN DE SERVICIOS FREELANCE
 
