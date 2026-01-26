@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { logger } from "../lib/loggerService";
+import { logger } from "@/lib/loggerService";
 
 /**
  * SDK oficial de Gemini (npm)
