@@ -1,1 +1,0 @@
-// ELIMINADO: Movido a pages/PublicProfilePage.tsx
