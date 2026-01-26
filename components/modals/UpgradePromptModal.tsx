@@ -1,8 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import Modal from '../ui/Modal.tsx';
-import Button from '../ui/Button.tsx';
-import { ZapIcon } from '../icons/Icon.tsx';
+import Modal from '../ui/Modal';
+import Button from '../ui/Button';
+import { ZapIcon } from '../icons/Icon';
 
 interface UpgradePromptModalProps {
   isOpen: boolean;
