@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Briefcase, DollarSign, Clock, Hash, Send, Zap, Star } from 'lucide-react';
-import { useToast } from '../hooks/useToast';
-import { redirectToCheckout } from '../services/stripeService';
-import { useAppStore } from '../hooks/useAppStore';
+import { useToast } from '@/hooks/useToast';
+import { redirectToCheckout } from '@/services/stripeService';
+import { useAppStore } from '@/hooks/useAppStore';
 import { useNavigate } from 'react-router-dom';
 
 const commonSkills = [
@@ -13,7 +13,7 @@ const commonSkills = [
   'React', 'Svelte', 'Tailwind CSS', 'TypeScript', 'Vue.js',
 ];
 
-const UpgradePromptModal = lazy(() => import('../components/modals/UpgradePromptModal'));
+const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
 
 interface FormData {
     titulo: string;
