@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Briefcase, DollarSign, Clock, Hash, Send, Zap, Star } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
