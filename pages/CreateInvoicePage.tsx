@@ -1,17 +1,17 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useAppStore } from '../hooks/useAppStore.tsx';
-import Card, { CardContent, CardHeader, CardFooter } from '../components/ui/Card.tsx';
-import Button from '../components/ui/Button.tsx';
-import Input from '../components/ui/Input.tsx';
-import Modal from '../components/ui/Modal.tsx';
-import { InvoiceItem } from '../types.ts';
-import { PlusIcon, TrashIcon, SparklesIcon, RepeatIcon } from '../components/icons/Icon.tsx';
-import { useToast } from '../hooks/useToast.ts';
-import { generateItemsForDocument, AI_CREDIT_COSTS } from '../services/geminiService.ts';
-import BuyCreditsModal from '../components/modals/BuyCreditsModal.tsx';
-import { formatCurrency } from '../lib/utils.ts';
+import { useAppStore } from '@/hooks/useAppStore';
+import Card, { CardContent, CardHeader, CardFooter } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import Modal from '@/components/ui/Modal';
+import { InvoiceItem } from '@/types';
+import { PlusIcon, TrashIcon, SparklesIcon, RepeatIcon } from '@/components/icons/Icon';
+import { useToast } from '@/hooks/useToast';
+import { generateItemsForDocument, AI_CREDIT_COSTS } from '@/services/geminiService';
+import BuyCreditsModal from '@/components/modals/BuyCreditsModal';
+import { formatCurrency } from '@/lib/utils';
 
 
 const CreateInvoicePage: React.FC = () => {
