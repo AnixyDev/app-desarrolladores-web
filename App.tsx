@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-import { useAppStore } from '@/hooks/useAppStore';
+import { useAppStore } from './hooks/useAppStore';
 import AppLayout from '@/components/layout/AppLayout';
 
 // Pages
