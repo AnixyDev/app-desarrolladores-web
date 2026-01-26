@@ -1,10 +1,10 @@
 import React, { useState, lazy, Suspense } from 'react';
-import { useAppStore } from '../hooks/useAppStore';
-import { Users as UsersIcon, UserIcon, ShieldIcon, BriefcaseIcon, EditIcon, SaveIcon, TrashIcon, DollarSignIcon } from '../components/icons/Icon';
-import { UserData } from '../types';
-import { formatCurrency } from '../lib/utils';
+import { useAppStore } from '@/hooks/useAppStore';
+import { Users as UsersIcon, UserIcon, ShieldIcon, BriefcaseIcon, EditIcon, SaveIcon, TrashIcon, DollarSignIcon } from '@/components/icons/Icon';
+import { UserData } from '@/types';
+import { formatCurrency } from '@/lib/utils';
 
-const ConfirmationModal = lazy(() => import('../components/modals/ConfirmationModal'));
+const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
 interface Role {
     id: 'Admin' | 'Manager' | 'Developer';
