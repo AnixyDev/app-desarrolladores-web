@@ -1,17 +1,17 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react';
 // FIX: Remove .tsx extensions from imports to fix module resolution errors.
-import { useAppStore } from '../hooks/useAppStore';
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Input from '../components/ui/Input';
-import Modal from '../components/ui/Modal';
-import { ClockIcon, PlusIcon, SparklesIcon, RefreshCwIcon } from '../components/icons/Icon';
-import { useToast } from '../hooks/useToast';
-import { generateTimeEntryDescription, AI_CREDIT_COSTS } from '../services/geminiService';
+import { useAppStore } from '@/hooks/useAppStore';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import Modal from '@/components/ui/Modal';
+import { ClockIcon, PlusIcon, SparklesIcon, RefreshCwIcon } from '@/components/icons/Icon';
+import { useToast } from '@/hooks/useToast';
+import { generateTimeEntryDescription, AI_CREDIT_COSTS } from '@/services/geminiService';
 
-const TimeDistributionChart = lazy(() => import('../components/charts/TimeDistributionChart'));
-const WeeklyHoursChart = lazy(() => import('../components/charts/WeeklyHoursChart'));
-const BuyCreditsModal = lazy(() => import('../components/modals/BuyCreditsModal'));
+const TimeDistributionChart = lazy(() => import('@/components/charts/TimeDistributionChart'));
+const WeeklyHoursChart = lazy(() => import('@/components/charts/WeeklyHoursChart'));
+const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
 
 
 interface ManualEntryForm {
