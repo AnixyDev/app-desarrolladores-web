@@ -1,8 +1,8 @@
 
 import { StateCreator } from 'zustand';
-import { Project, NewProject, Task, TimeEntry, NewTimeEntry } from '../../types.ts';
-import { AppState } from '../useAppStore.tsx';
-import { supabase } from '../lib/supabaseClient.ts';
+import { Project, NewProject, Task, TimeEntry, NewTimeEntry } from '@/types';
+import { AppState } from '../useAppStore';
+import { supabase } from '../lib/supabaseClient';
 
 export interface ProjectSlice {
   projects: Project[];
