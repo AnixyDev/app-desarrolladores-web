@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { SparklesIcon, RefreshCwIcon, SendIcon } from '../icons/Icon';
-import { generateProposalText, refineProposalText, AI_CREDIT_COSTS } from '../../services/geminiService';
-import { useAppStore } from '../../hooks/useAppStore';
-import { useToast } from '../../hooks/useToast';
+import { generateProposalText, refineProposalText, AI_CREDIT_COSTS } from '@/services/geminiService';
+import { useAppStore } from '@/hooks/useAppStore';
+import { useToast } from '@/hooks/useToast';
 import BuyCreditsModal from './BuyCreditsModal';
-import { Job } from '../../types';
+import { Job } from '@/types';
 
 
 interface ProposalGeneratorModalProps {
