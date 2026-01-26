@@ -1,10 +1,10 @@
 import React, { useState, lazy, Suspense } from 'react';
 // FIX: Switched to the centralized Icon wrapper for consistency and added the missing User icon.
-import { Users, UserPlus, Trash2, MailIcon as Mail, X, UserIcon as User } from '../components/icons/Icon';
-import { useAppStore } from '../hooks/useAppStore';
-import { UserData } from '../types';
+import { Users, UserPlus, Trash2, MailIcon as Mail, X, UserIcon as User } from '@/components/icons/Icon';
+import { useAppStore } from '@/hooks/useAppStore';
+import { UserData } from '@/types';
 
-const ConfirmationModal = lazy(() => import('../components/modals/ConfirmationModal'));
+const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
 const roles: UserData['role'][] = [
   'Developer', 
