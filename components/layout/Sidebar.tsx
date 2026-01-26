@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { SIDEBAR_STRUCTURE } from '../../constants';
+import { SIDEBAR_STRUCTURE } from '@/constants';
 import { Logo } from '../icons/Logo';
 import { ChevronDown, X } from 'lucide-react';
 import * as Icons from '../icons/Icon';
