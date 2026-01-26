@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import { Logo } from '../components/icons/Logo';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import { Logo } from '@/components/icons/Logo';
 
 const PrivacyPolicyPage: React.FC = () => {
     return (
