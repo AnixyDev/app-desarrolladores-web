@@ -1,5 +1,5 @@
 
-import { supabase, getURL } from '../lib/supabaseClient';
+import { supabase, getURL } from '@/lib/supabaseClient';
 import { loadStripe } from '@stripe/stripe-js';
 
 const getEnv = (key: string): string => {
