@@ -1,13 +1,13 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-import { useAppStore } from './hooks/useAppStore';
-import AppLayout from './components/layout/AppLayout';
+import { useAppStore } from '@/hooks/useAppStore';
+import AppLayout from '@/components/layout/AppLayout';
 
 // Pages
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/auth/RegisterPage';
-import DashboardPage from './pages/DashboardPage';
+import LoginPage from '@/pages/LoginPage';
+import RegisterPage from '@/pages/auth/RegisterPage';
+import DashboardPage from '@/pages/DashboardPage';
 
 /**
  * Pequeño guard para rutas protegidas
