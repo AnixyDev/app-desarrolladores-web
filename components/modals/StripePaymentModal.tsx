@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { getStripe, createPaymentIntent } from '../../services/stripeService';
-import { useAppStore } from '../../hooks/useAppStore';
+import { getStripe, createPaymentIntent } from '@/services/stripeService';
+import { useAppStore } from '@/hooks/useAppStore';
 import Button from '../ui/Button';
-import { formatCurrency } from '../../lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { RefreshCwIcon, AlertTriangleIcon } from '../icons/Icon';
 
 interface StripePaymentModalProps {
