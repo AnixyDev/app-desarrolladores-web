@@ -1,11 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import { useAppStore } from '../hooks/useAppStore';
-import { formatCurrency } from '../lib/utils';
-import { BookIcon, AlertTriangleIcon, DownloadIcon } from '../components/icons/Icon';
-import Input from '../components/ui/Input';
-import Button from '../components/ui/Button';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import { useAppStore } from '@/hooks/useAppStore';
+import { formatCurrency } from '@/lib/utils';
+import { BookIcon, AlertTriangleIcon, DownloadIcon } from '@/components/icons/Icon';
+import Input from '@/components/ui/Input';
+import Button from '@/components/ui/Button';
 
 const TaxLedgerPage: React.FC = () => {
     const { invoices, expenses, clients } = useAppStore();
