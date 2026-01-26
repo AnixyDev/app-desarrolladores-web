@@ -1,5 +1,5 @@
 import React from 'react';
-import { useToast, ToastType } from '../../hooks/useToast';
+import { useToast, ToastType } from '@/hooks/useToast';
 // FIX: Remove .tsx extension from icon import to fix module resolution error.
 import { CheckCircleIcon, XCircleIcon } from '../icons/Icon';
 
