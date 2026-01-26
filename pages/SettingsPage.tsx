@@ -1,12 +1,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppStore } from '../hooks/useAppStore';
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Input from '../components/ui/Input';
-import Button from '../components/ui/Button';
+import { useAppStore } from '@/hooks/useAppStore';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Input from '@/components/ui/Input';
+import Button from '@/components/ui/Button';
 import { Link } from 'react-router-dom';
-import { UserIcon, RefreshCwIcon, SaveIcon } from '../components/icons/Icon';
-import { useToast } from '../hooks/useToast';
+import { UserIcon, RefreshCwIcon, SaveIcon } from '@/components/icons/Icon';
+import { useToast } from '@/hooks/useToast';
 
 const SettingsPage: React.FC = () => {
     const { profile, updateProfile, refreshProfile } = useAppStore();
