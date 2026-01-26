@@ -1,15 +1,15 @@
 import React, { useState, lazy, Suspense } from 'react';
 // FIX: Remove .tsx and .ts extensions from imports to fix module resolution errors.
 import { useAppStore } from '../hooks/useAppStore';
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
-import Input from '../components/ui/Input';
-import { Expense, RecurringExpense } from '../types';
-import { formatCurrency } from '../lib/utils';
-import { PlusIcon, TrashIcon, RepeatIcon } from '../components/icons/Icon';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
+import Input from '@/components/ui/Input';
+import { Expense, RecurringExpense } from '@/types';
+import { formatCurrency } from '@/lib/utils';
+import { PlusIcon, TrashIcon, RepeatIcon } from '@/components/icons/Icon';
 
-const ConfirmationModal = lazy(() => import('../components/modals/ConfirmationModal'));
+const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
 const ExpensesPage: React.FC = () => {
     const {
