@@ -1,6 +1,3 @@
-
-
-
 import React from 'react';
 import { useParams } from 'react-router-dom';
 // FIX: Remove .tsx extensions from imports to fix module resolution errors.
