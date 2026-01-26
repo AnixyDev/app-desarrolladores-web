@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
-import { Notification } from '../../types.ts';
-import { AppState } from '../useAppStore.tsx';
+import { Notification } from '@/types';
+import { AppState } from '../useAppStore';
 
 export interface NotificationSlice {
   notifications: Notification[];
