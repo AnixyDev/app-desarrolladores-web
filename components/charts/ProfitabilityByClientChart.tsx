@@ -1,6 +1,6 @@
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatCurrency } from '@/lib/utils.ts';
+import { formatCurrency } from '@/lib/utils';
 
 interface ProfitabilityData {
   name: string;
