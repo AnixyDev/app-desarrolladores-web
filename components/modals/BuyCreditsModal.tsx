@@ -2,8 +2,8 @@
 import React, { useState } from 'react';
 import Modal from '../ui/Modal';
 import { SparklesIcon, ZapIcon, CheckCircleIcon, StarIcon, RefreshCwIcon, ShieldIcon } from '../icons/Icon';
-import { STRIPE_ITEMS, redirectToCheckout, StripeItemKey } from '../../services/stripeService';
-import { useToast } from '../../hooks/useToast';
+import { STRIPE_ITEMS, redirectToCheckout, StripeItemKey } from '@/services/stripeService';
+import { useToast } from '@/hooks/useToast';
 
 interface BuyCreditsModalProps {
   isOpen: boolean;
