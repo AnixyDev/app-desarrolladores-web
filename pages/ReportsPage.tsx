@@ -1,11 +1,11 @@
 // pages/ReportsPage.tsx
 import React, { useState, useMemo, lazy, Suspense } from 'react';
 
-import { useAppStore } from '../hooks/useAppStore';
-import { useToast } from '../hooks/useToast';
+import { useAppStore } from '@/hooks/useAppStore';
+import { useToast } from '@/hooks/useToast';
 
-import Card, { CardContent, CardHeader } from '../components/ui/Card';
-import Button from '../components/ui/Button';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
 
 import {
   DownloadIcon,
@@ -17,16 +17,16 @@ import {
   RefreshCwIcon,
   ArrowUpCircleIcon,
   AlertTriangleIcon,
-} from '../components/icons/Icon';
+} from '@/components/icons/Icon';
 
-import { formatCurrency } from '../lib/utils';
-import { analyzeProfitability, AI_CREDIT_COSTS } from '../services/geminiService';
+import { formatCurrency } from '@/lib/utils';
+import { analyzeProfitability, AI_CREDIT_COSTS } from '@/services/geminiService';
 
 const ProfitabilityByClientChart = lazy(
-  () => import('../components/charts/ProfitabilityByClientChart')
+  () => import('@/components/charts/ProfitabilityByClientChart')
 );
 const BuyCreditsModal = lazy(
-  () => import('../components/modals/BuyCreditsModal')
+  () => import('@/components/modals/BuyCreditsModal')
 );
 
 interface FinancialAnalysis {
