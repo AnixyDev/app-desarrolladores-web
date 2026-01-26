@@ -1,15 +1,15 @@
 
 import React, { useState, lazy, Suspense, useEffect, useMemo } from 'react';
 import { Briefcase, DollarSign, Clock, Zap, Target, Filter, ChevronDown, ChevronUp, TrendingUp, Search, Star, BellRing, X } from 'lucide-react';
-import { Job } from '../types';
-import Button from '../components/ui/Button';
+import { Job } from '@/types';
+import Button from '@/components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAppStore } from '../hooks/useAppStore';
-import EmptyState from '../components/ui/EmptyState';
-import { useToast } from '../hooks/useToast';
+import { useAppStore } from '@/hooks/useAppStore';
+import EmptyState from '@/components/ui/EmptyState';
+import { useToast } from '@/hooks/useToast';
 
-const ProposalGeneratorModal = lazy(() => import('../components/modals/ProposalGeneratorModal'));
-const UpgradePromptModal = lazy(() => import('../components/modals/UpgradePromptModal'));
+const ProposalGeneratorModal = lazy(() => import('@/components/modals/ProposalGeneratorModal'));
+const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
 
 const useDebounce = (value: string, delay: number) => {
     const [debouncedValue, setDebouncedValue] = useState(value);
