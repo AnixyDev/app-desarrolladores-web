@@ -1,6 +1,6 @@
 import React from 'react';
 import { Outlet } from 'react-router-dom';
-import { Logo } from '../components/icons/Logo.tsx';
+import { Logo } from '../components/icons/Logo';
 
 const AuthLayout: React.FC = () => {
     return (
