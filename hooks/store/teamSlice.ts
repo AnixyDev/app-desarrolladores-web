@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { UserData, Referral, KnowledgeArticle } from '../../types';
+import { UserData, Referral, KnowledgeArticle } from '@/types';
 import { AppState } from '../useAppStore';
 
 export interface TeamSlice {
