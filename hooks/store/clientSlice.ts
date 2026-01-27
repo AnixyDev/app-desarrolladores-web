@@ -1,7 +1,7 @@
 import { StateCreator } from 'zustand';
 import { Client, NewClient } from '@/types';
-import { AppState } from '../useAppStore';
-import { supabase } from '../lib/supabaseClient';
+import { AppState } from '@/useAppStore';
+import { supabase } from '@/lib/supabaseClient';
 
 export interface ClientSlice {
   clients: Client[];
