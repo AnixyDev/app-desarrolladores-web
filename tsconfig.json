@@ -32,7 +32,9 @@
     "hooks",
     "lib",
     "main.tsx",
-    "index.tsx"
+    "index.tsx",
+     "**/*.ts",
+     "**/*.tsx"
   ],
 
   "exclude": [
