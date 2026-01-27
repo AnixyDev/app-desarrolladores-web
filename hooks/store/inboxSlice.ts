@@ -1,6 +1,6 @@
 // hooks/store/inboxSlice.ts
 import { StateCreator } from 'zustand';
-import { AppState } from '../useAppStore';
+import { AppState } from '@/useAppStore';
 
 // Placeholder types for an inbox feature
 export interface InboxItem {
