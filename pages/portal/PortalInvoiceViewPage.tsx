@@ -1,13 +1,13 @@
 
 import React, { useState, lazy, Suspense } from 'react';
 import { useParams } from 'react-router-dom';
-import { useAppStore } from '../hooks/useAppStore';
-import Card, { CardHeader, CardContent, CardFooter } from '../components/ui/Card';
-import { formatCurrency } from '../lib/utils';
-import Button from '../components/ui/Button';
-import { useToast } from '../hooks/useToast';
+import { useAppStore } from '@/hooks/useAppStore';
+import Card, { CardHeader, CardContent, CardFooter } from '@/components/ui/Card';
+import { formatCurrency } from '@/lib/utils';
+import Button from '@/components/ui/Button';
+import { useToast } from '@/hooks/useToast';
 
-const StripePaymentModal = lazy(() => import('../components/modals/StripePaymentModal'));
+const StripePaymentModal = lazy(() => import('@/components/modals/StripePaymentModal'));
 
 const PortalInvoiceViewPage: React.FC = () => {
     const { invoiceId } = useParams<{ invoiceId: string }>();
