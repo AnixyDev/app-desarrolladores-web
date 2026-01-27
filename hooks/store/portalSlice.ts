@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { AppState } from '../useAppStore';
+import { AppState } from '@/useAppStore';
 
 // Mock types for portal feature
 export interface PortalComment {
