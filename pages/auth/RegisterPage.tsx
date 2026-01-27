@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import AuthCard from 'æ/components/auth/AuthCard';
+import AuthCard from '@/components/auth/AuthCard';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { useAppStore } from '@/hooks/useAppStore';
