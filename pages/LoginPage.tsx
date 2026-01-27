@@ -1,2 +1,2 @@
 // pages/LoginPage.tsx
-export { default } from '@/auth/LoginPage';
+export { default } from '@/pages/auth/LoginPage';
