@@ -1,10 +1,10 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 // FIX: Remove .tsx extensions from imports to fix module resolution errors.
-import { useAppStore } from '../hooks/useAppStore';
-import Card, { CardHeader, CardContent, CardFooter } from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import { SignatureIcon, CheckCircleIcon } from '../components/icons/Icon';
+import { useAppStore } from '@/hooks/useAppStore';
+import Card, { CardHeader, CardContent, CardFooter } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import { SignatureIcon, CheckCircleIcon } from '@/components/icons/Icon';
 
 const PortalContractViewPage: React.FC = () => {
     const { contractId } = useParams<{ contractId: string }>();
