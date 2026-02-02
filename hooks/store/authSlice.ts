@@ -124,6 +124,14 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         if (isInitializing) return () => {};
         isInitializing = true;
 
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+                get().refreshProfile();
+            } else {
+                get().resetStore();
+            }
+        });
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session) {
                 if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
