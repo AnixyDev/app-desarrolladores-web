@@ -156,6 +156,9 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
     login: async (email, password) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
+        if (!error && data.user) {
+            await get().refreshProfile();
+        }
         return !error && !!data.user;
     },
 
@@ -171,6 +174,9 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             password: password || '',
             options: { data: { full_name: name } }
         });
+        if (!error && data.session?.user) {
+            await get().refreshProfile();
+        }
         return !error && !!data.user;
     },
 
