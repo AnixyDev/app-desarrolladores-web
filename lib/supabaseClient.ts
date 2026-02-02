@@ -2,8 +2,18 @@ import { createClient } from '@supabase/supabase-js';
 
 // FIX: Access import.meta.env using bracket notation and casting to avoid TS errors in environments where types are not strictly defined.
 const env = (import.meta as any).env;
-const SUPABASE_URL = env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY;
+const rawSupabaseUrl = env.VITE_SUPABASE_URL ?? '';
+const SUPABASE_URL = rawSupabaseUrl
+  ? rawSupabaseUrl.startsWith('http')
+    ? rawSupabaseUrl
+    : `https://${rawSupabaseUrl}`
+  : '';
+const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY ?? '';
+
+export const supabaseConfigError =
+  !SUPABASE_URL || !SUPABASE_ANON_KEY
+    ? 'Faltan las variables VITE_SUPABASE_URL y/o VITE_SUPABASE_ANON_KEY.'
+    : '';
 
 /**
  * Devuelve la URL base oficial del proyecto.

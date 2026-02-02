@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { useAppStore } from './hooks/useAppStore';
+import { supabaseConfigError } from '@/lib/supabaseClient';
 import AppLayout from '@/components/layout/AppLayout';
 
 // Pages
@@ -76,11 +77,33 @@ const App: React.FC = () => {
   const initializeAuth = useAppStore((state) => state.initializeAuth);
 
   useEffect(() => {
+    if (supabaseConfigError) {
+      return;
+    }
+
     const cleanup = initializeAuth();
     return () => {
       cleanup();
     };
-  }, [initializeAuth]);
+  }, [initializeAuth, supabaseConfigError]);
+
+  if (supabaseConfigError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white p-6">
+        <div className="max-w-xl rounded-2xl border border-red-500/40 bg-gray-900/60 p-6 text-center space-y-3">
+          <h1 className="text-2xl font-bold text-red-300">Configuración de Supabase incompleta</h1>
+          <p className="text-sm text-gray-300">
+            {supabaseConfigError} Revisa los valores en Vercel y vuelve a desplegar.
+          </p>
+          <div className="text-xs text-gray-400">
+            <p>Variables requeridas:</p>
+            <p className="font-mono">VITE_SUPABASE_URL</p>
+            <p className="font-mono">VITE_SUPABASE_ANON_KEY</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
