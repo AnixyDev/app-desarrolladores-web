@@ -124,13 +124,19 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         if (isInitializing) return () => {};
         isInitializing = true;
 
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session?.user) {
-                get().refreshProfile();
-            } else {
-                get().resetStore();
+        (async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    await get().refreshProfile();
+                } else {
+                    get().resetStore();
+                }
+            } catch (error) {
+                console.error("Error initializing auth session:", error);
+                set({ isProfileLoading: false, isAuthenticated: false });
             }
-        });
+        })();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session) {
