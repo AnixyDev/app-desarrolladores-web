@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { useAppStore } from './hooks/useAppStore';
@@ -33,6 +33,15 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 };
 
 const App: React.FC = () => {
+  const initializeAuth = useAppStore((state) => state.initializeAuth);
+
+  useEffect(() => {
+    const cleanup = initializeAuth();
+    return () => {
+      cleanup();
+    };
+  }, [initializeAuth]);
+
   return (
     <BrowserRouter>
       <Routes>
