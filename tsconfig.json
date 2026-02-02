@@ -4,9 +4,10 @@
     "useDefineForClassFields": true,
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "baseUrl": ".",
-"paths": {
-  "@/*": ["*"]
-},
+    "paths": {
+      "@/*": ["*"],
+      ".@/*": ["*"]
+    },
 
     "module": "ESNext",
     "moduleResolution": "Bundler",
