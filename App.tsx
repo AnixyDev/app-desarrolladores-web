@@ -13,7 +13,7 @@ import DashboardPage from '@/pages/DashboardPage';
  * Pequeño guard para rutas protegidas
  */
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { profile, isProfileLoading } = useAppStore();
+  const { isAuthenticated, isProfileLoading } = useAppStore();
 
   // Mientras carga sesión (Supabase)
   if (isProfileLoading) {
@@ -25,8 +25,8 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   }
 
   // No autenticado → login
-  if (!profile) {
-    return <Navigate to="/login" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to="/auth/login" replace />;
   }
 
   return <>{children}</>;
@@ -46,8 +46,10 @@ const App: React.FC = () => {
     <BrowserRouter>
       <Routes>
         {/* PUBLIC */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/register" element={<RegisterPage />} />
+        <Route path="/login" element={<Navigate to="/auth/login" replace />} />
+        <Route path="/register" element={<Navigate to="/auth/register" replace />} />
 
         {/* PROTECTED */}
         <Route
