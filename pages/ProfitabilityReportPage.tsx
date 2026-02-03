@@ -6,7 +6,7 @@ import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';
 
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
-import Button from '@/Components/ui/Button';
+import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 
 import {
