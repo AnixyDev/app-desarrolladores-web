@@ -4,6 +4,10 @@ import { createClient } from '@supabase/supabase-js';
 const env = (import.meta as any).env;
 const SUPABASE_URL = env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY;
+export const supabaseConfigError =
+  !SUPABASE_URL || !SUPABASE_ANON_KEY
+    ? 'Faltan variables de entorno para Supabase.'
+    : null;
 
 /**
  * Devuelve la URL base oficial del proyecto.
