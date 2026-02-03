@@ -76,7 +76,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            
+            console.debug('[auth] session', session);
             if (!session?.user) {
                 get().resetStore();
                 return;
@@ -89,6 +89,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                 .maybeSingle();
             
             if (fetchError) console.error("Error fetching profile:", fetchError);
+            console.debug('[auth] profileData', profileData);
 
             const activeProfile = profileData ? (profileData as Profile) : {
                 ...initialProfile,
@@ -114,6 +115,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
         } catch (error) {
             console.error("Critical Auth Sync Error:", error);
+            console.debug('[auth] refreshProfile failed', error);
             set({ isProfileLoading: false, isAuthenticated: false });
         } finally {
             refreshLock = false;
@@ -123,6 +125,20 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     initializeAuth: () => {
         if (isInitializing) return () => {};
         isInitializing = true;
+
+        (async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    await get().refreshProfile();
+                } else {
+                    get().resetStore();
+                }
+            } catch (error) {
+                console.error("Error initializing auth session:", error);
+                set({ isProfileLoading: false, isAuthenticated: false });
+            }
+        })();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session) {
@@ -142,6 +158,9 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
     login: async (email, password) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
+        if (!error && data.user) {
+            await get().refreshProfile();
+        }
         return !error && !!data.user;
     },
 
@@ -157,6 +176,9 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             password: password || '',
             options: { data: { full_name: name } }
         });
+        if (!error && data.session?.user) {
+            await get().refreshProfile();
+        }
         return !error && !!data.user;
     },
 
