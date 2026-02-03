@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import EmptyState from '@/components/ui/EmptyState';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';
 import {
@@ -39,6 +40,16 @@ const AffiliateProgramPage = () => {
       ),
     };
   }, [referrals]);
+
+  const statusLabels: Record<string, string> = {
+    Registered: 'Registrado',
+    Subscribed: 'Suscripción activa',
+  };
+
+  const statusClasses: Record<string, string> = {
+    Registered: 'bg-gray-800 text-gray-300 border-gray-700',
+    Subscribed: 'bg-green-500/10 text-green-400 border-green-500/30',
+  };
 
   const StatCard = ({
     icon: Icon,
@@ -113,7 +124,58 @@ const AffiliateProgramPage = () => {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="border-b border-gray-800">
-                <tr>
-                  <th className="p-4">Nombre</th>
+            {referrals.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={UsersIcon}
+                  title="Aún no tienes referidos"
+                  message="Comparte tu enlace para empezar a ganar comisiones."
+                />
+              </div>
+            ) : (
+              <table className="w-full text-left">
+                <thead className="border-b border-gray-800">
+                  <tr>
+                    <th className="p-4">Nombre</th>
+                    <th className="p-4">Fecha de registro</th>
+                    <th className="p-4">Estado</th>
+                    <th className="p-4 text-right">Comisión</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {referrals.map((referral) => (
+                    <tr
+                      key={referral.id}
+                      className="border-b border-gray-800 hover:bg-gray-800/50"
+                    >
+                      <td className="p-4 font-semibold text-white">
+                        {referral.name}
+                      </td>
+                      <td className="p-4 text-gray-300">
+                        {referral.join_date}
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                            statusClasses[referral.status]
+                          }`}
+                        >
+                          {statusLabels[referral.status]}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right text-white">
+                        {formatCurrency(referral.commission_cents)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default AffiliateProgramPage;
