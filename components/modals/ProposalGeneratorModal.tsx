@@ -6,9 +6,9 @@ import { SparklesIcon, RefreshCwIcon, SendIcon } from '../icons/Icon';
 import { generateProposalText, refineProposalText, AI_CREDIT_COSTS } from '@/services/geminiService';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';
-const BuyCreditsModal = lazy(() => import('./BuyCreditsModal'));
 import { Job } from '@/types';
 
+const BuyCreditsModal = lazy(() => import('./BuyCreditsModal'));
 
 interface ProposalGeneratorModalProps {
   isOpen: boolean;
@@ -125,12 +125,13 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
                     )}
                 </div>
             </Modal>
-            <BuyCreditsModal isOpen={isBuyCreditsModalOpen} onClose={() => setIsBuyCreditsModalOpen(false)} />
             <Suspense fallback={null}>
-                <BuyCreditsModal
-                    isOpen={isBuyCreditsModalOpen}
-                    onClose={() => setIsBuyCreditsModalOpen(false)}
-                />
+                {isBuyCreditsModalOpen && (
+                    <BuyCreditsModal
+                        isOpen={isBuyCreditsModalOpen}
+                        onClose={() => setIsBuyCreditsModalOpen(false)}
+                    />
+                )}
             </Suspense>
         </>
     );

@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent, CardHeader, CardFooter } from '@/components/ui/Card';
@@ -10,9 +10,9 @@ import { InvoiceItem } from '@/types';
 import { PlusIcon, TrashIcon, SparklesIcon, RepeatIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 import { generateItemsForDocument, AI_CREDIT_COSTS } from '@/services/geminiService';
-import BuyCreditsModal from '@/components/modals/BuyCreditsModal';
 import { formatCurrency } from '@/lib/utils';
 
+const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
 
 const CreateInvoicePage: React.FC = () => {
     const { 
@@ -335,7 +335,14 @@ const CreateInvoicePage: React.FC = () => {
                 </div>
             </Modal>
             
-            <BuyCreditsModal isOpen={isBuyCreditsModalOpen} onClose={() => setIsBuyCreditsModalOpen(false)} />
+            <Suspense fallback={null}>
+                {isBuyCreditsModalOpen && (
+                    <BuyCreditsModal
+                        isOpen={isBuyCreditsModalOpen}
+                        onClose={() => setIsBuyCreditsModalOpen(false)}
+                    />
+                )}
+            </Suspense>
         </form>
     );
 };
