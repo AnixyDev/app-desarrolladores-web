@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { useAppStore } from './hooks/useAppStore';
-import { supabaseConfigError } from '@/supabaseClient';
+import { supabaseConfigError } from '@/lib/supabaseClient';
 import AppLayout from '@/components/layout/AppLayout';
 
 // Pages
