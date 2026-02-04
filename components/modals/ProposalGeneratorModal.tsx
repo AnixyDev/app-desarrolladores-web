@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { SparklesIcon, RefreshCwIcon, SendIcon } from '../icons/Icon';
 import { generateProposalText, refineProposalText, AI_CREDIT_COSTS } from '@/services/geminiService';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';
-import BuyCreditsModal from './BuyCreditsModal';
+const BuyCreditsModal = lazy(() => import('./BuyCreditsModal'));
 import { Job } from '@/types';
 
 
@@ -126,6 +126,12 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
                 </div>
             </Modal>
             <BuyCreditsModal isOpen={isBuyCreditsModalOpen} onClose={() => setIsBuyCreditsModalOpen(false)} />
+            <Suspense fallback={null}>
+                <BuyCreditsModal
+                    isOpen={isBuyCreditsModalOpen}
+                    onClose={() => setIsBuyCreditsModalOpen(false)}
+                />
+            </Suspense>
         </>
     );
 };
