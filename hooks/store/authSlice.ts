@@ -45,6 +45,7 @@ export interface AuthSlice {
 
 let isInitializing = false;
 let refreshLock = false;
+let authBootstrapInFlight = false;
 
 export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, get) => ({
     isAuthenticated: false,
@@ -124,6 +125,35 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         if (isInitializing) return () => {};
         isInitializing = true;
 
+        const bootstrapAuth = async () => {
+            if (authBootstrapInFlight) return;
+            authBootstrapInFlight = true;
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    await get().refreshProfile();
+                } else {
+                    get().resetStore();
+                }
+            } catch (error) {
+                console.error('Error during auth bootstrap:', error);
+                set({ isAuthenticated: false, isProfileLoading: false });
+            } finally {
+                authBootstrapInFlight = false;
+            }
+        };
+
+        // Evita quedarse en "Cargando..." si el evento INITIAL_SESSION no llega por cualquier motivo.
+        void bootstrapAuth();
+
+        const loadingSafetyTimeout = window.setTimeout(() => {
+            const { isProfileLoading } = get();
+            if (isProfileLoading) {
+                console.warn('Auth bootstrap timeout reached; releasing loading state.');
+                set({ isProfileLoading: false });
+            }
+        }, 7000);
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session) {
                 if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
@@ -135,6 +165,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         });
 
         return () => {
+            window.clearTimeout(loadingSafetyTimeout);
             subscription.unsubscribe();
             isInitializing = false;
         };
