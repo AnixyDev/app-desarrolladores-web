@@ -129,6 +129,20 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             if (authBootstrapInFlight) return;
             authBootstrapInFlight = true;
             try {
+                const params = new URLSearchParams(window.location.search);
+                const authCode = params.get('code');
+
+                // En OAuth con PKCE, intercambiamos explícitamente el code por sesión
+                // para evitar quedarnos en loading si detectSessionInUrl falla.
+                if (authCode) {
+                    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode);
+                    if (exchangeError) {
+                        console.error('Error exchanging OAuth code for session:', exchangeError);
+                    }
+                    const cleanUrl = `${window.location.origin}${window.location.pathname}${window.location.hash}`;
+                    window.history.replaceState({}, document.title, cleanUrl);
+                }
+
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session?.user) {
                     await get().refreshProfile();
