@@ -89,4 +89,4 @@ const App = () => {
           await supabase.auth.exchangeCodeForSession(url);
         } finally {
           // Limpia la URL (quita ?code=...)
-          window.history.replaceSta
+          window.history.replaceState({}, "", "/");
