@@ -53,7 +53,7 @@ import PortalContractViewPage from "@/pages/portal/PortalContractViewPage";
 /**
  * Guard de rutas protegidas
  */
-const ProtectedRoute = () => {
+const ProtectedRoute: React.FC = () => {
   const { isAuthenticated, isProfileLoading } = useAppStore();
 
   if (isProfileLoading) {
@@ -71,15 +71,18 @@ const ProtectedRoute = () => {
   return <Outlet />;
 };
 
-const App = () => {
+const App: React.FC = () => {
   const initializeAuth = useAppStore((state) => state.initializeAuth);
 
   /**
-   * 👉 FIX OAuth Google / Supabase
-   * Procesa ?code=... cuando Supabase vuelve al /
+   * Flujo correcto:
+   * 1. Procesar ?code= de Supabase
+   * 2. Inicializar el store de auth
    */
   useEffect(() => {
     if (supabaseConfigError) return;
+
+    let cleanup: void | (() => void);
 
     const run = async () => {
       const url = window.location.href;
@@ -87,23 +90,18 @@ const App = () => {
       if (url.includes("code=")) {
         try {
           await supabase.auth.exchangeCodeForSession(url);
+        } catch (e) {
+          console.error("Error exchanging OAuth code", e);
         } finally {
-          // Limpia la URL (quita ?code=...)
+          // Limpia la URL
           window.history.replaceState({}, "", "/");
         }
       }
+
+      cleanup = initializeAuth();
     };
 
     run();
-  }, []);
-
-  /**
-   * Inicialización normal de auth de tu store
-   */
-  useEffect(() => {
-    if (supabaseConfigError) return;
-
-    const cleanup = initializeAuth();
 
     return () => {
       cleanup?.();
