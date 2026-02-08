@@ -186,18 +186,29 @@ const CreateInvoicePage: React.FC = () => {
                 start_date: newInvoice.start_date,
             });
             addToast('Factura recurrente creada. La primera factura se generará ahora.', 'success');
-        } else {
-            addInvoice({
-                 client_id: newInvoice.client_id,
-                 project_id: newInvoice.project_id,
-                 issue_date: newInvoice.issue_date,
-                 due_date: newInvoice.due_date,
-                 items: newInvoice.items,
-                 tax_percent: newInvoice.tax_percent,
-                 irpf_percent: newInvoice.irpf_percent,
-            }, timeEntryIdsToBill);
-            addToast('Factura creada con éxito', 'success');
-        }
+       } else {
+
+    const subtotal_cents = totals.subtotal;
+    const total_cents = Math.round(totals.total);
+
+    const invoice_number = `INV-${Date.now()}`;
+
+    addInvoice({
+        invoice_number,
+        client_id: newInvoice.client_id,
+        project_id: newInvoice.project_id || null,
+        issue_date: newInvoice.issue_date,
+        due_date: newInvoice.due_date,
+        items: newInvoice.items,
+        subtotal_cents,
+        tax_percent: newInvoice.tax_percent,
+        irpf_percent: newInvoice.irpf_percent,
+        total_cents,
+    }, timeEntryIdsToBill);
+
+    addToast('Factura creada con éxito', 'success');
+}
+
         navigate('/invoices');
     };
     
