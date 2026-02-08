@@ -55,6 +55,11 @@ export const generateItemsForDocument = async (
   return callAI("generateItemsForDocument", { prompt, hourlyRate });
 };
 
+export const analyzeProfitability = async (data: any) => {
+  const res = await callAI("analyzeProfitability", { data });
+  return res;
+};
+
 /* ======================
    ❗ FALTABA ESTA
 ====================== */
