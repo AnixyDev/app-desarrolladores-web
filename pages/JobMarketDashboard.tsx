@@ -1,6 +1,6 @@
 
 import React, { useState, lazy, Suspense, useEffect, useMemo } from 'react';
-import { Briefcase, DollarSign, Clock, Zap, Target, Filter, ChevronDown, ChevronUp, TrendingUp, Search, Star, BellRing, X } from 'lucide-react';
+import { DollarSign, Clock, Zap, Target, Filter, ChevronDown, ChevronUp, TrendingUp, Search, Star, X } from 'lucide-react';
 import { Job } from '@/types';
 import Button from '@/components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';

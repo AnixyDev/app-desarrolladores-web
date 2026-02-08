@@ -1,5 +1,4 @@
 import React from 'react';
-import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import { BriefcaseIcon } from '@/components/icons/Icon';
 import EmptyState from '@/components/ui/EmptyState';
 

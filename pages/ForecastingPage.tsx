@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
-import { formatCurrency } from '@/lib/utils';
 import { TrendingUpIcon, SparklesIcon, AlertTriangleIcon, CheckCircleIcon, RefreshCwIcon } from '@/components/icons/Icon';
 import { generateFinancialForecast, AI_CREDIT_COSTS } from '@/services/geminiService'; 
 import BuyCreditsModal from '@/components/modals/BuyCreditsModal';

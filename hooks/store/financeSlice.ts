@@ -1,7 +1,7 @@
 
 import { StateCreator } from 'zustand';
 import { Invoice, Expense, RecurringExpense, Budget, Proposal, Contract, RecurringInvoice } from '../../types.ts';
-import { AppState } from '@/useAppStore';
+import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
 
 export interface FinanceSlice {

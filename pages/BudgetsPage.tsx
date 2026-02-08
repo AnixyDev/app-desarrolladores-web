@@ -4,20 +4,17 @@ import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import Modal from '@/components/ui/Modal';
-import Input from '@/components/ui/Input';
 import StatusChip from '@/components/ui/StatusChip';
 import EmptyState from '@/components/ui/EmptyState';
 
-import { Budget, InvoiceItem } from '@/types';
+import { InvoiceItem } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import {
-  PlusIcon,
-  TrashIcon,
+  
   CheckCircleIcon,
   XCircleIcon,
   MessageSquareIcon,
-  SparklesIcon,
+
 } from '../components/icons/Icon';
 
 import { generateItemsForDocument, AI_CREDIT_COSTS } from '../services/geminiService';

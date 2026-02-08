@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppStore } from '../../hooks/useAppStore';
+import { useAppStore } from '@/hooks/useAppStore';
 import {
   MenuIcon as Menu,
   BellIcon as Bell,

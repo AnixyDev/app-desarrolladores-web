@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 // FIX: Add .tsx extension to Icon import
-import { ZapIcon, LinkIcon, TrashIcon, SettingsIcon, PlusIcon, RefreshCwIcon, CheckCircleIcon, XCircleIcon } from '@/components/icons/Icon.tsx';
+import { ZapIcon, TrashIcon, SettingsIcon, PlusIcon, RefreshCwIcon, CheckCircleIcon, XCircleIcon } from '../components/icons/Icon';
 
 // --- TYPES ---
 interface Integration {

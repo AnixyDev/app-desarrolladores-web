@@ -1,7 +1,7 @@
 
 import { StateCreator } from 'zustand';
 import { Project, NewProject, Task, TimeEntry, NewTimeEntry } from '@/types';
-import { AppState } from '@/useAppStore';
+import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
 
 export interface ProjectSlice {
