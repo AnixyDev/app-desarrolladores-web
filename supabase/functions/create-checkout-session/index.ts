@@ -29,7 +29,14 @@ serve(async (req) => {
     if (!user) throw new Error('No autorizado')
 
     const body = await req.json()
-    const { priceId, mode, amount, productName, metadata } = body
+    const {
+    priceId,
+    mode = 'payment',
+    amount,
+    productName,
+    metadata
+  } = body
+
     
     // Captura dinámica del origen desde los headers
     const origin = req.headers.get('origin') || req.headers.get('referer') || 'https://devfreelancer.app'
@@ -60,7 +67,7 @@ serve(async (req) => {
         price_data: {
             currency: 'eur',
             product_data: { name: productName || 'Pago DevFreelancer' },
-            unit_amount: amount,
+            unit_amount: Math.round(amount),
         },
         quantity: 1,
       }],
