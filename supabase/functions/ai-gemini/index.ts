@@ -53,107 +53,48 @@ serve(async (req) => {
     };
 
     /* ======================
-       ROUTER DE ACCIONES
-    ====================== */
+   ROUTER DE ACCIONES
+====================== */
 
-    let text = "";
+let text = "";
 
-    switch (action) {
-      case "generateTimeEntryDescription": {
-        const { projectName, projectDesc, keywords } = payload;
+switch (action) {
 
-        text = await generate(
-          `Redacta una descripción profesional de una sola frase para un parte de trabajo.
+  case "generateTimeEntryDescription": {
+    const { projectName, projectDesc, keywords } = payload;
+
+    text = await generate(
+      `Redacta una descripción profesional de una sola frase para un parte de trabajo.
 
 Proyecto: ${projectName}
 Contexto: ${projectDesc}
 Tareas realizadas: ${keywords}`
-        );
+    );
 
-        break;
-      }
+    break;
+  }
 
-      case "generateItemsForDocument": {
-        const { prompt, hourlyRate } = payload;
+  case "generateItemsForDocument": {
+    const { prompt, hourlyRate } = payload;
 
-        text = await generate(
-          `Genera un concepto de factura profesional y claro.
+    text = await generate(
+      `Genera un concepto de factura profesional y claro.
 
 Contexto:
 ${prompt}
 
 Tarifa base: ${hourlyRate / 100} €/hora`
-        );
-
-        return new Response(
-          JSON.stringify([
-            {
-              description: text,
-              quantity: 1,
-              price_cents: hourlyRate,
-            },
-          ]),
-          {
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      case "generateFinancialForecast": {
-        const { data } = payload;
-
-        text = await generate(
-          `Analiza los siguientes datos financieros y genera:
-
-- Un resumen
-- Riesgos principales
-- Sugerencias prácticas
-
-Datos:
-${JSON.stringify(data)}`
-        );
-
-        return new Response(
-          JSON.stringify({
-            summary: text,
-            potentialRisks: [],
-            suggestions: [],
-          }),
-          {
-            headers: {
-              ...corsHeaders,
-              "Content-Type": "application/json",
-            },
-          }
-        );
-      }
-
-      default:
-        return new Response(
-          JSON.stringify({ error: "Unknown action" }),
-          { status: 400 }
-        );
-    }
-
-    return new Response(
-      JSON.stringify({ text }),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
     );
-  } catch (e) {
+
     return new Response(
-      JSON.stringify({
-        error: String(e?.message || e),
-      }),
+      JSON.stringify([
+        {
+          description: text,
+          quantity: 1,
+          price_cents: hourlyRate,
+        },
+      ]),
       {
-        status: 500,
         headers: {
           ...corsHeaders,
           "Content-Type": "application/json",
@@ -161,4 +102,80 @@ ${JSON.stringify(data)}`
       }
     );
   }
-});
+
+  case "generateFinancialForecast": {
+    const { data } = payload;
+
+    text = await generate(
+      `Analiza los siguientes datos financieros y genera:
+
+- Un resumen
+- Riesgos principales
+- Sugerencias prácticas
+
+Datos:
+${JSON.stringify(data)}`
+    );
+
+    return new Response(
+      JSON.stringify({
+        summary: text,
+        potentialRisks: [],
+        suggestions: [],
+      }),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  // ✅ NUEVO
+  case "summarizeApplicant": {
+    const { jobDesc, applicantProfile, proposal } = payload;
+
+    text = await generate(
+      `Evalúa este candidato y genera un resumen claro,
+fortalezas y posibles riesgos.
+
+Oferta:
+${jobDesc}
+
+Perfil:
+${applicantProfile}
+
+Propuesta:
+${proposal}`
+    );
+
+    return new Response(
+      JSON.stringify({
+        summary: text,
+      }),
+      {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
+  default:
+    return new Response(
+      JSON.stringify({ error: "Unknown action" }),
+      { status: 400 }
+    );
+}
+
+return new Response(
+  JSON.stringify({ text }),
+  {
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "application/json",
+    },
+  }
+);
