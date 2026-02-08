@@ -60,6 +60,20 @@ export const analyzeProfitability = async (data: any) => {
   return res;
 };
 
+export const summarizeApplicant = async (
+  jobDesc: string,
+  applicantProfile: string,
+  proposal: string
+) => {
+  const res = await callAI("summarizeApplicant", {
+    jobDesc,
+    applicantProfile,
+    proposal,
+  });
+
+  return res;
+};
+
 /* ======================
    ❗ FALTABA ESTA
 ====================== */
