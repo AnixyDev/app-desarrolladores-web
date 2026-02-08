@@ -78,27 +78,30 @@ const App: React.FC = () => {
   useEffect(() => {
     if (supabaseConfigError) return;
 
-    // 👉 Enganchamos el listener primero
-    const cleanup = initializeAuth();
+    let cleanup: void | (() => void);
 
-    const runOAuth = async () => {
-      const url = new URL(window.location.href);
+    const run = async () => {
+      const url = window.location.href;
 
-      if (url.searchParams.get("code")) {
+      // 1. Intercambio de código OAuth si existe
+      if (url.includes("code=")) {
         try {
-          await supabase.auth.exchangeCodeForSession(window.location.href);
+          await supabase.auth.exchangeCodeForSession(url);
         } catch (e) {
           console.error("Error exchanging OAuth code", e);
         } finally {
-          // 👉 limpiamos SOLO los params, mantenemos la ruta real
-          url.searchParams.delete("code");
-          url.searchParams.delete("state");
-          window.history.replaceState({}, "", url.pathname + url.search);
+          window.history.replaceState({}, "", "/");
         }
       }
+
+      // 2. Inicializamos listeners
+      cleanup = initializeAuth();
+
+      // 3. 🔴 FIX real del bug de "Cargando..." al refrescar rutas internas
+      await useAppStore.getState().refreshProfile();
     };
 
-    runOAuth();
+    run();
 
     return () => {
       cleanup?.();
@@ -186,6 +189,7 @@ const App: React.FC = () => {
           </Route>
         </Route>
 
+        {/* fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
