@@ -54,3 +54,21 @@ export const generateItemsForDocument = async (
 ) => {
   return callAI("generateItemsForDocument", { prompt, hourlyRate });
 };
+
+/* ======================
+   ❗ FALTABA ESTA
+====================== */
+
+export const generateProposalText = async (
+  title: string,
+  context: string,
+  profileSummary: string
+): Promise<string> => {
+  const res = await callAI("generateProposalText", {
+    title,
+    context,
+    profileSummary,
+  });
+
+  return res.text;
+};
