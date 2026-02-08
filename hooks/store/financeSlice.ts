@@ -73,7 +73,7 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
     if (r.status === 'fulfilled' && !r.value.error) {
       return r.value.data || [];
     }
-    console.error('Finance fetch error:', r);
+    console.error('Finance fetch error:', r.value?.error);
     return [];
   };
 
