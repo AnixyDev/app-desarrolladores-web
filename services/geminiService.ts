@@ -1,9 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
 
-/**
- * Coste de créditos de cada operación IA
- * (lo usas en la UI)
- */
 export const AI_CREDIT_COSTS = {
   chatMessage: 1,
   analyzeProfitability: 15,
@@ -18,32 +14,43 @@ export const AI_CREDIT_COSTS = {
   summarizeApplicant: 10,
 };
 
-/* ============================================================
-   PREVISIÓN FINANCIERA (ForecastingPage)
-   -> llama a la Edge Function: ai-forecast
-============================================================ */
-
-export interface FinancialAnalysis {
-  summary: string;
-  potentialRisks: string[];
-  suggestions: string[];
-}
-
-export const generateFinancialForecast = async (
-  data: any[]
-): Promise<FinancialAnalysis> => {
-
-  const { data: result, error } = await supabase.functions.invoke(
-    "ai-forecast",
-    {
-      body: { data },
-    }
-  );
+async function callAI(action: string, payload: any) {
+  const { data, error } = await supabase.functions.invoke("ai-gemini", {
+    body: { action, payload },
+  });
 
   if (error) {
-    console.error("AI forecast function error", error);
-    throw error;
+    throw new Error(error.message);
   }
 
-  return result as FinancialAnalysis;
+  return data;
+}
+
+/* ======================
+   API pública frontend
+====================== */
+
+export const generateTimeEntryDescription = async (
+  projectName: string,
+  projectDesc: string,
+  keywords: string
+): Promise<string> => {
+  const res = await callAI("generateTimeEntryDescription", {
+    projectName,
+    projectDesc,
+    keywords,
+  });
+
+  return res.text;
+};
+
+export const generateFinancialForecast = async (data: any[]) => {
+  return callAI("generateFinancialForecast", { data });
+};
+
+export const generateItemsForDocument = async (
+  prompt: string,
+  hourlyRate: number
+) => {
+  return callAI("generateItemsForDocument", { prompt, hourlyRate });
 };
