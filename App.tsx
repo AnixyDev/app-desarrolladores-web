@@ -83,7 +83,6 @@ const App: React.FC = () => {
     const run = async () => {
       const url = window.location.href;
 
-      // 1. Intercambio de código OAuth si existe
       if (url.includes("code=")) {
         try {
           await supabase.auth.exchangeCodeForSession(url);
@@ -94,10 +93,9 @@ const App: React.FC = () => {
         }
       }
 
-      // 2. Inicializamos listeners
       cleanup = initializeAuth();
 
-      // 3. 🔴 FIX real del bug de "Cargando..." al refrescar rutas internas
+      // 👉 fuerza carga inicial tras refresh
       await useAppStore.getState().refreshProfile();
     };
 
@@ -131,6 +129,7 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
+
         {/* PUBLIC */}
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/register" element={<RegisterPage />} />
@@ -171,10 +170,7 @@ const App: React.FC = () => {
             <Route path="/my-applications" element={<MyApplicationsPage />} />
             <Route path="/post-job" element={<JobPostForm />} />
             <Route path="/my-job-posts" element={<MyJobPostsPage />} />
-            <Route
-              path="/my-job-posts/:jobId/applicants"
-              element={<JobApplicantsPage />}
-            />
+            <Route path="/my-job-posts/:jobId/applicants" element={<JobApplicantsPage />} />
             <Route path="/ai-assistant" element={<AIAssistantPage />} />
             <Route path="/team" element={<TeamManagementDashboard />} />
             <Route path="/roles" element={<RoleManagement />} />
@@ -189,8 +185,8 @@ const App: React.FC = () => {
           </Route>
         </Route>
 
-        {/* fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
+
       </Routes>
     </BrowserRouter>
   );
