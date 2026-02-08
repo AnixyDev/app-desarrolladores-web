@@ -50,9 +50,8 @@ import PortalProposalViewPage from "@/pages/portal/PortalProposalViewPage";
 import PortalBudgetViewPage from "@/pages/portal/PortalBudgetViewPage";
 import PortalContractViewPage from "@/pages/portal/PortalContractViewPage";
 
-/**
- * Guard de rutas protegidas
- */
+/* ---------------- Guard ---------------- */
+
 const ProtectedRoute: React.FC = () => {
   const { isAuthenticated, isProfileLoading } = useAppStore();
 
@@ -71,37 +70,35 @@ const ProtectedRoute: React.FC = () => {
   return <Outlet />;
 };
 
+/* ---------------- App ---------------- */
+
 const App: React.FC = () => {
   const initializeAuth = useAppStore((state) => state.initializeAuth);
 
-  /**
-   * Flujo correcto:
-   * 1. Procesar ?code= de Supabase
-   * 2. Inicializar el store de auth
-   */
   useEffect(() => {
     if (supabaseConfigError) return;
 
-    let cleanup: void | (() => void);
+    // 👉 Enganchamos el listener primero
+    const cleanup = initializeAuth();
 
-    const run = async () => {
-      const url = window.location.href;
+    const runOAuth = async () => {
+      const url = new URL(window.location.href);
 
-      if (url.includes("code=")) {
+      if (url.searchParams.get("code")) {
         try {
-          await supabase.auth.exchangeCodeForSession(url);
+          await supabase.auth.exchangeCodeForSession(window.location.href);
         } catch (e) {
           console.error("Error exchanging OAuth code", e);
         } finally {
-          // Limpia la URL
-          window.history.replaceState({}, "", "/");
+          // 👉 limpiamos SOLO los params, mantenemos la ruta real
+          url.searchParams.delete("code");
+          url.searchParams.delete("state");
+          window.history.replaceState({}, "", url.pathname + url.search);
         }
       }
-
-      cleanup = initializeAuth();
     };
 
-    run();
+    runOAuth();
 
     return () => {
       cleanup?.();
@@ -171,7 +168,10 @@ const App: React.FC = () => {
             <Route path="/my-applications" element={<MyApplicationsPage />} />
             <Route path="/post-job" element={<JobPostForm />} />
             <Route path="/my-job-posts" element={<MyJobPostsPage />} />
-            <Route path="/my-job-posts/:jobId/applicants" element={<JobApplicantsPage />} />
+            <Route
+              path="/my-job-posts/:jobId/applicants"
+              element={<JobApplicantsPage />}
+            />
             <Route path="/ai-assistant" element={<AIAssistantPage />} />
             <Route path="/team" element={<TeamManagementDashboard />} />
             <Route path="/roles" element={<RoleManagement />} />
@@ -186,7 +186,6 @@ const App: React.FC = () => {
           </Route>
         </Route>
 
-        {/* fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
