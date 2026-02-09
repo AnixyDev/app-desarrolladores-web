@@ -1,5 +1,9 @@
 import { supabase } from "@/lib/supabaseClient";
 
+/* =========================
+   Costes de créditos
+========================= */
+
 export const AI_CREDIT_COSTS = {
   chatMessage: 1,
   analyzeProfitability: 15,
@@ -14,25 +18,36 @@ export const AI_CREDIT_COSTS = {
   summarizeApplicant: 10,
 };
 
+/* =========================
+   Helper interno
+========================= */
+
 async function callAI(action: string, payload: any) {
   const { data, error } = await supabase.functions.invoke("ai-gemini", {
     body: { action, payload },
   });
 
   if (error) {
-    throw new Error(error.message);
+    throw new Error(error.message || "AI function error");
   }
 
   return data;
 }
 
 /* =========================
-   API pública (frontend)
+   Chat genérico (AIAssistant)
 ========================= */
 
-export const getAIResponse = async (prompt: string) => {
-  return callAI("getAIResponse", { prompt });
+export const getAIResponse = async (
+  prompt: string
+): Promise<{ text: string }> => {
+  const res = await callAI("getAIResponse", { prompt });
+  return { text: res.text };
 };
+
+/* =========================
+   Partes de tiempo
+========================= */
 
 export const generateTimeEntryDescription = async (
   projectName: string,
@@ -48,6 +63,10 @@ export const generateTimeEntryDescription = async (
   return res.text;
 };
 
+/* =========================
+   Presupuestos / documentos
+========================= */
+
 export const generateItemsForDocument = async (
   prompt: string,
   hourlyRate: number
@@ -58,60 +77,100 @@ export const generateItemsForDocument = async (
   });
 };
 
+/* =========================
+   Previsión financiera
+========================= */
+
 export const generateFinancialForecast = async (data: any[]) => {
   return callAI("generateFinancialForecast", { data });
 };
 
+/* =========================
+   Informe de rentabilidad
+========================= */
+
 export const analyzeProfitability = async (data: any) => {
   return callAI("analyzeProfitability", { data });
 };
+
+/* =========================
+   Propuestas
+========================= */
 
 export const generateProposalText = async (
   title: string,
   context: string,
   profileSummary: string
 ): Promise<string> => {
-  const res = await callAI("generateProposalText", {
-    title,
-    context,
-    profileSummary,
+  const res = await callAI("getAIResponse", {
+    prompt: `
+Redacta una propuesta comercial profesional.
+
+Título:
+${title}
+
+Requerimientos:
+${context}
+
+Perfil profesional:
+${profileSummary}
+`,
   });
 
   return res.text;
 };
 
-export const summarizeApplicant = async (
-  jobDesc: string,
-  applicantProfile: string,
-  proposal: string
-) => {
-  return callAI("summarizeApplicant", {
-    jobDesc,
-    applicantProfile,
-    proposal,
+export const refineProposalText = async (
+  originalText: string,
+  tone: "formal" | "conciso" | "entusiasta"
+): Promise<string> => {
+  const res = await callAI("getAIResponse", {
+    prompt: `
+Reescribe el siguiente texto con un tono ${tone}.
+
+Texto original:
+${originalText}
+`,
   });
+
+  return res.text;
 };
 
-/*
-  👉 Esta es la que te falta y rompe el build
-  pages/KnowledgeBase.tsx
-*/
+/* =========================
+   Knowledge base
+========================= */
+
 export const rankArticlesByRelevance = async (
   query: string,
   articles: any[]
 ): Promise<string[]> => {
-
   const res = await callAI("getAIResponse", {
     prompt: `
 Consulta:
 ${query}
 
 Artículos:
-${JSON.stringify(articles)}
+${JSON.stringify(articles.slice(0, 10))}
 
-Devuelve los títulos más relevantes ordenados.
+Devuelve los títulos más relevantes en texto.
 `,
   });
 
   return [res.text];
+};
+
+/* =========================
+   Candidatos
+========================= */
+
+export const summarizeApplicant = async (
+  jobDesc: string,
+  applicantProfile: string,
+  proposal: string
+): Promise<{ summary: string }> => {
+  return callAI("summarizeApplicant", {
+    jobDesc,
+    applicantProfile,
+    proposal,
+  });
 };
