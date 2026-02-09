@@ -30,12 +30,6 @@ async function callAI(action: string, payload: any) {
    API pública frontend
 ====================== */
 
-export const getAIResponse = async (
-  prompt: string
-): Promise<{ text: string }> => {
-  return callAI("getAIResponse", { prompt });
-};
-
 export const generateTimeEntryDescription = async (
   projectName: string,
   projectDesc: string,
@@ -61,8 +55,31 @@ export const generateItemsForDocument = async (
   return callAI("generateItemsForDocument", { prompt, hourlyRate });
 };
 
+/* -------------------------
+   ✅ NUEVO – proposals
+------------------------- */
+
+export const generateProposalText = async (
+  title: string,
+  context: string,
+  profileSummary: string
+): Promise<string> => {
+  const res = await callAI("generateProposalText", {
+    title,
+    context,
+    profileSummary,
+  });
+
+  return res.text;
+};
+
+/* -------------------------
+   ya usado en otras páginas
+------------------------- */
+
 export const analyzeProfitability = async (data: any) => {
-  return callAI("analyzeProfitability", { data });
+  const res = await callAI("analyzeProfitability", { data });
+  return res;
 };
 
 export const summarizeApplicant = async (
@@ -70,9 +87,16 @@ export const summarizeApplicant = async (
   applicantProfile: string,
   proposal: string
 ) => {
-  return callAI("summarizeApplicant", {
+  const res = await callAI("summarizeApplicant", {
     jobDesc,
     applicantProfile,
     proposal,
   });
+
+  return res;
+};
+
+export const getAIResponse = async (prompt: string) => {
+  const res = await callAI("getAIResponse", { prompt });
+  return res;
 };
