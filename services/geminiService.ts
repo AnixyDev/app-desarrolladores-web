@@ -30,6 +30,12 @@ async function callAI(action: string, payload: any) {
    API pública frontend
 ====================== */
 
+export const getAIResponse = async (
+  prompt: string
+): Promise<{ text: string }> => {
+  return callAI("getAIResponse", { prompt });
+};
+
 export const generateTimeEntryDescription = async (
   projectName: string,
   projectDesc: string,
@@ -56,8 +62,7 @@ export const generateItemsForDocument = async (
 };
 
 export const analyzeProfitability = async (data: any) => {
-  const res = await callAI("analyzeProfitability", { data });
-  return res;
+  return callAI("analyzeProfitability", { data });
 };
 
 export const summarizeApplicant = async (
@@ -65,29 +70,9 @@ export const summarizeApplicant = async (
   applicantProfile: string,
   proposal: string
 ) => {
-  const res = await callAI("summarizeApplicant", {
+  return callAI("summarizeApplicant", {
     jobDesc,
     applicantProfile,
     proposal,
   });
-
-  return res;
-};
-
-/* ======================
-   ❗ FALTABA ESTA
-====================== */
-
-export const generateProposalText = async (
-  title: string,
-  context: string,
-  profileSummary: string
-): Promise<string> => {
-  const res = await callAI("generateProposalText", {
-    title,
-    context,
-    profileSummary,
-  });
-
-  return res.text;
 };
