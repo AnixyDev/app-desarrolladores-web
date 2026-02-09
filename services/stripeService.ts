@@ -1,4 +1,4 @@
-// src/services/stripeService.ts
+//services/stripeService.ts
 
 import { supabase, getURL } from '@/lib/supabaseClient';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
