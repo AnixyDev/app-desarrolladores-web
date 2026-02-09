@@ -26,9 +26,13 @@ async function callAI(action: string, payload: any) {
   return data;
 }
 
-/* ======================
-   API pública frontend
-====================== */
+/* =========================
+   API pública (frontend)
+========================= */
+
+export const getAIResponse = async (prompt: string) => {
+  return callAI("getAIResponse", { prompt });
+};
 
 export const generateTimeEntryDescription = async (
   projectName: string,
@@ -44,20 +48,23 @@ export const generateTimeEntryDescription = async (
   return res.text;
 };
 
-export const generateFinancialForecast = async (data: any[]) => {
-  return callAI("generateFinancialForecast", { data });
-};
-
 export const generateItemsForDocument = async (
   prompt: string,
   hourlyRate: number
 ) => {
-  return callAI("generateItemsForDocument", { prompt, hourlyRate });
+  return callAI("generateItemsForDocument", {
+    prompt,
+    hourlyRate,
+  });
 };
 
-/* -------------------------
-   ✅ NUEVO – proposals
-------------------------- */
+export const generateFinancialForecast = async (data: any[]) => {
+  return callAI("generateFinancialForecast", { data });
+};
+
+export const analyzeProfitability = async (data: any) => {
+  return callAI("analyzeProfitability", { data });
+};
 
 export const generateProposalText = async (
   title: string,
@@ -73,30 +80,38 @@ export const generateProposalText = async (
   return res.text;
 };
 
-/* -------------------------
-   ya usado en otras páginas
-------------------------- */
-
-export const analyzeProfitability = async (data: any) => {
-  const res = await callAI("analyzeProfitability", { data });
-  return res;
-};
-
 export const summarizeApplicant = async (
   jobDesc: string,
   applicantProfile: string,
   proposal: string
 ) => {
-  const res = await callAI("summarizeApplicant", {
+  return callAI("summarizeApplicant", {
     jobDesc,
     applicantProfile,
     proposal,
   });
-
-  return res;
 };
 
-export const getAIResponse = async (prompt: string) => {
-  const res = await callAI("getAIResponse", { prompt });
-  return res;
+/*
+  👉 Esta es la que te falta y rompe el build
+  pages/KnowledgeBase.tsx
+*/
+export const rankArticlesByRelevance = async (
+  query: string,
+  articles: any[]
+): Promise<string[]> => {
+
+  const res = await callAI("getAIResponse", {
+    prompt: `
+Consulta:
+${query}
+
+Artículos:
+${JSON.stringify(articles)}
+
+Devuelve los títulos más relevantes ordenados.
+`,
+  });
+
+  return [res.text];
 };
