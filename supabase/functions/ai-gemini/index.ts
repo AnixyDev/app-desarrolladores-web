@@ -15,7 +15,6 @@ serve(async (req) => {
 
   try {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-
     if (!GEMINI_API_KEY) {
       throw new Error("Missing GEMINI_API_KEY");
     }
@@ -53,92 +52,141 @@ serve(async (req) => {
     };
 
     /* ======================
-   ROUTER DE ACCIONES
-====================== */
+       ROUTER DE ACCIONES
+    ====================== */
 
-let text = "";
+    let text = "";
 
-switch (action) {
+    switch (action) {
 
-  case "generateTimeEntryDescription": {
-    const { projectName, projectDesc, keywords } = payload;
+      // ------------------------------------------------
+      // Chat genérico (AIAssistantPage)
+      // ------------------------------------------------
+      case "getAIResponse": {
+        const { prompt } = payload;
 
-    text = await generate(
-      `Redacta una descripción profesional de una sola frase para un parte de trabajo.
+        text = await generate(prompt);
+        break;
+      }
+
+      // ------------------------------------------------
+      // Partes de tiempo
+      // ------------------------------------------------
+      case "generateTimeEntryDescription": {
+        const { projectName, projectDesc, keywords } = payload;
+
+        text = await generate(
+          `Redacta una descripción profesional de una sola frase para un parte de trabajo.
 
 Proyecto: ${projectName}
 Contexto: ${projectDesc}
 Tareas realizadas: ${keywords}`
-    );
+        );
 
-    break;
-  }
+        break;
+      }
 
-  case "generateItemsForDocument": {
-    const { prompt, hourlyRate } = payload;
+      // ------------------------------------------------
+      // Presupuestos / documentos
+      // ------------------------------------------------
+      case "generateItemsForDocument": {
+        const { prompt, hourlyRate } = payload;
 
-    text = await generate(
-      `Genera un concepto de factura profesional y claro.
+        text = await generate(
+          `Genera un concepto de factura profesional y claro.
 
 Contexto:
 ${prompt}
 
 Tarifa base: ${hourlyRate / 100} €/hora`
-    );
+        );
 
-    return new Response(
-      JSON.stringify([
-        {
-          description: text,
-          quantity: 1,
-          price_cents: hourlyRate,
-        },
-      ]),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+        return new Response(
+          JSON.stringify([
+            {
+              description: text,
+              quantity: 1,
+              price_cents: hourlyRate,
+            },
+          ]),
+          {
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
       }
-    );
-  }
 
-  case "generateFinancialForecast": {
-    const { data } = payload;
+      // ------------------------------------------------
+      // Previsión financiera
+      // ------------------------------------------------
+      case "generateFinancialForecast": {
+        const { data } = payload;
 
-    text = await generate(
-      `Analiza los siguientes datos financieros y genera:
+        text = await generate(
+          `Analiza los siguientes datos financieros y genera:
 
-- Un resumen
+- Un resumen claro
 - Riesgos principales
 - Sugerencias prácticas
 
 Datos:
 ${JSON.stringify(data)}`
-    );
+        );
 
-    return new Response(
-      JSON.stringify({
-        summary: text,
-        potentialRisks: [],
-        suggestions: [],
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
+        return new Response(
+          JSON.stringify({
+            summary: text,
+            potentialRisks: [],
+            suggestions: [],
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
       }
-    );
-  }
 
-  // ✅ NUEVO
-  case "summarizeApplicant": {
-    const { jobDesc, applicantProfile, proposal } = payload;
+      // ------------------------------------------------
+      // Informe de rentabilidad
+      // ------------------------------------------------
+      case "analyzeProfitability": {
+        const { data } = payload;
 
-    text = await generate(
-      `Evalúa este candidato y genera un resumen claro,
-fortalezas y posibles riesgos.
+        text = await generate(
+          `Analiza la rentabilidad del siguiente conjunto de datos y genera un informe claro para un freelance:
+
+${JSON.stringify(data)}`
+        );
+
+        return new Response(
+          JSON.stringify({
+            summary: text,
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      // ------------------------------------------------
+      // Candidatos
+      // ------------------------------------------------
+      case "summarizeApplicant": {
+        const { jobDesc, applicantProfile, proposal } = payload;
+
+        text = await generate(
+          `Evalúa este candidato y genera:
+
+- Un resumen
+- Fortalezas
+- Riesgos
 
 Oferta:
 ${jobDesc}
@@ -148,12 +196,36 @@ ${applicantProfile}
 
 Propuesta:
 ${proposal}`
-    );
+        );
+
+        return new Response(
+          JSON.stringify({
+            summary: text,
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      default:
+        return new Response(
+          JSON.stringify({ error: "Unknown action" }),
+          {
+            status: 400,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+    }
 
     return new Response(
-      JSON.stringify({
-        summary: text,
-      }),
+      JSON.stringify({ text }),
       {
         headers: {
           ...corsHeaders,
@@ -161,21 +233,19 @@ ${proposal}`
         },
       }
     );
-  }
 
-  default:
+  } catch (e) {
     return new Response(
-      JSON.stringify({ error: "Unknown action" }),
-      { status: 400 }
+      JSON.stringify({
+        error: String((e as any)?.message || e),
+      }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+        },
+      }
     );
-}
-
-return new Response(
-  JSON.stringify({ text }),
-  {
-    headers: {
-      ...corsHeaders,
-      "Content-Type": "application/json",
-    },
   }
-);
+});
