@@ -6,6 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 serve(async (req) => {
@@ -15,6 +16,7 @@ serve(async (req) => {
 
   try {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+
     if (!GEMINI_API_KEY) {
       throw new Error("Missing GEMINI_API_KEY");
     }
@@ -25,18 +27,19 @@ serve(async (req) => {
       {
         global: {
           headers: {
-            Authorization: req.headers.get("Authorization")!,
+            Authorization: req.headers.get("Authorization") ?? "",
           },
         },
       }
     );
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      return new Response("Unauthorized", { status: 401 });
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: corsHeaders }
+      );
     }
 
     const { action, payload } = await req.json();
@@ -59,9 +62,9 @@ serve(async (req) => {
 
     switch (action) {
 
-      // ------------------------------------------------
-      // Chat genérico (AIAssistantPage)
-      // ------------------------------------------------
+      /* ---------------------------
+         Chat genérico
+      --------------------------- */
       case "getAIResponse": {
         const { prompt } = payload;
 
@@ -69,9 +72,9 @@ serve(async (req) => {
         break;
       }
 
-      // ------------------------------------------------
-      // Partes de tiempo
-      // ------------------------------------------------
+      /* ---------------------------
+         Partes de tiempo
+      --------------------------- */
       case "generateTimeEntryDescription": {
         const { projectName, projectDesc, keywords } = payload;
 
@@ -86,9 +89,9 @@ Tareas realizadas: ${keywords}`
         break;
       }
 
-      // ------------------------------------------------
-      // Presupuestos / documentos
-      // ------------------------------------------------
+      /* ---------------------------
+         Presupuestos / documentos
+      --------------------------- */
       case "generateItemsForDocument": {
         const { prompt, hourlyRate } = payload;
 
@@ -118,9 +121,9 @@ Tarifa base: ${hourlyRate / 100} €/hora`
         );
       }
 
-      // ------------------------------------------------
-      // Previsión financiera
-      // ------------------------------------------------
+      /* ---------------------------
+         Previsión financiera
+      --------------------------- */
       case "generateFinancialForecast": {
         const { data } = payload;
 
@@ -150,9 +153,9 @@ ${JSON.stringify(data)}`
         );
       }
 
-      // ------------------------------------------------
-      // Informe de rentabilidad
-      // ------------------------------------------------
+      /* ---------------------------
+         Rentabilidad
+      --------------------------- */
       case "analyzeProfitability": {
         const { data } = payload;
 
@@ -175,9 +178,31 @@ ${JSON.stringify(data)}`
         );
       }
 
-      // ------------------------------------------------
-      // Candidatos
-      // ------------------------------------------------
+      /* ---------------------------
+         Propuestas comerciales
+      --------------------------- */
+      case "generateProposalText": {
+        const { title, context, profileSummary } = payload;
+
+        text = await generate(
+          `Redacta una propuesta comercial profesional y persuasiva.
+
+Título:
+${title}
+
+Requisitos del cliente:
+${context}
+
+Perfil del profesional:
+${profileSummary}`
+        );
+
+        break;
+      }
+
+      /* ---------------------------
+         Candidatos
+      --------------------------- */
       case "summarizeApplicant": {
         const { jobDesc, applicantProfile, proposal } = payload;
 
@@ -223,6 +248,8 @@ ${proposal}`
           }
         );
     }
+
+    /* Respuesta estándar { text } */
 
     return new Response(
       JSON.stringify({ text }),
