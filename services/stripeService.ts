@@ -1,6 +1,10 @@
-import { supabase, getURL } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient'; // Quita el getURL de aquí
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 
+// Define getURL aquí mismo para evitar el error de importación
+const getURL = () => {
+  return window.location.origin;
+};
 /* -------------------------
    Helpers de entorno
 -------------------------- */
