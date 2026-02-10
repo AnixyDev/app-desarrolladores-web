@@ -5,15 +5,14 @@ import { useAppStore } from "./hooks/useAppStore";
 // Layouts
 import AppLayout from "./components/layout/AppLayout";
 
-// Páginas Públicas (Verificadas en tu captura)
+// Páginas Públicas
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/auth/RegisterPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfService from "./pages/TermsOfService";
-// Nota: Si RegisterPage está dentro de una subcarpeta auth, asegúrate que la ruta sea esta:
-import RegisterPage from "./pages/auth/RegisterPage"; 
 
-// Páginas Privadas (Nombres exactos de tu imagen)
+// Páginas Privadas (Sincronizadas con tu lista de archivos /pages)
 import DashboardPage from "./pages/DashboardPage";
 import ClientsPage from "./pages/ClientsPage";
 import ProjectsPage from "./pages/ProjectsPage";
@@ -23,15 +22,31 @@ import TimeTrackingPage from "./pages/TimeTrackingPage";
 import ExpensesPage from "./pages/ExpensesPage";       
 import AIAssistantPage from "./pages/AIAssistantPage";
 import TaxLedgerPage from "./pages/TaxLedgerPage";
+import BudgetsPage from "./pages/BudgetsPage";
+import ProposalsPage from "./pages/ProposalsPage";
+import ContractsPage from "./pages/ContractsPage";
+import ReportsPage from "./pages/ReportsPage";
+import ProfitabilityReportPage from "./pages/ProfitabilityReportPage";
+import ForecastingPage from "./pages/ForecastingPage";
+import JobMarketDashboard from "./pages/JobMarketDashboard";
+import SavedJobsPage from "./pages/SavedJobsPage";
+import MyApplicationsPage from "./pages/MyApplicationsPage";
+import JobPostForm from "./pages/JobPostForm";
+import MyJobPostsPage from "./pages/MyJobPostsPage";
+import KnowledgeBase from "./pages/KnowledgeBase";
+import PublicProfilePage from "./pages/PublicProfilePage";
+import BillingPage from "./pages/BillingPage";
+import AffiliateProgramPage from "./pages/AffiliateProgramPage";
+import IntegrationsManager from "./pages/IntegrationsManager";
 
-/* --- Guardián de Rutas --- */
 const ProtectedRoute = () => {
   const { isAuthenticated, isProfileLoading } = useAppStore();
-
+  
   if (isProfileLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary-500"></div>
+      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary-500 mb-4"></div>
+        <span className="text-primary-500 font-black italic animate-pulse">DEVFREELANCER</span>
       </div>
     );
   }
@@ -39,53 +54,55 @@ const ProtectedRoute = () => {
   return isAuthenticated ? <Outlet /> : <Navigate to="/auth/login" replace />;
 };
 
-/* --- Componente Principal --- */
 const App: React.FC = () => {
   const { isAuthenticated, initializeAuth } = useAppStore();
 
   useEffect(() => {
     const cleanup = initializeAuth();
-    return () => {
-      if (typeof cleanup === 'function') cleanup();
-    };
+    return () => { if (typeof cleanup === 'function') cleanup(); };
   }, [initializeAuth]);
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* RUTAS PÚBLICAS */}
-        <Route 
-          path="/" 
-          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} 
-        />
-        <Route 
-          path="/auth/login" 
-          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
-        />
-        <Route 
-          path="/auth/register" 
-          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} 
-        />
-        
+        {/* Lógica de inicio: Si está logueado, va al Dashboard. Si no, a la Landing */}
+        <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
+        <Route path="/auth/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
+        <Route path="/auth/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsOfService />} />
 
-        {/* RUTAS PROTEGIDAS (Panel de Control) */}
+        {/* RUTAS PROTEGIDAS (Sincronizadas con constants.ts) */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/time-tracking" element={<TimeTrackingPage />} />
             <Route path="/invoices" element={<InvoicesPage />} />
-            <Route path="/tasks" element={<TimeTrackingPage />} />
-            <Route path="/finances" element={<ExpensesPage />} />
-            <Route path="/taxes" element={<TaxLedgerPage />} />
+            <Route path="/expenses" element={<ExpensesPage />} />
+            <Route path="/tax-ledger" element={<TaxLedgerPage />} />
+            <Route path="/budgets" element={<BudgetsPage />} />
+            <Route path="/proposals" element={<ProposalsPage />} />
+            <Route path="/contracts" element={<ContractsPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/reports/profitability" element={<ProfitabilityReportPage />} />
+            <Route path="/forecasting" element={<ForecastingPage />} />
+            <Route path="/job-market" element={<JobMarketDashboard />} />
+            <Route path="/saved-jobs" element={<SavedJobsPage />} />
+            <Route path="/my-applications" element={<MyApplicationsPage />} />
+            <Route path="/post-job" element={<JobPostForm />} />
+            <Route path="/my-job-posts" element={<MyJobPostsPage />} />
             <Route path="/ai-assistant" element={<AIAssistantPage />} />
+            <Route path="/knowledge-base" element={<KnowledgeBase />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/public-profile" element={<PublicProfilePage />} />
+            <Route path="/billing" element={<BillingPage />} />
+            <Route path="/affiliate" element={<AffiliateProgramPage />} />
+            <Route path="/integrations" element={<IntegrationsManager />} />
           </Route>
         </Route>
 
-        {/* Redirección automática si la ruta no existe */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

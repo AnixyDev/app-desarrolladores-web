@@ -21,21 +21,20 @@ export type SidebarGroup = {
 export type SidebarItem = SidebarLink | SidebarGroup;
 
 export const SIDEBAR_STRUCTURE: SidebarItem[] = [
-  // --- CORE ---
-  { type: 'link', href: '/', label: 'Dashboard', icon: 'LayoutDashboard' },
+  { type: 'link', href: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard' }, // Corregido
   { type: 'link', href: '/clients', label: 'Clientes', icon: 'Users' },
   { type: 'link', href: '/projects', label: 'Proyectos', icon: 'BriefcaseIcon' },
   { type: 'link', href: '/time-tracking', label: 'Time Tracking', icon: 'ClockIcon' },
-
-  // --- SALES ---
+  
+  // Finanzas (Sincronizado con App.tsx)
   {
     type: 'group',
-    label: 'Ventas',
-    icon: 'ShoppingBag',
+    label: 'Finanzas',
+    icon: 'DollarSignIcon',
     items: [
-      { href: '/budgets', label: 'Presupuestos', icon: 'MessageSquareIcon' },
-      { href: '/proposals', label: 'Propuestas', icon: 'FileSignatureIcon' },
-      { href: '/contracts', label: 'Contratos', icon: 'BookIcon' },
+      { href: '/invoices', label: 'Facturas', icon: 'FileTextIcon' },
+      { href: '/expenses', label: 'Gastos', icon: 'BarChart2' },
+      { href: '/tax-ledger', label: 'Libro Fiscal', icon: 'BookIcon' },
     ],
   },
 
