@@ -78,8 +78,8 @@ export const STRIPE_ITEMS = {
   },
   // Plan Anual: 295€ (Cuota un año)
   teamsPlanYearly: {
-    priceId: 'price_1SOggV8oC5awQy15Ppz7bUj0',
-    mode: 'subscription' as const,
+    priceId: 'price_1SOggV8oC5awQy15Ppz7bUj0', 
+    mode: 'payment' as const, // <--- CAMBIA 'subscription' por 'payment'
     name: 'Plan de equipos (Anual)',
   },
   aiCredits100: {
