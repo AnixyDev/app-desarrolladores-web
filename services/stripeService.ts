@@ -1,5 +1,3 @@
-//services/stripeService.ts
-
 import { supabase, getURL } from '@/lib/supabaseClient';
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 
@@ -17,7 +15,6 @@ const getEnv = (key: string): string => {
   return '';
 };
 
-// Soporte dual Vite / Next-style
 const STRIPE_PUBLIC_KEY =
   getEnv('VITE_STRIPE_PUBLIC_KEY') ||
   getEnv('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY');
@@ -70,16 +67,16 @@ export const STRIPE_ITEMS = {
     mode: 'subscription' as const,
     name: 'Pro Plan',
   },
-  // Plan Mensual: 35,95€
+  // Plan Mensual: 35,95€ (Es recurrente en Stripe)
   teamsPlan: {
     priceId: 'price_1SOggV8oC5awQy15YW1wAgcg',
     mode: 'subscription' as const,
     name: 'Plan de equipos (Mensual)',
   },
-  // Plan Anual: 295€ (Cuota un año)
+  // Plan Anual: 295€ (Es Pago Único en Stripe, por eso usamos mode: 'payment')
   teamsPlanYearly: {
     priceId: 'price_1SOggV8oC5awQy15Ppz7bUj0', 
-    mode: 'payment' as const, // <--- CAMBIA 'subscription' por 'payment'
+    mode: 'payment' as const, 
     name: 'Plan de equipos (Anual)',
   },
   aiCredits100: {
@@ -110,7 +107,7 @@ export const STRIPE_ITEMS = {
     mode: 'payment' as const,
     name: 'Pago de Factura',
   },
-};;
+};
 
 export type StripeItemKey = keyof typeof STRIPE_ITEMS;
 
@@ -125,7 +122,8 @@ export const redirectToCheckout = async (
   const item = STRIPE_ITEMS[itemKey];
   if (!item) throw new Error('El artículo de compra no es válido.');
 
-  const currentUrl = getURL();
+  // TRUCO DE LIMPIEZA: Eliminamos la barra final de la URL si existe
+  const currentUrl = getURL().replace(/\/$/, "");
 
   const bodyPayload = {
     priceId: item.priceId || undefined,
@@ -200,12 +198,13 @@ export const createPaymentIntent = async (
 -------------------------- */
 
 export const redirectToCustomerPortal = async () => {
-  const currentUrl = getURL();
+  // Limpiamos también aquí por consistencia
+  const currentUrl = getURL().replace(/\/$/, "");
 
   const { data, error } = await supabase.functions.invoke(
     'create-portal-session',
     {
-      body: { return_url: `${currentUrl}billing` },
+      body: { return_url: `${currentUrl}/billing` },
     }
   );
 
