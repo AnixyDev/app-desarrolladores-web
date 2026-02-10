@@ -3,7 +3,6 @@ import { supabase } from "@/lib/supabaseClient";
 /* =========================
    Costes de créditos
 ========================= */
-
 export const AI_CREDIT_COSTS = {
   chatMessage: 1,
   analyzeProfitability: 15,
@@ -19,15 +18,16 @@ export const AI_CREDIT_COSTS = {
 };
 
 /* =========================
-   Helper interno
+   Helper interno (CORREGIDO EL NOMBRE)
 ========================= */
-
 async function callAI(action: string, payload: any) {
-  const { data, error } = await supabase.functions.invoke("ai-gemini", {
+  // Cambiamos "ai-gemini" por "bright-task" que es tu función real
+  const { data, error } = await supabase.functions.invoke("bright-task", {
     body: { action, payload },
   });
 
   if (error) {
+    console.error("Error invoking bright-task:", error);
     throw new Error(error.message || "AI function error");
   }
 
@@ -35,15 +35,18 @@ async function callAI(action: string, payload: any) {
 }
 
 /* =========================
-   Chat genérico (AIAssistant)
+   Chat genérico (CORREGIDO PARA HISTORIAL)
 ========================= */
-
 export const getAIResponse = async (
-  prompt: string
+  prompt: string,
+  history: any[] = [] // Ahora acepta el historial del chat
 ): Promise<{ text: string }> => {
-  const res = await callAI("getAIResponse", { prompt });
+  const res = await callAI("getAIResponse", { prompt, history });
   return { text: res.text };
 };
+
+// ... resto de funciones (generateTimeEntryDescription, etc.) se mantienen igual 
+// ya que todas usan callAI que ahora apunta a bright-task.
 
 /* =========================
    Partes de tiempo
