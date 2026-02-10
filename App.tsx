@@ -12,7 +12,7 @@ import RegisterPage from "./pages/auth/RegisterPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfService from "./pages/TermsOfService";
 
-// Páginas Privadas (Sincronizadas con tu lista de archivos /pages)
+// Páginas Privadas (Asegúrate de que los nombres coincidan con tus archivos en /pages)
 import DashboardPage from "./pages/DashboardPage";
 import ClientsPage from "./pages/ClientsPage";
 import ProjectsPage from "./pages/ProjectsPage";
@@ -46,7 +46,7 @@ const ProtectedRoute = () => {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary-500 mb-4"></div>
-        <span className="text-primary-500 font-black italic animate-pulse">DEVFREELANCER</span>
+        <span className="text-primary-500 font-black italic">CARGANDO...</span>
       </div>
     );
   }
@@ -65,14 +65,14 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Lógica de inicio: Si está logueado, va al Dashboard. Si no, a la Landing */}
+        {/* Rutas Públicas */}
         <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/auth/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
         <Route path="/auth/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsOfService />} />
 
-        {/* RUTAS PROTEGIDAS (Sincronizadas con constants.ts) */}
+        {/* RUTAS PROTEGIDAS */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -103,10 +103,9 @@ const App: React.FC = () => {
           </Route>
         </Route>
 
-        <Route 
-  path="/auth/login" 
-  element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
-/>
+        {/* Catch-all para errores 404 */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 };
