@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom'; // Añadido useNavigate
 import { SIDEBAR_STRUCTURE } from '@/constants';
 import { Logo } from '../icons/Logo';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown, X, LogOut } from 'lucide-react'; // Añadido LogOut
 import * as Icons from '../icons/Icon';
+import { useAppStore } from '@/hooks/useAppStore'; // Añadido para gestionar la sesión
+import { supabase } from '@/lib/supabaseClient'; // Añadido para el signout
 
 interface SidebarProps {
   isOpen: boolean;
@@ -18,6 +20,8 @@ const DynamicIcon = ({ name, className }: { name: string; className: string }) =
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const logoutAction = useAppStore(state => state.logout); // Obtenemos la función logout del store
 
   const handleGroupClick = (label: string) => {
     setOpenGroup(openGroup === label ? null : label);
@@ -25,6 +29,27 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   const handleLinkClick = () => {
     if (window.innerWidth < 768) onClose();
+  };
+
+  // FUNCIÓN DE CIERRE DE SESIÓN REFORZADA
+  const handleLogout = async () => {
+    try {
+      // 1. Intentar cerrar sesión en Supabase
+      await supabase.auth.signOut();
+      
+      // 2. Limpiar estado local (Zustand)
+      if (logoutAction) logoutAction();
+
+      // 3. Limpiar almacenamiento local por seguridad
+      localStorage.clear();
+      
+      // 4. Redirigir al login
+      navigate('/auth/login');
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      // Forzar salida incluso con error
+      window.location.href = '/auth/login';
+    }
   };
 
   const isExternalLink = (url: string) =>
@@ -161,13 +186,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           })}
         </nav>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-gray-800">
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-primary-900/20 to-purple-900/20 border border-primary-500/10">
+        {/* Footer con Botón de Logout */}
+        <div className="p-4 border-t border-gray-800 space-y-4">
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center px-4 py-3 text-sm font-semibold text-red-400 hover:bg-red-500/10 rounded-xl transition group"
+          >
+            <LogOut className="w-5 h-5 mr-3 group-hover:scale-110 transition-transform" />
+            Cerrar Sesión
+          </button>
+
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-primary-900/10 to-purple-900/10 border border-primary-500/10">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-[10px] font-bold uppercase text-gray-300">
-                Sistema Operativo
+              <span className="text-[10px] font-bold uppercase text-gray-400">
+                Sistema Operativo V1.0
               </span>
             </div>
           </div>
