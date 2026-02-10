@@ -120,25 +120,33 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         }
     },
 
-    initializeAuth: () => {
-        if (isInitializing) return () => {};
-        isInitializing = true;
+ // Reemplaza el contenido de initializeAuth en tu archivo authSlice.ts
+initializeAuth: () => {
+    if (isInitializing) return () => {};
+    isInitializing = true;
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-            if (session) {
-                if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
-                    await get().refreshProfile();
-                }
-            } else {
-                get().resetStore();
+    // Captura la sesión inicial inmediatamente
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) get().refreshProfile();
+        else set({ isProfileLoading: false });
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (session) {
+            // Esto asegura que el token se actualice antes de llamar a Stripe/IA
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+                await get().refreshProfile();
             }
-        });
+        } else {
+            get().resetStore();
+        }
+    });
 
-        return () => {
-            subscription.unsubscribe();
-            isInitializing = false;
-        };
-    },
+    return () => {
+        subscription.unsubscribe();
+        isInitializing = false;
+    };
+},
 
     login: async (email, password) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });

@@ -41,16 +41,11 @@ export const getStripe = () => {
     if (STRIPE_PUBLIC_KEY.startsWith('pk_test')) {
       if (isProduction) {
         console.error(
-          '%c⚠️ ALERTA CRÍTICA: Se está utilizando una clave de PRUEBAS en PRODUCCIÓN. Los pagos reales no funcionarán.',
+          '%c⚠️ ALERTA CRÍTICA: Se está utilizando una clave de PRUEBAS en PRODUCCIÓN.',
           'color: white; background: red; font-size: 16px; font-weight: bold; padding: 8px;'
         );
-      } else {
-        console.info('Stripe cargado en modo TEST.');
       }
-    } else if (STRIPE_PUBLIC_KEY.startsWith('pk_live')) {
-      console.info('Stripe cargado en modo PRODUCCIÓN (LIVE).');
     }
-
     stripePromise = loadStripe(STRIPE_PUBLIC_KEY);
   }
 
@@ -58,7 +53,7 @@ export const getStripe = () => {
 };
 
 /* -------------------------
-   Catálogo de productos CORREGIDO
+   Catálogo de productos
 -------------------------- */
 
 export const STRIPE_ITEMS = {
@@ -67,13 +62,11 @@ export const STRIPE_ITEMS = {
     mode: 'subscription' as const,
     name: 'Pro Plan',
   },
-  // Plan Mensual: 35,95€ (Es recurrente en Stripe)
   teamsPlan: {
     priceId: 'price_1SOggV8oC5awQy15YW1wAgcg',
     mode: 'subscription' as const,
     name: 'Plan de equipos (Mensual)',
   },
-  // Plan Anual: 295€ (Es Pago Único en Stripe, por eso usamos mode: 'payment')
   teamsPlanYearly: {
     priceId: 'price_1SOggV8oC5awQy15Ppz7bUj0', 
     mode: 'payment' as const, 
@@ -112,7 +105,7 @@ export const STRIPE_ITEMS = {
 export type StripeItemKey = keyof typeof STRIPE_ITEMS;
 
 /* -------------------------
-   Checkout
+   Checkout (CORREGIDO)
 -------------------------- */
 
 export const redirectToCheckout = async (
@@ -122,20 +115,13 @@ export const redirectToCheckout = async (
   const item = STRIPE_ITEMS[itemKey];
   if (!item) throw new Error('El artículo de compra no es válido.');
 
-  // TRUCO DE LIMPIEZA: Eliminamos la barra final de la URL si existe
   const currentUrl = getURL().replace(/\/$/, "");
 
   const bodyPayload = {
     priceId: item.priceId || undefined,
     mode: item.mode,
-    amount:
-      itemKey === 'invoicePayment'
-        ? extraParams.amount_cents
-        : undefined,
-    productName:
-      itemKey === 'invoicePayment'
-        ? `Factura ${extraParams.invoice_number}`
-        : undefined,
+    amount: itemKey === 'invoicePayment' ? extraParams.amount_cents : undefined,
+    productName: itemKey === 'invoicePayment' ? `Factura ${extraParams.invoice_number}` : undefined,
     metadata: {
       ...extraParams,
       itemKey,
@@ -143,20 +129,27 @@ export const redirectToCheckout = async (
     },
   };
 
+  // Obtenemos sesión explícita para asegurar que el token viaja
+  await supabase.auth.getSession();
+
   const { data, error } = await supabase.functions.invoke(
     'create-checkout-session',
     {
       body: bodyPayload,
+      headers: {
+        'Content-Type': 'application/json'
+      }
     }
   );
 
   if (error) {
     console.error('Supabase Function Invoke Error:', error);
-    throw new Error('No se pudo iniciar la sesión de pago segura.');
+    throw new Error('Sesión de pago fallida. Revisa tu conexión o vuelve a iniciar sesión.');
   }
 
   if (data?.url) {
-    window.location.assign(data.url);
+    // window.location.href es más fiable para evitar bloqueos de popups y CORS
+    window.location.href = data.url;
   } else {
     throw new Error('La pasarela de pago no devolvió una URL válida.');
   }
@@ -182,13 +175,11 @@ export const createPaymentIntent = async (
         description: `Pago ${itemKey}`,
         metadata: { ...metadata, userId, itemKey },
       },
+      headers: { 'Content-Type': 'application/json' }
     }
   );
 
-  if (error)
-    throw new Error(
-      error.message || 'Error al procesar el intento de pago.'
-    );
+  if (error) throw new Error(error.message || 'Error al procesar el intento de pago.');
 
   return data.paymentIntentClientSecret;
 };
@@ -198,20 +189,19 @@ export const createPaymentIntent = async (
 -------------------------- */
 
 export const redirectToCustomerPortal = async () => {
-  // Limpiamos también aquí por consistencia
   const currentUrl = getURL().replace(/\/$/, "");
 
   const { data, error } = await supabase.functions.invoke(
     'create-portal-session',
     {
       body: { return_url: `${currentUrl}/billing` },
+      headers: { 'Content-Type': 'application/json' }
     }
   );
 
-  if (error)
-    throw new Error('Error al abrir el portal de facturación.');
+  if (error) throw new Error('Error al abrir el portal de facturación.');
 
   if (data?.url) {
-    window.location.assign(data.url);
+    window.location.href = data.url;
   }
 };
