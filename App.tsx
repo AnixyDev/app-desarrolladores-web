@@ -6,6 +6,7 @@ import { supabase, supabaseConfigError } from "@/lib/supabaseClient";
 import AppLayout from "@/components/layout/AppLayout";
 
 // Pages
+import LandingPage from "@/pages/LandingPage"; // <--- NUEVA IMPORTACIÓN
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
 import DashboardPage from "@/pages/DashboardPage";
@@ -57,7 +58,7 @@ const ProtectedRoute: React.FC = () => {
 
   if (isProfileLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-400">
+      <div className="min-h-screen flex items-center justify-center text-gray-400 bg-gray-950">
         Cargando…
       </div>
     );
@@ -94,8 +95,6 @@ const App: React.FC = () => {
       }
 
       cleanup = initializeAuth();
-
-      // 👉 fuerza carga inicial tras refresh
       await useAppStore.getState().refreshProfile();
     };
 
@@ -110,17 +109,10 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white p-6">
         <div className="max-w-xl rounded-2xl border border-red-500/40 bg-gray-900/60 p-6 text-center space-y-3">
-          <h1 className="text-2xl font-bold text-red-300">
-            Configuración de Supabase incompleta
-          </h1>
+          <h1 className="text-2xl font-bold text-red-300">Configuración de Supabase incompleta</h1>
           <p className="text-sm text-gray-300">
             {supabaseConfigError} Revisa los valores en Vercel y vuelve a desplegar.
           </p>
-          <div className="text-xs text-gray-400">
-            <p>Variables requeridas:</p>
-            <p className="font-mono">VITE_SUPABASE_URL</p>
-            <p className="font-mono">VITE_SUPABASE_ANON_KEY</p>
-          </div>
         </div>
       </div>
     );
@@ -129,8 +121,8 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
-
-        {/* PUBLIC */}
+        {/* PUBLIC ROUTES */}
+        <Route path="/" element={<LandingPage />} />
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/register" element={<RegisterPage />} />
         <Route path="/login" element={<Navigate to="/auth/login" replace />} />
@@ -138,16 +130,16 @@ const App: React.FC = () => {
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsOfService />} />
 
+        {/* CLIENT PORTAL (PUBLIC) */}
         <Route path="/portal/:clientId" element={<PortalDashboardPage />} />
         <Route path="/portal/invoice/:invoiceId" element={<PortalInvoiceViewPage />} />
         <Route path="/portal/proposal/:proposalId" element={<PortalProposalViewPage />} />
         <Route path="/portal/budget/:budgetId" element={<PortalBudgetViewPage />} />
         <Route path="/portal/contract/:contractId" element={<PortalContractViewPage />} />
 
-        {/* PROTECTED */}
+        {/* PROTECTED ROUTES */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/clients/:clientId" element={<ClientDetailPage />} />
@@ -186,7 +178,6 @@ const App: React.FC = () => {
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
-
       </Routes>
     </BrowserRouter>
   );
