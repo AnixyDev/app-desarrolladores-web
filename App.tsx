@@ -1,31 +1,89 @@
 import React, { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { useAppStore } from "./hooks/useAppStore";
+
+// Layouts
+import AppLayout from "./components/layout/AppLayout";
+
+// Páginas Públicas (Basado en tu imagen)
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/auth/RegisterPage";
-// Importa tus otras páginas aquí...
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
+import TermsOfService from "./pages/TermsOfService";
+// Nota: RegisterPage no aparece en tu imagen de /pages, 
+// asumo que está dentro de /pages/auth/ o cámbialo si es necesario.
+import RegisterPage from "./pages/auth/RegisterPage"; 
 
+// Páginas Privadas (Nombres corregidos según tu imagen)
+import DashboardPage from "./pages/DashboardPage";
+import ClientsPage from "./pages/ClientsPage";
+import ProjectsPage from "./pages/ProjectsPage";
+import InvoicesPage from "./pages/InvoicesPage";
+import SettingsPage from "./pages/SettingsPage";
+import TimeTrackingPage from "./pages/TimeTrackingPage"; // En lugar de TasksPage
+import ExpensesPage from "./pages/ExpensesPage";       // En lugar de FinancesPage
+import AIAssistantPage from "./pages/AIAssistantPage";
+
+/* --- Guardián de Rutas --- */
+const ProtectedRoute = () => {
+  const { isAuthenticated, isProfileLoading } = useAppStore();
+
+  if (isProfileLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-950">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  return isAuthenticated ? <Outlet /> : <Navigate to="/auth/login" replace />;
+};
+
+/* --- Componente Principal --- */
 const App: React.FC = () => {
-  const initializeAuth = useAppStore((state) => state.initializeAuth);
+  const { isAuthenticated, initializeAuth } = useAppStore();
 
   useEffect(() => {
-    initializeAuth();
+    const cleanup = initializeAuth();
+    return () => {
+      if (typeof cleanup === 'function') cleanup();
+    };
   }, [initializeAuth]);
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rutas Públicas */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/auth/login" element={<LoginPage />} />
-        <Route path="/auth/register" element={<RegisterPage />} />
+        {/* RUTAS PÚBLICAS */}
+        <Route 
+          path="/" 
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} 
+        />
+        <Route 
+          path="/auth/login" 
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
+        />
+        <Route 
+          path="/auth/register" 
+          element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} 
+        />
         
-        {/* Rutas Legales */}
-        <Route path="/privacy" element={<div>Política de Privacidad</div>} />
-        <Route path="/terms" element={<div>Términos de Servicio</div>} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsOfService />} />
 
-        {/* Redirección por defecto */}
+        {/* RUTAS PROTEGIDAS */}
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppLayout />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/clients" element={<ClientsPage />} />
+            <Route path="/projects" element={<ProjectsPage />} />
+            <Route path="/invoices" element={<InvoicesPage />} />
+            <Route path="/tasks" element={<TimeTrackingPage />} />
+            <Route path="/finances" element={<ExpensesPage />} />
+            <Route path="/ai-assistant" element={<AIAssistantPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
+        </Route>
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
