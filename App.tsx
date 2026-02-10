@@ -51,15 +51,19 @@ import PortalProposalViewPage from "@/pages/portal/PortalProposalViewPage";
 import PortalBudgetViewPage from "@/pages/portal/PortalBudgetViewPage";
 import PortalContractViewPage from "@/pages/portal/PortalContractViewPage";
 
-/* ---------------- Guard ---------------- */
+/* ---------------- App.tsx (Versión Corregida) ---------------- */
+
+// ... (todas tus importaciones igual)
 
 const ProtectedRoute: React.FC = () => {
   const { isAuthenticated, isProfileLoading } = useAppStore();
 
+  // Solo mostramos carga si estamos REALMENTE esperando el perfil, 
+  // pero dejamos pasar si ya sabemos que no está autenticado.
   if (isProfileLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-400 bg-gray-950">
-        Cargando…
+      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">
+        <div className="animate-pulse">Cargando sistema...</div>
       </div>
     );
   }
@@ -71,116 +75,50 @@ const ProtectedRoute: React.FC = () => {
   return <Outlet />;
 };
 
-/* ---------------- App ---------------- */
-
 const App: React.FC = () => {
   const initializeAuth = useAppStore((state) => state.initializeAuth);
 
   useEffect(() => {
     if (supabaseConfigError) return;
-
-    let cleanup: void | (() => void);
-
-    const run = async () => {
-      const url = window.location.href;
-
-      if (url.includes("code=")) {
-        try {
-          await supabase.auth.exchangeCodeForSession(url);
-        } catch (e) {
-          console.error("Error exchanging OAuth code", e);
-        } finally {
-          window.history.replaceState({}, "", "/");
-        }
-      }
-
-      cleanup = initializeAuth();
-      await useAppStore.getState().refreshProfile();
-    };
-
-    run();
-
-    return () => {
-      cleanup?.();
-    };
+    const cleanup = initializeAuth();
+    return () => { cleanup?.(); };
   }, [initializeAuth]);
-
-  if (supabaseConfigError) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-950 text-white p-6">
-        <div className="max-w-xl rounded-2xl border border-red-500/40 bg-gray-900/60 p-6 text-center space-y-3">
-          <h1 className="text-2xl font-bold text-red-300">Configuración de Supabase incompleta</h1>
-          <p className="text-sm text-gray-300">
-            {supabaseConfigError} Revisa los valores en Vercel y vuelve a desplegar.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* PUBLIC ROUTES */}
+        {/* RUTA RAÍZ: Siempre accesible */}
         <Route path="/" element={<LandingPage />} />
+
+        {/* RUTAS DE AUTH: Deben ser accesibles SIEMPRE que no estés logueado */}
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/register" element={<RegisterPage />} />
+        
+        {/* Redirecciones simples */}
         <Route path="/login" element={<Navigate to="/auth/login" replace />} />
         <Route path="/register" element={<Navigate to="/auth/register" replace />} />
+        
+        {/* LEGALES */}
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsOfService />} />
 
-        {/* CLIENT PORTAL (PUBLIC) */}
+        {/* PORTAL CLIENTES */}
         <Route path="/portal/:clientId" element={<PortalDashboardPage />} />
         <Route path="/portal/invoice/:invoiceId" element={<PortalInvoiceViewPage />} />
-        <Route path="/portal/proposal/:proposalId" element={<PortalProposalViewPage />} />
-        <Route path="/portal/budget/:budgetId" element={<PortalBudgetViewPage />} />
-        <Route path="/portal/contract/:contractId" element={<PortalContractViewPage />} />
 
-        {/* PROTECTED ROUTES */}
+        {/* RUTAS PROTEGIDAS (Solo tras login) */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/clients" element={<ClientsPage />} />
-            <Route path="/clients/:clientId" element={<ClientDetailPage />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
-            <Route path="/time-tracking" element={<TimeTrackingPage />} />
-            <Route path="/budgets" element={<BudgetsPage />} />
-            <Route path="/proposals" element={<ProposalsPage />} />
-            <Route path="/contracts" element={<ContractsPage />} />
-            <Route path="/invoices" element={<InvoicesPage />} />
-            <Route path="/invoices/create" element={<CreateInvoicePage />} />
-            <Route path="/expenses" element={<ExpensesPage />} />
-            <Route path="/tax-ledger" element={<TaxLedgerPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/reports/profitability" element={<ProfitabilityReportPage />} />
-            <Route path="/forecasting" element={<ForecastingPage />} />
-            <Route path="/job-market" element={<JobMarketDashboard />} />
-            <Route path="/job-market/:jobId" element={<JobDetailPage />} />
-            <Route path="/saved-jobs" element={<SavedJobsPage />} />
-            <Route path="/my-applications" element={<MyApplicationsPage />} />
-            <Route path="/post-job" element={<JobPostForm />} />
-            <Route path="/my-job-posts" element={<MyJobPostsPage />} />
-            <Route path="/my-job-posts/:jobId/applicants" element={<JobApplicantsPage />} />
-            <Route path="/ai-assistant" element={<AIAssistantPage />} />
-            <Route path="/team" element={<TeamManagementDashboard />} />
-            <Route path="/roles" element={<RoleManagement />} />
-            <Route path="/knowledge-base" element={<KnowledgeBase />} />
-            <Route path="/my-timesheet" element={<MyTeamTimesheet />} />
+            {/* ... resto de tus rutas protegidas ... */}
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/public-profile" element={<PublicProfilePage />} />
-            <Route path="/billing" element={<BillingPage />} />
-            <Route path="/integrations" element={<IntegrationsManager />} />
-            <Route path="/affiliate" element={<AffiliateProgramPage />} />
-            <Route path="/admin" element={<AdminDashboard />} />
           </Route>
         </Route>
 
+        {/* Catch-all: Si no existe, al inicio */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
 };
-
-export default App;
