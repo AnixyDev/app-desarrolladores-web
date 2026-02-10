@@ -27,9 +27,11 @@ const LandingPage: React.FC = () => {
             DevFreelancer es una plataforma integral diseñada para ayudar a desarrolladores independientes a organizar sus proyectos, automatizar facturas mediante IA y monitorizar su rentabilidad financiera en tiempo real.
           </p>
           <div className="flex justify-center gap-4">
-            <Link to="/auth/register">
-              <Button className="px-8 py-4 text-lg">Empezar ahora gratis</Button>
-            </Link>
+            <Link to="/auth/register" className="w-full sm:w-auto">
+  <Button className="px-8 py-4 text-lg w-full">
+    Empezar ahora gratis
+  </Button>
+</Link>
           </div>
         </section>
 
