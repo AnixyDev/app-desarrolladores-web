@@ -6,7 +6,7 @@ import { supabase, supabaseConfigError } from "@/lib/supabaseClient";
 import AppLayout from "@/components/layout/AppLayout";
 
 // Pages
-import LandingPage from "@/pages/LandingPage"; // <--- NUEVA IMPORTACIÓN
+import LandingPage from "@/pages/auth/LandingPage"; // <--- NUEVA IMPORTACIÓN
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/auth/RegisterPage";
 import DashboardPage from "@/pages/DashboardPage";
