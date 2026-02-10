@@ -49,10 +49,6 @@ const LoginPage: React.FC = () => {
     };
 
     return (
-        /* AÑADIDO: Contenedor principal para centrar y limitar el ancho 
-           min-h-screen: para centrar verticalmente en toda la pantalla
-           px-4: para que en móviles no toque los bordes
-        */
         <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 py-12">
             <div className="w-full max-w-md"> 
                 <AuthCard>
@@ -93,10 +89,15 @@ const LoginPage: React.FC = () => {
                          <Button 
                             type="button"
                             variant="secondary"
-                            className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
+                            {/* CORRECCIÓN AQUÍ: text-gray-900 para asegurar contraste y font-medium */}
+                            className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 hover:bg-gray-100 border border-gray-300 py-2 px-4 rounded-lg transition-colors font-medium shadow-sm"
                             onClick={handleGoogleLogin}
                         >
-                            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
+                            <img 
+                                src="https://www.google.com/favicon.ico" 
+                                alt="Google" 
+                                className="w-5 h-5" 
+                            />
                             Continuar con Google
                         </Button>
                     </div>
