@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthCard from '@/components/auth/AuthCard';
@@ -18,7 +17,6 @@ const LoginPage: React.FC = () => {
     const handleGoogleLogin = async () => {
         try {
             setError('');
-            // En producción y previsualización, la redirección debe ir a la raíz del origen actual
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
@@ -51,59 +49,67 @@ const LoginPage: React.FC = () => {
     };
 
     return (
-        <AuthCard>
-            <h2 className="text-2xl font-bold text-center text-white mb-6">Iniciar Sesión</h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-6">
-                <Input 
-                    label="Email" 
-                    type="email" 
-                    placeholder="tu@email.com" 
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                />
-                <Input 
-                    label="Contraseña" 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                />
-                {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? 'Iniciando...' : 'Entrar'}
-                </Button>
-            </form>
+        /* AÑADIDO: Contenedor principal para centrar y limitar el ancho 
+           min-h-screen: para centrar verticalmente en toda la pantalla
+           px-4: para que en móviles no toque los bordes
+        */
+        <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 py-12">
+            <div className="w-full max-w-md"> 
+                <AuthCard>
+                    <h2 className="text-2xl font-bold text-center text-white mb-6">Iniciar Sesión</h2>
+                    
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <Input 
+                            label="Email" 
+                            type="email" 
+                            placeholder="tu@email.com" 
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                        />
+                        <Input 
+                            label="Contraseña" 
+                            type="password" 
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
+                        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                        <Button type="submit" className="w-full" disabled={loading}>
+                            {loading ? 'Iniciando...' : 'Entrar'}
+                        </Button>
+                    </form>
 
-            <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-700" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-gray-900 text-gray-500">O continúa con</span>
-                </div>
+                    <div className="relative my-6">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-gray-700" />
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                            <span className="px-2 bg-gray-900 text-gray-500">O continúa con</span>
+                        </div>
+                    </div>
+
+                    <div className='flex justify-center'>
+                         <Button 
+                            type="button"
+                            variant="secondary"
+                            className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
+                            onClick={handleGoogleLogin}
+                        >
+                            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
+                            Continuar con Google
+                        </Button>
+                    </div>
+
+                    <p className="mt-6 text-center text-sm text-gray-400">
+                        ¿No tienes cuenta?{' '}
+                        <Link to="/auth/register" className="font-medium text-primary-400 hover:text-primary-300">
+                            Regístrate
+                        </Link>
+                    </p>
+                </AuthCard>
             </div>
-
-            <div className='flex justify-center'>
-                 <Button 
-                    type="button"
-                    variant="secondary"
-                    className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
-                    onClick={handleGoogleLogin}
-                >
-                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
-                    Continuar con Google
-                </Button>
-            </div>
-
-            <p className="mt-6 text-center text-sm text-gray-400">
-                ¿No tienes cuenta?{' '}
-                <Link to="/auth/register" className="font-medium text-primary-400 hover:text-primary-300">
-                    Regístrate
-                </Link>
-            </p>
-        </AuthCard>
+        </div>
     );
 };
 
