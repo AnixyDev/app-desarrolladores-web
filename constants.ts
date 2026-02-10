@@ -1,5 +1,3 @@
-// constants.ts (RAÍZ DEL PROYECTO)
-
 export type SidebarLink = {
   type: 'link';
   href: string;
@@ -21,12 +19,22 @@ export type SidebarGroup = {
 export type SidebarItem = SidebarLink | SidebarGroup;
 
 export const SIDEBAR_STRUCTURE: SidebarItem[] = [
-  { type: 'link', href: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard' }, // Corregido
+  { type: 'link', href: '/dashboard', label: 'Dashboard', icon: 'LayoutDashboard' },
   { type: 'link', href: '/clients', label: 'Clientes', icon: 'Users' },
   { type: 'link', href: '/projects', label: 'Proyectos', icon: 'BriefcaseIcon' },
   { type: 'link', href: '/time-tracking', label: 'Time Tracking', icon: 'ClockIcon' },
-  
-  // Finanzas (Sincronizado con App.tsx)
+
+  {
+    type: 'group',
+    label: 'Ventas',
+    icon: 'ShoppingBag',
+    items: [
+      { href: '/budgets', label: 'Presupuestos', icon: 'MessageSquareIcon' },
+      { href: '/proposals', label: 'Propuestas', icon: 'FileSignatureIcon' },
+      { href: '/contracts', label: 'Contratos', icon: 'BookIcon' },
+    ],
+  },
+
   {
     type: 'group',
     label: 'Finanzas',
@@ -38,35 +46,17 @@ export const SIDEBAR_STRUCTURE: SidebarItem[] = [
     ],
   },
 
-  // --- FINANCE ---
-  {
-    type: 'group',
-    label: 'Finanzas',
-    icon: 'DollarSignIcon',
-    items: [
-      { href: '/invoices', label: 'Facturas', icon: 'FileTextIcon' },
-      { href: '/expenses', label: 'Gastos', icon: 'BarChart2' },
-      { href: '/tax-ledger', label: 'Libro Fiscal', icon: 'BookIcon' },
-    ],
-  },
-
-  // --- REPORTS ---
   {
     type: 'group',
     label: 'Análisis y Reportes',
     icon: 'TrendingUpIcon',
     items: [
       { href: '/reports', label: 'Resumen General', icon: 'TrendingUpIcon' },
-      {
-        href: '/reports/profitability',
-        label: 'Rentabilidad',
-        icon: 'DollarSignIcon',
-      },
+      { href: '/reports/profitability', label: 'Rentabilidad', icon: 'DollarSignIcon' },
       { href: '/forecasting', label: 'Previsión', icon: 'TrendingUpIcon' },
     ],
   },
 
-  // --- MARKETPLACE ---
   {
     type: 'group',
     label: 'Marketplace',
@@ -80,10 +70,8 @@ export const SIDEBAR_STRUCTURE: SidebarItem[] = [
     ],
   },
 
-  // --- AI ---
   { type: 'link', href: '/ai-assistant', label: 'Asistente IA', icon: 'SparklesIcon' },
 
-  // --- TEAM ---
   {
     type: 'group',
     label: 'Equipo',
@@ -96,7 +84,6 @@ export const SIDEBAR_STRUCTURE: SidebarItem[] = [
     ],
   },
 
-  // --- SETTINGS ---
   {
     type: 'group',
     label: 'Configuración',

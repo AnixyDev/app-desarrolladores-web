@@ -12,7 +12,7 @@ import RegisterPage from "./pages/auth/RegisterPage";
 import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import TermsOfService from "./pages/TermsOfService";
 
-// Páginas Privadas (Asegúrate de que los nombres coincidan con tus archivos en /pages)
+// Páginas Privadas
 import DashboardPage from "./pages/DashboardPage";
 import ClientsPage from "./pages/ClientsPage";
 import ProjectsPage from "./pages/ProjectsPage";
@@ -28,16 +28,8 @@ import ContractsPage from "./pages/ContractsPage";
 import ReportsPage from "./pages/ReportsPage";
 import ProfitabilityReportPage from "./pages/ProfitabilityReportPage";
 import ForecastingPage from "./pages/ForecastingPage";
-import JobMarketDashboard from "./pages/JobMarketDashboard";
-import SavedJobsPage from "./pages/SavedJobsPage";
-import MyApplicationsPage from "./pages/MyApplicationsPage";
-import JobPostForm from "./pages/JobPostForm";
-import MyJobPostsPage from "./pages/MyJobPostsPage";
-import KnowledgeBase from "./pages/KnowledgeBase";
 import PublicProfilePage from "./pages/PublicProfilePage";
 import BillingPage from "./pages/BillingPage";
-import AffiliateProgramPage from "./pages/AffiliateProgramPage";
-import IntegrationsManager from "./pages/IntegrationsManager";
 
 const ProtectedRoute = () => {
   const { isAuthenticated, isProfileLoading } = useAppStore();
@@ -46,7 +38,7 @@ const ProtectedRoute = () => {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary-500 mb-4"></div>
-        <span className="text-primary-500 font-black italic">CARGANDO...</span>
+        <span className="text-primary-500 font-black italic">DEVFREELANCER...</span>
       </div>
     );
   }
@@ -72,7 +64,7 @@ const App: React.FC = () => {
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsOfService />} />
 
-        {/* RUTAS PROTEGIDAS */}
+        {/* Rutas Protegidas */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -88,22 +80,13 @@ const App: React.FC = () => {
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/reports/profitability" element={<ProfitabilityReportPage />} />
             <Route path="/forecasting" element={<ForecastingPage />} />
-            <Route path="/job-market" element={<JobMarketDashboard />} />
-            <Route path="/saved-jobs" element={<SavedJobsPage />} />
-            <Route path="/my-applications" element={<MyApplicationsPage />} />
-            <Route path="/post-job" element={<JobPostForm />} />
-            <Route path="/my-job-posts" element={<MyJobPostsPage />} />
             <Route path="/ai-assistant" element={<AIAssistantPage />} />
-            <Route path="/knowledge-base" element={<KnowledgeBase />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/public-profile" element={<PublicProfilePage />} />
             <Route path="/billing" element={<BillingPage />} />
-            <Route path="/affiliate" element={<AffiliateProgramPage />} />
-            <Route path="/integrations" element={<IntegrationsManager />} />
           </Route>
         </Route>
 
-        {/* Catch-all para errores 404 */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
