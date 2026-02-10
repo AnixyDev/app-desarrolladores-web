@@ -1,116 +1,90 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import AuthCard from '@/components/auth/AuthCard';
-import Input from '@/components/ui/Input';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { Logo } from '@/components/icons/Logo';
 import Button from '@/components/ui/Button';
-import { useAppStore } from '@/hooks/useAppStore';
-import { supabase } from '@/lib/supabaseClient';
 
-const LoginPage: React.FC = () => {
-    const navigate = useNavigate();
-    const login = useAppStore(state => state.login);
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-
-    const handleGoogleLogin = async () => {
-        try {
-            setError('');
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    redirectTo: window.location.origin, 
-                },
-            });
-            if (error) throw error;
-        } catch (err: any) {
-            setError('Error al conectar con Google');
-            console.error(err.message);
-        }
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-        setLoading(true);
-        try {
-            const success = await login(email, password);
-            if (success) {
-                navigate('/');
-            } else {
-                setError('Email no encontrado o contraseña incorrecta.');
-            }
-        } catch (err) {
-            setError('Ocurrió un error al iniciar sesión.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <div className="min-h-[80vh] flex flex-col items-center justify-center px-4 py-12">
-            <div className="w-full max-w-md"> 
-                <AuthCard>
-                    <h2 className="text-2xl font-bold text-center text-white mb-6">Iniciar Sesión</h2>
-                    
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <Input 
-                            label="Email" 
-                            type="email" 
-                            placeholder="tu@email.com" 
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                        />
-                        <Input 
-                            label="Contraseña" 
-                            type="password" 
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                        />
-                        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                        <Button type="submit" className="w-full" disabled={loading}>
-                            {loading ? 'Iniciando...' : 'Entrar'}
-                        </Button>
-                    </form>
-
-                    <div className="relative my-6">
-                        <div className="absolute inset-0 flex items-center">
-                            <div className="w-full border-t border-gray-700" />
-                        </div>
-                        <div className="relative flex justify-center text-sm">
-                            <span className="px-2 bg-gray-900 text-gray-500">O continúa con</span>
-                        </div>
-                    </div>
-
-                    <div className='flex justify-center'>
-                         <Button 
-                            type="button"
-                            variant="secondary"
-                            className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 hover:bg-gray-100 border border-gray-300 py-2 px-4 rounded-lg transition-colors font-medium shadow-sm"
-                            onClick={handleGoogleLogin}
-                        >
-                            <img 
-                                src="https://www.google.com/favicon.ico" 
-                                alt="Google" 
-                                className="w-5 h-5" 
-                            />
-                            Continuar con Google
-                        </Button>
-                    </div>
-
-                    <p className="mt-6 text-center text-sm text-gray-400">
-                        ¿No tienes cuenta?{' '}
-                        <Link to="/auth/register" className="font-medium text-primary-400 hover:text-primary-300">
-                            Regístrate
-                        </Link>
-                    </p>
-                </AuthCard>
-            </div>
+const LandingPage: React.FC = () => {
+  return (
+    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+      {/* Navegación simple */}
+      <nav className="h-20 border-b border-gray-800 flex items-center justify-between px-6 sm:px-12 bg-gray-950/50 backdrop-blur-md sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <Logo className="h-8 w-8" />
+          <span className="text-xl font-bold tracking-tighter italic">DEVFREELANCER</span>
         </div>
-    );
+        <Link to="/auth/login">
+          <Button variant="primary">Iniciar Sesión</Button>
+        </Link>
+      </nav>
+
+      {/* Hero Section - AQUÍ SE EXPLICA EL PROPÓSITO (Punto 1) */}
+      <main className="flex-1">
+        <section className="py-20 px-6 max-w-5xl mx-auto text-center">
+          <h1 className="text-5xl md:text-6xl font-black mb-6 bg-gradient-to-r from-primary-400 to-purple-500 bg-clip-text text-transparent">
+            Gestión Inteligente para el Desarrollador Moderno
+          </h1>
+          <p className="text-gray-400 text-xl mb-10 max-w-3xl mx-auto">
+            DevFreelancer es una plataforma integral diseñada para ayudar a desarrolladores independientes a organizar sus proyectos, automatizar facturas mediante IA y monitorizar su rentabilidad financiera en tiempo real.
+          </p>
+          <div className="flex justify-center gap-4">
+            <Link to="/auth/register">
+              <Button className="px-8 py-4 text-lg">Empezar ahora gratis</Button>
+            </Link>
+          </div>
+        </section>
+
+        {/* Sección de Características - JUSTIFICACIÓN DE DATOS */}
+        <section className="py-16 bg-gray-900/30 border-y border-gray-800 px-6">
+          <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
+            <div className="p-8 rounded-2xl bg-gray-900 border border-gray-800">
+              <h3 className="text-xl font-bold mb-3 text-primary-400">Asistente de IA</h3>
+              <p className="text-gray-400 text-sm">
+                Utilizamos tu perfil profesional para generar propuestas comerciales y descripciones de tareas precisas, ahorrándote horas de redacción manual.
+              </p>
+            </div>
+            <div className="p-8 rounded-2xl bg-gray-900 border border-gray-800">
+              <h3 className="text-xl font-bold mb-3 text-green-400">Facturación Pro</h3>
+              <p className="text-gray-400 text-sm">
+                Crea, gestiona y envía facturas profesionales a tus clientes. Mantén un control estricto de tus ingresos y estados de pago.
+              </p>
+            </div>
+            <div className="p-8 rounded-2xl bg-gray-900 border border-gray-800">
+              <h3 className="text-xl font-bold mb-3 text-purple-400">Análisis de Datos</h3>
+              <p className="text-gray-400 text-sm">
+                Visualiza la rentabilidad de tus proyectos con gráficos avanzados. Entiende dónde inviertes tu tiempo y qué clientes son más rentables.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      {/* Footer - VÍNCULOS OBLIGATORIOS (Punto 4) */}
+      <footer className="border-t border-gray-800 py-12 px-6 bg-gray-950">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-2 opacity-50">
+            <Logo className="h-5 w-5" />
+            <span className="text-sm font-bold tracking-tighter">DEVFREELANCER</span>
+          </div>
+          
+          <div className="flex gap-8">
+            <Link to="/privacy" className="text-sm text-gray-500 hover:text-primary-400 transition">
+              Política de Privacidad
+            </Link>
+            <Link to="/terms" className="text-sm text-gray-500 hover:text-primary-400 transition">
+              Términos del Servicio
+            </Link>
+            <a href="mailto:soporte@devfreelancer.app" className="text-sm text-gray-500 hover:text-primary-400 transition">
+              Contacto
+            </a>
+          </div>
+
+          <p className="text-gray-600 text-xs">
+            © 2026 DevFreelancer. Todos los derechos reservados.
+          </p>
+        </div>
+      </footer>
+    </div>
+  );
 };
 
-export default LoginPage;
+export default LandingPage;
