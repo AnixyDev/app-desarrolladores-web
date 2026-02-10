@@ -103,8 +103,10 @@ const App: React.FC = () => {
           </Route>
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+        <Route 
+  path="/auth/login" 
+  element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} 
+/>
     </BrowserRouter>
   );
 };
