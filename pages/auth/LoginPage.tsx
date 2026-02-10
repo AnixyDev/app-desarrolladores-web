@@ -89,7 +89,6 @@ const LoginPage: React.FC = () => {
                          <Button 
                             type="button"
                             variant="secondary"
-                            {/* CORRECCIÓN AQUÍ: text-gray-900 para asegurar contraste y font-medium */}
                             className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 hover:bg-gray-100 border border-gray-300 py-2 px-4 rounded-lg transition-colors font-medium shadow-sm"
                             onClick={handleGoogleLogin}
                         >
