@@ -61,7 +61,7 @@ export const getStripe = () => {
 };
 
 /* -------------------------
-   Catálogo de productos
+   Catálogo de productos CORREGIDO
 -------------------------- */
 
 export const STRIPE_ITEMS = {
@@ -70,11 +70,13 @@ export const STRIPE_ITEMS = {
     mode: 'subscription' as const,
     name: 'Pro Plan',
   },
+  // Plan Mensual: 35,95€
   teamsPlan: {
     priceId: 'price_1SOggV8oC5awQy15YW1wAgcg',
     mode: 'subscription' as const,
-    name: 'Plan de equipos',
+    name: 'Plan de equipos (Mensual)',
   },
+  // Plan Anual: 295€ (Cuota un año)
   teamsPlanYearly: {
     priceId: 'price_1SOggV8oC5awQy15Ppz7bUj0',
     mode: 'subscription' as const,
@@ -108,7 +110,7 @@ export const STRIPE_ITEMS = {
     mode: 'payment' as const,
     name: 'Pago de Factura',
   },
-};
+};;
 
 export type StripeItemKey = keyof typeof STRIPE_ITEMS;
 
