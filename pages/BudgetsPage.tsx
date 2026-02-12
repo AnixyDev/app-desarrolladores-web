@@ -143,10 +143,15 @@ const BudgetsPage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-semibold text-white">Presupuestos</h1>
-        <Button onClick={() => setIsModalOpen(true)}>
-          Crear Presupuesto
-        </Button>
-      </div>
+        <Button
+  onClick={() => {
+    console.log("CLICK FUNCIONA");
+    setIsModalOpen(true);
+  }}
+>
+  Crear Presupuesto
+</Button>
+
 
       {budgets.length === 0 ? (
         <EmptyState
