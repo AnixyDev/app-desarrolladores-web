@@ -7,11 +7,11 @@ import { AppLayout } from './components/layout/AppLayout';
 import AuthLayout from './pages/auth/AuthLayout';
 import PortalLayout from './pages/portal/PortalLayout';
 
-// Páginas (He puesto las principales, añade las que falten siguiendo el mismo patrón)
+// Páginas
 import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
-import ProjectPage from './pages/ProjectPage';
+import ProjectPage from './pages/ProjectPage'; // Importación corregida (singular)
 import ClientsPage from './pages/ClientsPage';
 import InvoicesPage from './pages/InvoicesPage';
 import AIAssistantPage from './pages/AIAssistantPage';
@@ -50,19 +50,17 @@ function App() {
       {/* RUTAS PRIVADAS (APP DESARROLLADOR) */}
       <Route element={<AppLayout />}>
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/projects" element={<ProjectPage />} />
+        <Route path="/projects" element={<ProjectPage />} /> 
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/invoices" element={<InvoicesPage />} />
         <Route path="/ai-assistant" element={<AIAssistantPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-        {/* Añade aquí el resto de tus páginas de la misma forma */}
       </Route>
 
       {/* RUTAS DEL PORTAL DEL CLIENTE */}
       <Route path="/portal/login" element={<PortalLoginPage />} />
       <Route path="/portal" element={<PortalLayout />}>
         <Route index element={<PortalDashboardPage />} />
-        {/* Otras rutas del portal... */}
       </Route>
 
       {/* REDIRECCIÓN POR DEFECTO */}
@@ -70,4 +68,5 @@ function App() {
     </Routes>
   );
 }
+
 export default App;
