@@ -1,16 +1,18 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom'; // <--- ESTO FALTABA
 import { GoogleOAuthProvider } from "@react-oauth/google";
-import App from "./App.tsx";
+import App from "./App";
 import "./index.css";
 
-// Tu ID de cliente verificado
-const GOOGLE_CLIENT_ID = "457438236235-n2s8q6nvcjm32u0o3ut2lksd8po8gfqf.apps.googleusercontent.com"; 
+const GOOGLE_CLIENT_ID = "457438236235-n2s8q6nvcjm32u0o3ut2lksd8po8gfqf.apps.googleusercontent.com";
 
-ReactDOM.createRoot(document.getElementById("root")!).render(
+ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-      <App />
-    </GoogleOAuthProvider>
+    <BrowserRouter> {/* <--- ENVOLVEMOS LA APP PARA QUE EL ROUTER FUNCIONE */}
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <App />
+      </GoogleOAuthProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );
