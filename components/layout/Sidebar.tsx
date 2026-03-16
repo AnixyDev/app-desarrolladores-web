@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'; // Añadido useNavigate
 import { SIDEBAR_STRUCTURE } from '@/constants';
 import { Logo } from '../icons/Logo';
 import { ChevronDown, X, LogOut } from 'lucide-react'; // Añadido LogOut
-import * as Icons from '../icons/Icon';
+import { DynamicIcon } from '../icons/Icon';
 import { useAppStore } from '@/hooks/useAppStore'; // Añadido para gestionar la sesión
 import { supabase } from '@/lib/supabaseClient'; // Añadido para el signout
 
@@ -11,12 +11,6 @@ interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-const DynamicIcon = ({ name, className }: { name: string; className: string }) => {
-  const IconComponent = (Icons as any)[name];
-  if (!IconComponent) return null;
-  return <IconComponent className={className} />;
-};
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
