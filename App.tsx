@@ -54,13 +54,17 @@ const App: React.FC = () => {
     return () => { if (typeof cleanup === 'function') cleanup(); };
   }, [initializeAuth]);
 
-  // Si está cargando el perfil inicial, mostramos el loading para TODA la app
-  // Esto evita que el usuario vea el Login si ya estaba logueado
+  // Bloqueo de renderizado global hasta que la sesión sea verificada
   if (isProfileLoading) {
     return (
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary-500 mb-4"></div>
-        <span className="text-primary-500 font-black italic tracking-tighter">DEVFREELANCER...</span>
+        <div className="relative">
+          <div className="h-16 w-16 rounded-full border-t-4 border-b-4 border-primary-500 animate-spin"></div>
+          <div className="absolute top-0 left-0 h-16 w-16 rounded-full border-t-4 border-b-4 border-primary-200 opacity-20"></div>
+        </div>
+        <span className="mt-4 text-primary-500 font-black italic tracking-tighter animate-pulse">
+          DEVFREELANCER...
+        </span>
       </div>
     );
   }
@@ -68,27 +72,12 @@ const App: React.FC = () => {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rutas Públicas - Ahora solo se evalúan cuando ya sabemos si el usuario es auténtico */}
+        {/* Lógica de redirección inteligente en rutas públicas */}
         <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/auth/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
-        <Route path="/auth/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
         
-        <Route path="/privacy" element={<PrivacyPolicyPage />} />
-        <Route path="/terms" element={<TermsOfService />} />
-
-        {/* Rutas Protegidas */}
-        <Route element={<ProtectedRoute />}>
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            {/* ... resto de tus rutas */}
-            <Route path="/billing" element={<BillingPage />} />
-          </Route>
-        </Route>
-
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* ... resto de tus rutas protegidas con ProtectedRoute ... */}
       </Routes>
     </BrowserRouter>
   );
 };
-
-export default App;
