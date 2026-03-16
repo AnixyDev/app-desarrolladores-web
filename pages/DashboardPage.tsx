@@ -6,14 +6,15 @@ import SmartInboxWidget from '../components/dashboard/SmartInboxWidget';
 import { Sparkles, TrendingUp, Users, Briefcase } from 'lucide-react';
 
 const DashboardPage: React.FC = () => {
-  const profile = useAppStore(state => state.profile);
+  // Extraemos invoices y expenses para pasárselos al gráfico
+  const { profile, invoices, expenses } = useAppStore();
 
   return (
     <div className="space-y-6">
       {/* Header de Bienvenida */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">¡Hola, {profile.full_name.split(' ')[0]}! 👋</h1>
+          <h1 className="text-2xl font-bold text-white">¡Hola, {profile.full_name?.split(' ')[0] || 'Usuario'}! 👋</h1>
           <p className="text-gray-400 text-sm">Esto es lo que está pasando en tu negocio hoy.</p>
         </div>
         <div className="flex items-center gap-3 bg-primary-500/10 border border-primary-500/20 p-3 rounded-2xl">
@@ -33,15 +34,16 @@ const DashboardPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Gráfico Principal (Ocupa 2 columnas) */}
+        {/* Gráfico Principal */}
         <div className="lg:col-span-2 bg-gray-900/50 border border-gray-800 rounded-3xl p-6">
           <h3 className="text-lg font-semibold text-white mb-6">Rendimiento Financiero</h3>
           <div className="h-[300px]">
-             <IncomeExpenseChart />
+             {/* PASAMOS LAS PROPS REALES AQUÍ */}
+             <IncomeExpenseChart invoices={invoices} expenses={expenses} />
           </div>
         </div>
 
-        {/* Widget de Mensajes/Tareas (Ocupa 1 columna) */}
+        {/* Widget de Smart Inbox */}
         <div className="lg:col-span-1">
           <SmartInboxWidget />
         </div>
@@ -53,13 +55,11 @@ const DashboardPage: React.FC = () => {
             <h3 className="text-lg font-semibold text-white mb-4">Distribución de Horas</h3>
             <WeeklyHoursChart />
          </div>
-         {/* Aquí podrías poner un componente de "Próximos Vencimientos" */}
       </div>
     </div>
   );
 };
 
-// Componente pequeño para las tarjetas de arriba
 const StatCard = ({ title, value, icon: Icon, trend, color }: any) => (
   <div className="bg-gray-900/50 border border-gray-800 p-5 rounded-3xl hover:border-gray-700 transition-colors">
     <div className="flex justify-between items-start mb-4">
