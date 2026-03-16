@@ -1,21 +1,17 @@
-// routes.tsx
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Auth
-import LoginPage from './pages/auth/LoginPage';
+import LoginPage from './pages/LoginPage'; // Ajustado a la ruta correcta
 import RegisterPage from './pages/auth/RegisterPage';
 
 // App core
 import DashboardPage from './pages/DashboardPage';
-import ProjectsPage from './pages/ProjectPage';
+import ProjectPage from './pages/ProjectPage'; // Nombre corregido (sin S)
 import ClientsPage from './pages/ClientsPage';
 import InvoicesPage from './pages/InvoicesPage';
 import SettingsPage from './pages/SettingsPage';
-
-// Optional but existing
-import ReportsPage from './pages/ReportsPage';
-import ProposalsPage from './pages/ProposalsPage';
+import AIAssistantPage from './pages/AIAssistantPage';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -24,14 +20,13 @@ const AppRoutes: React.FC = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
-      {/* App */}
+      {/* App con Layout (Si usas AppLayout, envuélvelas aquí) */}
       <Route path="/" element={<DashboardPage />} />
-      <Route path="/projects" element={<ProjectsPage />} />
+      <Route path="/projects" element={<ProjectPage />} />
       <Route path="/clients" element={<ClientsPage />} />
       <Route path="/invoices" element={<InvoicesPage />} />
-      <Route path="/reports" element={<ReportsPage />} />
-      <Route path="/proposals" element={<ProposalsPage />} />
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/ai-assistant" element={<AIAssistantPage />} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -34,7 +34,8 @@ export interface AuthSlice {
   login: (email: string, password?: string) => Promise<boolean>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password?: string) => Promise<boolean>;
-  loginWithGoogle: (payload: { email: string; name?: string; picture?: string }) => void;
+  // CORREGIDO: Ahora acepta el string del token y devuelve una Promesa
+  loginWithGoogle: (token: string) => Promise<boolean>; 
   consumeCredits: (amount: number) => Promise<boolean>;
   updateProfile: (profileData: Partial<Profile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -105,7 +106,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                 isProfileLoading: false 
             });
 
-            // Carga inicial de datos
             await Promise.allSettled([
                 get().fetchClients?.(),
                 get().fetchProjects?.(),
@@ -129,7 +129,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             if (session) {
                 await get().refreshProfile();
 
-                // 3.2 Sincronización Realtime del Perfil (Créditos, Plan, etc)
                 if (profileChannel) supabase.removeChannel(profileChannel);
                 
                 profileChannel = supabase
@@ -175,26 +174,26 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         return !error && !!data.user;
     },
 
-    loginWithGoogle: (payload) => {
-        set(state => ({
-            isAuthenticated: true,
-            isProfileLoading: false,
-            profile: {
-                ...state.profile,
-                email: payload.email,
-                full_name: payload.name || state.profile.full_name,
-                avatar_url: payload.picture || state.profile.avatar_url,
-            }
-        }));
+    // IMPLEMENTACIÓN CORREGIDA PARA GOOGLE AUTH REAL
+    loginWithGoogle: async (token: string) => {
+        const { data, error } = await supabase.auth.signInWithIdToken({
+            provider: 'google',
+            token: token,
+        });
+
+        if (error) {
+            console.error("Error login Google:", error.message);
+            return false;
+        }
+        
+        await get().refreshProfile();
+        return !!data.user;
     },
 
-    // 3.3 Manejo Seguro de Créditos
     consumeCredits: async (amount) => {
         const { profile, refreshProfile } = get();
         if (profile.ai_credits < amount) return false;
 
-        // Intentar usar RPC para una operación atómica en la base de datos
-        // Si no tienes la función 'consume_user_credits' en Supabase, usa el update normal corregido:
         const { data, error } = await supabase
             .from('profiles')
             .update({ ai_credits: profile.ai_credits - amount })
@@ -204,11 +203,10 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
         if (error) {
             console.error("Error al consumir créditos:", error);
-            await refreshProfile(); // Re-sincronizar en caso de error
+            await refreshProfile();
             return false;
         }
 
-        // Actualizamos estado local inmediatamente
         set(state => ({
             profile: { ...state.profile, ai_credits: data.ai_credits }
         }));
@@ -220,7 +218,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         const { profile } = get();
         if (!profile.id) return;
 
-        // Protección de campos sensibles
         const { 
             id, email, plan, ai_credits, role, 
             stripe_account_id, affiliate_code, ...safeData 
