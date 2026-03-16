@@ -33,25 +33,26 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
   // FUNCIÓN DE CIERRE DE SESIÓN REFORZADA
   const handleLogout = async () => {
-    try {
-      // 1. Intentar cerrar sesión en Supabase
-      await supabase.auth.signOut();
-      
-      // 2. Limpiar estado local (Zustand)
-      if (logoutAction) logoutAction();
+  try {
+    // 1. Notificar a Supabase (esto invalida el token en el servidor)
+    await supabase.auth.signOut();
+    
+    // 2. Limpiar el Store de Zustand (esto reinicia los estados a null/false)
+    if (logoutAction) logoutAction();
 
-      // 3. Limpiar almacenamiento local por seguridad
-      localStorage.clear();
-      
-      // 4. Redirigir al login
-      navigate('/auth/login');
-    } catch (error) {
-      console.error('Error al cerrar sesión:', error);
-      // Forzar salida incluso con error
-      window.location.href = '/auth/login';
-    }
-  };
-
+    // 3. Limpiar SOLO las claves de sesión, no todo el almacenamiento
+    // Ajusta 'auth-storage' al nombre que uses en la persistencia de Zustand
+    localStorage.removeItem('auth-storage'); 
+    
+    // 4. Redirigir usando React Router (evita recargar toda la ventana si no es necesario)
+    navigate('/auth/login', { replace: true });
+    
+  } catch (error) {
+    console.error('Error al cerrar sesión:', error);
+    // Solo como último recurso si falla lo anterior:
+    window.location.href = '/auth/login';
+  }
+};
   const isExternalLink = (url: string) =>
     url.startsWith('http://') || url.startsWith('https://');
 
