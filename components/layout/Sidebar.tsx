@@ -110,19 +110,20 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               }
 
               return (
-                <NavLink
-                  key={item.href}
-                  to={item.href}
-                  end={item.href === '/'}
-                  onClick={handleLinkClick}
-                  className={({ isActive }) =>
-                    `${base} ${
-                      isActive
-                        ? 'bg-primary-600/10 text-primary-400'
-                        : 'text-gray-400 hover:bg-gray-900 hover:text-white'
-                    }`
-                  }
-                >
+               <NavLink
+  key={item.href}
+  to={item.href}
+  // Esto asegura que '/' no coincida con '/clientes', etc.
+  end={item.href === '/'} 
+  onClick={handleLinkClick}
+  className={({ isActive }) =>
+    `${base} ${
+      isActive
+        ? 'bg-primary-600/10 text-primary-400'
+        : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+    }`
+  }
+>
                   <DynamicIcon name={item.icon as string} className="w-5 h-5 mr-3" />
                   {item.label}
                 </NavLink>
