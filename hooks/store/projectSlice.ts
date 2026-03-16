@@ -1,4 +1,3 @@
-
 import { StateCreator } from 'zustand';
 import { Project, NewProject, Task, TimeEntry, NewTimeEntry } from '@/types';
 import { AppState } from '../useAppStore';
@@ -14,6 +13,8 @@ export interface ProjectSlice {
   getProjectById: (id: string) => Project | undefined;
   getProjectByName: (name: string) => Project | undefined;
   addProject: (project: NewProject) => Promise<void>;
+  // AÑADIMOS ESTA LÍNEA PARA EL KANBAN Y EDICIONES GENERALES
+  updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
   updateProjectStatus: (id: string, status: Project['status']) => Promise<void>;
   getTasksByProjectId: (projectId: string) => Task[];
   addTask: (task: Omit<Task, 'id'|'user_id'|'created_at'|'completed'|'invoice_id'>) => Promise<void>;
@@ -57,12 +58,18 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         }
     },
 
-    updateProjectStatus: async (id, status) => {
-        const { error } = await supabase.from('projects').update({ status }).eq('id', id);
+    // ESTA ES LA NUEVA FUNCIÓN QUE ARREGLA TU ERROR EN PROJECTPAGE
+    updateProject: async (id, updates) => {
+        const { error } = await supabase.from('projects').update(updates).eq('id', id);
         
         if (!error) {
-            const project = get().projects.find(p => p.id === id);
-            if(project) {
+            set(state => ({ 
+                projects: state.projects.map(p => p.id === id ? { ...p, ...updates } : p) 
+            }));
+
+            // Si el update incluye cambio de estado, enviamos notificación (opcional)
+            if (updates.status) {
+                const project = get().projects.find(p => p.id === id);
                 const statusMap = {
                     'planning': 'Planificación',
                     'in-progress': 'En Progreso',
@@ -70,12 +77,16 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
                     'on-hold': 'En Pausa'
                 };
                 get().addNotification(
-                    `El estado del proyecto "${project.name}" ha cambiado a "${statusMap[status]}".`,
+                    `El estado del proyecto "${project?.name}" ha cambiado a "${statusMap[updates.status]}".`,
                     `/projects/${id}`
                 );
             }
-            set(state => ({ projects: state.projects.map(p => p.id === id ? { ...p, status } : p) }));
         }
+    },
+
+    updateProjectStatus: async (id, status) => {
+        // Ahora simplemente llamamos a la función general para no repetir código
+        await get().updateProject(id, { status });
     },
 
     getTasksByProjectId: (projectId) => get().tasks.filter(t => t.project_id === projectId),
@@ -97,12 +108,10 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         if (!task) return;
 
         const newCompleted = !task.completed;
-        // Optimistic update
         set(state => ({ tasks: state.tasks.map(t => t.id === id ? { ...t, completed: newCompleted } : t) }));
 
         const { error } = await supabase.from('tasks').update({ completed: newCompleted }).eq('id', id);
         if (error) {
-            // Revert on error
             set(state => ({ tasks: state.tasks.map(t => t.id === id ? { ...t, completed: !newCompleted } : t) }));
         }
     },

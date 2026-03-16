@@ -1,14 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
 import { LayoutGrid, List } from 'lucide-react';
-import Card from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
-import Modal from '@/components/ui/Modal';
-import Input from '@/components/ui/Input';
-import { Project, NewProject, NewClient } from '@/types';
-import EmptyState from '@/components/ui/EmptyState';
-import { BriefcaseIcon, PlusIcon, SearchIcon, Filter, Users } from '@/components/icons/Icon.tsx';
-import { useToast } from '@/hooks/useToast';
 import { ProjectCard } from '@/components/projects/ProjectCard'; // Importamos el nuevo componente
 
 // DND Kit
