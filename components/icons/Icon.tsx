@@ -1,5 +1,28 @@
+import React from 'react';
+import * as Icons from 'lucide-react';
+import { LucideProps } from 'lucide-react';
+import { IconName } from '@/types';
 
-// components/icons/Icon.tsx
+// 1. EL COMPONENTE PRO: Permite renderizar cualquier icono pasando solo el nombre
+interface DynamicIconProps extends LucideProps {
+  name: string;
+  fallback?: IconName;
+}
+
+export const DynamicIcon = ({ 
+  name, 
+  fallback = 'HelpCircle', 
+  ...props 
+}: DynamicIconProps) => {
+  // Buscamos el componente en la librería Lucide
+  const IconComponent = (Icons as any)[name] || (Icons as any)[fallback];
+
+  if (!IconComponent) return null;
+
+  return <IconComponent {...props} />;
+};
+
+// 2. MANTENEMOS TUS EXPORTACIONES ACTUALES (para no romper el resto de la app)
 export {
   LayoutDashboard,
   Users,
@@ -37,7 +60,7 @@ export {
   PlusCircle,
   XCircle as XCircleIcon,
   Search as SearchIcon,
-  PenTool as SignatureIcon, // Corregido: 'Signature' no existe en lucide-react, usamos PenTool
+  PenTool as SignatureIcon,
   AlertTriangle as AlertTriangleIcon,
   Copy as CopyIcon,
   ArrowUpCircle as ArrowUpCircleIcon,
