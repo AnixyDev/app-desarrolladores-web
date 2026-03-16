@@ -1,7 +1,8 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../useAppStore';
-import { Profile, PlanType, UserRole } from '@/types'; // Asegúrate de tener estos tipos
+import { Profile, PlanType, UserRole } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 const initialProfile: Profile = {
     id: '',
@@ -43,6 +44,7 @@ export interface AuthSlice {
 
 let isInitializing = false;
 let refreshLock = false;
+let profileChannel: RealtimeChannel | null = null;
 
 export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, get) => ({
     isAuthenticated: false,
@@ -50,11 +52,14 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     profile: initialProfile,
 
     resetStore: () => {
+        if (profileChannel) {
+            supabase.removeChannel(profileChannel);
+            profileChannel = null;
+        }
         set({ 
             isAuthenticated: false, 
             profile: initialProfile, 
             isProfileLoading: false,
-            // Limpiamos todos los arreglos de los otros slices para evitar fugas de datos entre sesiones
             clients: [],
             projects: [],
             invoices: [],
@@ -86,7 +91,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             
             if (fetchError) throw fetchError;
 
-            // Mapeo seguro de datos: Prioridad DB > Metadata > Initial
             const activeProfile: Profile = {
                 ...initialProfile,
                 ...(profileData || {}),
@@ -101,7 +105,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                 isProfileLoading: false 
             });
 
-            // Carga paralela de datos de la app
+            // Carga inicial de datos
             await Promise.allSettled([
                 get().fetchClients?.(),
                 get().fetchProjects?.(),
@@ -121,10 +125,25 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         if (isInitializing) return () => {};
         isInitializing = true;
 
-        // El listener de Supabase es la fuente de verdad
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session) {
                 await get().refreshProfile();
+
+                // 3.2 Sincronización Realtime del Perfil (Créditos, Plan, etc)
+                if (profileChannel) supabase.removeChannel(profileChannel);
+                
+                profileChannel = supabase
+                    .channel(`public:profiles:id=eq.${session.user.id}`)
+                    .on('postgres_changes', 
+                        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${session.user.id}` },
+                        (payload) => {
+                            set(state => ({
+                                profile: { ...state.profile, ...payload.new }
+                            }));
+                        }
+                    )
+                    .subscribe();
+
             } else {
                 get().resetStore();
             }
@@ -132,6 +151,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
         return () => {
             subscription.unsubscribe();
+            if (profileChannel) supabase.removeChannel(profileChannel);
             isInitializing = false;
         };
     },
@@ -144,7 +164,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     logout: async () => {
         await supabase.auth.signOut();
         get().resetStore();
-        // Nota: El redireccionamiento lo maneja App.tsx gracias al cambio de estado
     },
 
     register: async (name, email, password) => {
@@ -169,28 +188,31 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         }));
     },
 
+    // 3.3 Manejo Seguro de Créditos
     consumeCredits: async (amount) => {
-        const { profile } = get();
+        const { profile, refreshProfile } = get();
         if (profile.ai_credits < amount) return false;
 
-        const newCredits = profile.ai_credits - amount;
-
-        // Update optimista
-        set(state => ({
-            profile: { ...state.profile, ai_credits: newCredits }
-        }));
-
-        const { error } = await supabase
+        // Intentar usar RPC para una operación atómica en la base de datos
+        // Si no tienes la función 'consume_user_credits' en Supabase, usa el update normal corregido:
+        const { data, error } = await supabase
             .from('profiles')
-            .update({ ai_credits: newCredits })
-            .eq('id', profile.id);
+            .update({ ai_credits: profile.ai_credits - amount })
+            .eq('id', profile.id)
+            .select()
+            .single();
 
         if (error) {
-            console.error("Error syncing credits:", error);
-            // Revertir si falla
-            await get().refreshProfile();
+            console.error("Error al consumir créditos:", error);
+            await refreshProfile(); // Re-sincronizar en caso de error
             return false;
         }
+
+        // Actualizamos estado local inmediatamente
+        set(state => ({
+            profile: { ...state.profile, ai_credits: data.ai_credits }
+        }));
+
         return true;
     },
 
@@ -198,8 +220,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         const { profile } = get();
         if (!profile.id) return;
 
-        // Sanitización Pro: Evitamos que el usuario edite campos sensibles manualmente
-        // mediante el objeto de actualización, incluso si TypeScript lo permitiera.
+        // Protección de campos sensibles
         const { 
             id, email, plan, ai_credits, role, 
             stripe_account_id, affiliate_code, ...safeData 
@@ -212,7 +233,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
         if (error) throw error;
         
-        // Sincronizamos el estado local solo con los datos permitidos
         set(state => ({ 
             profile: { ...state.profile, ...safeData } 
         }));
