@@ -21,7 +21,7 @@ import SettingsPage from './pages/SettingsPage';
 import PortalDashboardPage from './pages/portal/PortalDashboardPage';
 import PortalLoginPage from './pages/portal/PortalLoginPage';
 
-export default function App() {
+function App() {
   const initializeAuth = useAppStore((state) => state.initializeAuth);
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
   const isProfileLoading = useAppStore((state) => state.isProfileLoading);
