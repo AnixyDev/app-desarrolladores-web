@@ -47,20 +47,32 @@ const ProtectedRoute = () => {
 };
 
 const App: React.FC = () => {
-  const { isAuthenticated, initializeAuth } = useAppStore();
+  const { isAuthenticated, isProfileLoading, initializeAuth } = useAppStore();
 
   useEffect(() => {
     const cleanup = initializeAuth();
     return () => { if (typeof cleanup === 'function') cleanup(); };
   }, [initializeAuth]);
 
+  // Si está cargando el perfil inicial, mostramos el loading para TODA la app
+  // Esto evita que el usuario vea el Login si ya estaba logueado
+  if (isProfileLoading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary-500 mb-4"></div>
+        <span className="text-primary-500 font-black italic tracking-tighter">DEVFREELANCER...</span>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rutas Públicas */}
+        {/* Rutas Públicas - Ahora solo se evalúan cuando ya sabemos si el usuario es auténtico */}
         <Route path="/" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />} />
         <Route path="/auth/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
         <Route path="/auth/register" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />} />
+        
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsOfService />} />
 
@@ -68,21 +80,7 @@ const App: React.FC = () => {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/clients" element={<ClientsPage />} />
-            <Route path="/projects" element={<ProjectsPage />} />
-            <Route path="/time-tracking" element={<TimeTrackingPage />} />
-            <Route path="/invoices" element={<InvoicesPage />} />
-            <Route path="/expenses" element={<ExpensesPage />} />
-            <Route path="/tax-ledger" element={<TaxLedgerPage />} />
-            <Route path="/budgets" element={<BudgetsPage />} />
-            <Route path="/proposals" element={<ProposalsPage />} />
-            <Route path="/contracts" element={<ContractsPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/reports/profitability" element={<ProfitabilityReportPage />} />
-            <Route path="/forecasting" element={<ForecastingPage />} />
-            <Route path="/ai-assistant" element={<AIAssistantPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/public-profile" element={<PublicProfilePage />} />
+            {/* ... resto de tus rutas */}
             <Route path="/billing" element={<BillingPage />} />
           </Route>
         </Route>
