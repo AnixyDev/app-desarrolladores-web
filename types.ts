@@ -1,6 +1,8 @@
-
 // types.ts
+import * as Icons from 'lucide-react';
 
+// Esto crea un tipo de unión con todos los nombres de iconos disponibles
+export type IconName = keyof typeof Icons;
 export interface Profile {
   id: string;
   full_name: string;
