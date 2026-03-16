@@ -8,7 +8,7 @@ import { Project, NewProject, NewClient } from '@/types';
 import EmptyState from '@/components/ui/EmptyState';
 import { BriefcaseIcon, PlusIcon, SearchIcon, Filter, Users, LayoutGrid, List } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
-import { ProjectCard } from '@/components/projects/ProjectCard.tsx'; // Importamos el nuevo componente
+import { ProjectCard } from '../components/projects/ProjectsCard'; // Importamos el nuevo componente
 
 // DND Kit
 import { DndContext, closestCorners, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
