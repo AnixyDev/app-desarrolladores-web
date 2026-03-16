@@ -57,13 +57,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, progress, cli
                 )}
             </div>
 
-            <Link 
-                to={`/projects/${project.id}`} 
-                onPointerDown={(e) => e.stopPropagation()} // Para que el link funcione con DND
-                className="text-white font-semibold text-sm line-clamp-1 mb-1 group-hover:text-primary-400 transition-colors"
-            >
-                {project.name}
-            </Link>
+            <div className="text-white font-semibold text-sm line-clamp-1 mb-1">
+    {project.name}
+</div>
             
             <p className="text-gray-500 text-xs mb-3 flex items-center gap-1 font-medium">
                 <BriefcaseIcon className="w-3 h-3" /> {clientName || 'Sin cliente'}

@@ -8,13 +8,13 @@ import { Project, NewProject, NewClient } from '@/types';
 import EmptyState from '@/components/ui/EmptyState';
 import { BriefcaseIcon, PlusIcon, SearchIcon, Filter, Users } from '@/components/icons/Icon.tsx';
 import { useToast } from '@/hooks/useToast';
-import { ProjectCard } from '../components/projects/ProjectCard'; // Importamos el nuevo componente
+import { ProjectCard } from '@/components/projects/ProjectCard'; // Importamos el nuevo componente
 
 // DND Kit
 import { DndContext, closestCorners, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
-const ProjectsPage: React.FC = () => {
+const ProjectPage: React.FC = () => {
     const { projects, clients, tasks, addProject, getClientById, addClient, updateProject } = useAppStore();
     const { addToast } = useToast();
     
@@ -124,4 +124,4 @@ const ProjectsPage: React.FC = () => {
     );
 };
 
-export default ProjectsPage;
+export default ProjectPage;
