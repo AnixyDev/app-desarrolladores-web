@@ -11,7 +11,7 @@ import PortalLayout from './pages/portal/PortalLayout';
 import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
-import ProjectsPage from './pages/ProjectPage';
+import ProjectPage from './pages/ProjectPage';
 import ClientsPage from './pages/ClientsPage';
 import InvoicesPage from './pages/InvoicesPage';
 import AIAssistantPage from './pages/AIAssistantPage';
@@ -50,7 +50,7 @@ function App() {
       {/* RUTAS PRIVADAS (APP DESARROLLADOR) */}
       <Route element={<AppLayout />}>
         <Route path="/" element={<DashboardPage />} />
-        <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/projects" element={<ProjectPage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/invoices" element={<InvoicesPage />} />
         <Route path="/ai-assistant" element={<AIAssistantPage />} />

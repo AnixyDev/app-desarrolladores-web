@@ -6,7 +6,6 @@ import { formatCurrency } from '@/lib/utils';
 import { useAppStore } from '@/hooks/useAppStore';
 import { BriefcaseIcon, ClockIcon } from '@/components/icons/Icon';
 import StatusChip from '@/components/ui/StatusChip';
-import { Link } from 'react-router-dom';
 
 interface ProjectCardProps {
     project: Project;
