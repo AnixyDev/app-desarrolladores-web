@@ -11,7 +11,7 @@ import PortalLayout from './pages/portal/PortalLayout';
 import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
-import ProjectsPage from './pages/ProjectsPage';
+import ProjectsPage from './pages/ProjectPage';
 import ClientsPage from './pages/ClientsPage';
 import InvoicesPage from './pages/InvoicesPage';
 import AIAssistantPage from './pages/AIAssistantPage';

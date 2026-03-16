@@ -6,7 +6,7 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { Project, NewProject, NewClient } from '@/types';
 import EmptyState from '@/components/ui/EmptyState';
-import { BriefcaseIcon, PlusIcon, SearchIcon, Filter, Users, LayoutGrid, List } from '@/components/icons/Icon.tsx';
+import { BriefcaseIcon, PlusIcon, SearchIcon, Filter, Users } from '@/components/icons/Icon.tsx';
 import { useToast } from '@/hooks/useToast';
 import { ProjectCard } from '../components/projects/ProjectsCard'; // Importamos el nuevo componente
 

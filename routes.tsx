@@ -8,7 +8,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 
 // App core
 import DashboardPage from './pages/DashboardPage';
-import ProjectsPage from './pages/ProjectsPage';
+import ProjectsPage from './pages/ProjectPage';
 import ClientsPage from './pages/ClientsPage';
 import InvoicesPage from './pages/InvoicesPage';
 import SettingsPage from './pages/SettingsPage';
