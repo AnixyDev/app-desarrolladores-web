@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../useAppStore';
-import { Profile } from '@/types';
+import { Profile, PlanType, UserRole } from '@/types'; // Asegúrate de tener estos tipos
 import { supabase } from '@/lib/supabaseClient';
 
 const initialProfile: Profile = {
@@ -10,8 +10,8 @@ const initialProfile: Profile = {
     business_name: '',
     tax_id: '',
     avatar_url: '',
-    plan: 'Free',
-    role: 'Developer',
+    plan: 'Free' as PlanType,
+    role: 'Developer' as UserRole,
     ai_credits: 10,
     hourly_rate_cents: 0,
     pdf_color: '#d9009f',
@@ -33,13 +33,11 @@ export interface AuthSlice {
   login: (email: string, password?: string) => Promise<boolean>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password?: string) => Promise<boolean>;
-  // FIX: Added missing property loginWithGoogle required by RegisterPage.tsx
-  loginWithGoogle: (payload: any) => void;
-  // FIX: Added missing property consumeCredits required by many AI-driven pages
+  loginWithGoogle: (payload: { email: string; name?: string; picture?: string }) => void;
   consumeCredits: (amount: number) => Promise<boolean>;
   updateProfile: (profileData: Partial<Profile>) => Promise<void>;
   refreshProfile: () => Promise<void>;
-  initializeAuth: () => () => void; // Devuelve función de cleanup
+  initializeAuth: () => () => void;
   resetStore: () => void;
 }
 
@@ -56,13 +54,11 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             isAuthenticated: false, 
             profile: initialProfile, 
             isProfileLoading: false,
+            // Limpiamos todos los arreglos de los otros slices para evitar fugas de datos entre sesiones
             clients: [],
             projects: [],
-            tasks: [],
             invoices: [],
             expenses: [],
-            recurringInvoices: [],
-            recurringExpenses: [],
             budgets: [],
             proposals: [],
             contracts: [],
@@ -70,79 +66,75 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         });
     },
     
-   refreshProfile: async () => {
-    if (refreshLock) return;
-    refreshLock = true;
+    refreshProfile: async () => {
+        if (refreshLock) return;
+        refreshLock = true;
 
-    try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session?.user) {
-            get().resetStore();
-            set({ isProfileLoading: false }); // <--- Aseguramos que deje de cargar
-            return;
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (!session?.user) {
+                get().resetStore();
+                return;
+            }
+
+            const { data: profileData, error: fetchError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .maybeSingle();
+            
+            if (fetchError) throw fetchError;
+
+            // Mapeo seguro de datos: Prioridad DB > Metadata > Initial
+            const activeProfile: Profile = {
+                ...initialProfile,
+                ...(profileData || {}),
+                id: session.user.id,
+                email: session.user.email || profileData?.email || '',
+                full_name: profileData?.full_name || session.user.user_metadata?.full_name || 'Usuario',
+            };
+
+            set({ 
+                profile: activeProfile, 
+                isAuthenticated: true,
+                isProfileLoading: false 
+            });
+
+            // Carga paralela de datos de la app
+            await Promise.allSettled([
+                get().fetchClients?.(),
+                get().fetchProjects?.(),
+                get().fetchFinanceData?.(),
+                get().fetchNotifications?.()
+            ]);
+
+        } catch (error) {
+            console.error("Auth Sync Error:", error);
+            set({ isProfileLoading: false, isAuthenticated: false });
+        } finally {
+            refreshLock = false;
         }
+    },
 
-        const { data: profileData, error: fetchError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .maybeSingle();
-        
-        if (fetchError) console.error("Error fetching profile:", fetchError);
+    initializeAuth: () => {
+        if (isInitializing) return () => {};
+        isInitializing = true;
 
-        const activeProfile = profileData ? (profileData as Profile) : {
-            ...initialProfile,
-            id: session.user.id,
-            email: session.user.email || '',
-            full_name: session.user.user_metadata?.full_name || 'Usuario',
-        };
-
-        set({ 
-            profile: activeProfile, 
-            isAuthenticated: true,
-            isProfileLoading: false // <--- Éxito
+        // El listener de Supabase es la fuente de verdad
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (session) {
+                await get().refreshProfile();
+            } else {
+                get().resetStore();
+            }
         });
 
-        // Carga de datos en segundo plano (no bloquea el renderizado)
-        Promise.allSettled([
-            get().fetchClients(),
-            get().fetchProjects(),
-            get().fetchFinanceData(),
-            get().fetchTasks(),
-            get().fetchTimeEntries()
-        ]);
-
-    } catch (error) {
-        console.error("Critical Auth Sync Error:", error);
-        set({ isProfileLoading: false, isAuthenticated: false });
-    } finally {
-        refreshLock = false;
-    }
-},
-
- // Reemplaza el contenido de initializeAuth en tu archivo authSlice.ts
-initializeAuth: () => {
-    if (isInitializing) return () => {};
-    isInitializing = true;
-
-    // Escuchamos los cambios de autenticación
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (session) {
-            // Si hay sesión, refrescamos el perfil (esto pondrá isProfileLoading en false al terminar)
-            await get().refreshProfile();
-        } else {
-            // Si no hay sesión, limpiamos y paramos la carga
-            get().resetStore();
-            set({ isProfileLoading: false });
-        }
-    });
-
-    return () => {
-        subscription.unsubscribe();
-        isInitializing = false;
-    };
-},
+        return () => {
+            subscription.unsubscribe();
+            isInitializing = false;
+        };
+    },
 
     login: async (email, password) => {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
@@ -152,7 +144,7 @@ initializeAuth: () => {
     logout: async () => {
         await supabase.auth.signOut();
         get().resetStore();
-        window.location.href = '/auth/login';
+        // Nota: El redireccionamiento lo maneja App.tsx gracias al cambio de estado
     },
 
     register: async (name, email, password) => {
@@ -164,41 +156,40 @@ initializeAuth: () => {
         return !error && !!data.user;
     },
 
-    // FIX: Implemented loginWithGoogle to sync state with Google JWT payload
     loginWithGoogle: (payload) => {
-        set({
+        set(state => ({
             isAuthenticated: true,
             isProfileLoading: false,
             profile: {
-                ...get().profile,
-                email: payload.email || '',
-                full_name: payload.name || 'Usuario',
-                avatar_url: payload.picture || '',
+                ...state.profile,
+                email: payload.email,
+                full_name: payload.name || state.profile.full_name,
+                avatar_url: payload.picture || state.profile.avatar_url,
             }
-        });
+        }));
     },
 
-    // FIX: Implemented consumeCredits to manage AI credit consumption locally and in Supabase
     consumeCredits: async (amount) => {
         const { profile } = get();
         if (profile.ai_credits < amount) return false;
 
         const newCredits = profile.ai_credits - amount;
 
-        // Optimistic local state update
+        // Update optimista
         set(state => ({
             profile: { ...state.profile, ai_credits: newCredits }
         }));
 
-        if (profile.id) {
-            try {
-                await supabase
-                    .from('profiles')
-                    .update({ ai_credits: newCredits })
-                    .eq('id', profile.id);
-            } catch (error) {
-                console.error("Error syncing credits with database:", error);
-            }
+        const { error } = await supabase
+            .from('profiles')
+            .update({ ai_credits: newCredits })
+            .eq('id', profile.id);
+
+        if (error) {
+            console.error("Error syncing credits:", error);
+            // Revertir si falla
+            await get().refreshProfile();
+            return false;
         }
         return true;
     },
@@ -207,15 +198,23 @@ initializeAuth: () => {
         const { profile } = get();
         if (!profile.id) return;
 
-        // PROTECCIÓN DE COLUMNAS SENSIBLES: El RLS también bloquea esto, 
-        // pero lo sanitizamos en el cliente para mejor UX.
-        const { plan, ai_credits, role, stripe_customer_id, ...safeData } = profileData as any;
+        // Sanitización Pro: Evitamos que el usuario edite campos sensibles manualmente
+        // mediante el objeto de actualización, incluso si TypeScript lo permitiera.
+        const { 
+            id, email, plan, ai_credits, role, 
+            stripe_account_id, affiliate_code, ...safeData 
+        } = profileData as any;
 
-        const { error } = await supabase.from('profiles').update(safeData).eq('id', profile.id);
-        if (!error) {
-            set(state => ({ profile: { ...state.profile, ...safeData } as Profile }));
-        } else {
-            throw new Error(error.message);
-        }
+        const { error } = await supabase
+            .from('profiles')
+            .update(safeData)
+            .eq('id', profile.id);
+
+        if (error) throw error;
+        
+        // Sincronizamos el estado local solo con los datos permitidos
+        set(state => ({ 
+            profile: { ...state.profile, ...safeData } 
+        }));
     },
 });
