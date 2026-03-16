@@ -70,75 +70,71 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         });
     },
     
-    refreshProfile: async () => {
-        if (refreshLock) return;
-        refreshLock = true;
+   refreshProfile: async () => {
+    if (refreshLock) return;
+    refreshLock = true;
 
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (!session?.user) {
-                get().resetStore();
-                return;
-            }
-
-            const { data: profileData, error: fetchError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .maybeSingle();
-            
-            if (fetchError) console.error("Error fetching profile:", fetchError);
-
-            const activeProfile = profileData ? (profileData as Profile) : {
-                ...initialProfile,
-                id: session.user.id,
-                email: session.user.email || '',
-                full_name: session.user.user_metadata?.full_name || 'Usuario',
-            };
-
-            set({ 
-                profile: activeProfile, 
-                isAuthenticated: true,
-                isProfileLoading: false 
-            });
-
-            // Carga de datos paralela optimizada
-            await Promise.allSettled([
-                get().fetchClients(),
-                get().fetchProjects(),
-                get().fetchFinanceData(),
-                get().fetchTasks(),
-                get().fetchTimeEntries()
-            ]);
-
-        } catch (error) {
-            console.error("Critical Auth Sync Error:", error);
-            set({ isProfileLoading: false, isAuthenticated: false });
-        } finally {
-            refreshLock = false;
+    try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.user) {
+            get().resetStore();
+            set({ isProfileLoading: false }); // <--- Aseguramos que deje de cargar
+            return;
         }
-    },
+
+        const { data: profileData, error: fetchError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .maybeSingle();
+        
+        if (fetchError) console.error("Error fetching profile:", fetchError);
+
+        const activeProfile = profileData ? (profileData as Profile) : {
+            ...initialProfile,
+            id: session.user.id,
+            email: session.user.email || '',
+            full_name: session.user.user_metadata?.full_name || 'Usuario',
+        };
+
+        set({ 
+            profile: activeProfile, 
+            isAuthenticated: true,
+            isProfileLoading: false // <--- Éxito
+        });
+
+        // Carga de datos en segundo plano (no bloquea el renderizado)
+        Promise.allSettled([
+            get().fetchClients(),
+            get().fetchProjects(),
+            get().fetchFinanceData(),
+            get().fetchTasks(),
+            get().fetchTimeEntries()
+        ]);
+
+    } catch (error) {
+        console.error("Critical Auth Sync Error:", error);
+        set({ isProfileLoading: false, isAuthenticated: false });
+    } finally {
+        refreshLock = false;
+    }
+},
 
  // Reemplaza el contenido de initializeAuth en tu archivo authSlice.ts
 initializeAuth: () => {
     if (isInitializing) return () => {};
     isInitializing = true;
 
-    // Captura la sesión inicial inmediatamente
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) get().refreshProfile();
-        else set({ isProfileLoading: false });
-    });
-
+    // Escuchamos los cambios de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (session) {
-            // Esto asegura que el token se actualice antes de llamar a Stripe/IA
-            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-                await get().refreshProfile();
-            }
+            // Si hay sesión, refrescamos el perfil (esto pondrá isProfileLoading en false al terminar)
+            await get().refreshProfile();
         } else {
+            // Si no hay sesión, limpiamos y paramos la carga
             get().resetStore();
+            set({ isProfileLoading: false });
         }
     });
 
