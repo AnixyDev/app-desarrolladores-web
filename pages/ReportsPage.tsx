@@ -8,15 +8,12 @@ import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 
 import {
-  DownloadIcon,
   DollarSignIcon,
   TrendingUpIcon,
   Users as UsersIcon,
   ClockIcon,
   SparklesIcon,
   RefreshCwIcon,
-  ArrowUpCircleIcon,
-  AlertTriangleIcon,
 } from '@/components/icons/Icon';
 
 import { formatCurrency } from '@/lib/utils';
@@ -25,6 +22,7 @@ import { analyzeProfitability, AI_CREDIT_COSTS } from '@/services/geminiService'
 const ProfitabilityByClientChart = lazy(
   () => import('@/components/charts/ProfitabilityByClientChart')
 );
+
 const BuyCreditsModal = lazy(
   () => import('@/components/modals/BuyCreditsModal')
 );
@@ -42,13 +40,15 @@ const StatCard: React.FC<{
   color?: string;
 }> = ({ icon: Icon, title, value, color = 'text-white' }) => (
   <Card>
-    <CardContent className="p-4 flex items-center">
-      <div className="p-3 rounded-full bg-primary-600/20 text-primary-400 mr-4">
+    <CardContent className="p-4 flex items-center gap-4">
+      <div className="p-3 rounded-full bg-primary-600/20 text-primary-400 shrink-0">
         <Icon className="w-6 h-6" />
       </div>
-      <div>
-        <p className="text-sm text-gray-400">{String(title)}</p>
-        <p className={`text-2xl font-bold ${color}`}>{String(value)}</p>
+      <div className="min-w-0">
+        <p className="text-sm text-gray-400 truncate">{String(title)}</p>
+        <p className={`text-2xl font-bold ${color} truncate`}>
+          {String(value)}
+        </p>
       </div>
     </CardContent>
   </Card>
@@ -73,9 +73,7 @@ const ReportsPage: React.FC = () => {
   const [startDate, setStartDate] = useState(
     firstDayOfMonth.toISOString().split('T')[0]
   );
-  const [endDate, setEndDate] = useState(
-    today.toISOString().split('T')[0]
-  );
+  const [endDate, setEndDate] = useState(today.toISOString().split('T')[0]);
 
   const [analysis, setAnalysis] = useState<FinancialAnalysis | null>(null);
   const [isAiLoading, setIsAiLoading] = useState(false);
@@ -109,6 +107,7 @@ const ReportsPage: React.FC = () => {
       (sum, inv) => sum + inv.total_cents,
       0
     );
+
     const totalExpenses = filteredData.expenses.reduce(
       (sum, exp) => sum + exp.amount_cents,
       0
@@ -119,6 +118,7 @@ const ReportsPage: React.FC = () => {
         const clientInvoices = paidInvoices.filter(
           i => i.client_id === client.id
         );
+
         const income = clientInvoices.reduce(
           (sum, i) => sum + i.subtotal_cents,
           0
@@ -196,21 +196,27 @@ const ReportsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
+
+      {/* Filtros – mobile first */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-2">
         <input
           type="date"
           value={startDate}
           onChange={e => setStartDate(e.target.value)}
-          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded"
+          className="w-full sm:w-auto px-3 py-2 bg-gray-800 border border-gray-700 rounded"
         />
         <input
           type="date"
           value={endDate}
           onChange={e => setEndDate(e.target.value)}
-          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded"
+          className="w-full sm:w-auto px-3 py-2 bg-gray-800 border border-gray-700 rounded"
         />
 
-        <Button onClick={handleAiAnalysis} disabled={isAiLoading}>
+        <Button
+          onClick={handleAiAnalysis}
+          disabled={isAiLoading}
+          className="w-full sm:w-auto"
+        >
           {isAiLoading ? (
             <RefreshCwIcon className="w-4 h-4 mr-2 animate-spin" />
           ) : (
@@ -220,7 +226,8 @@ const ReportsPage: React.FC = () => {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
           icon={DollarSignIcon}
           title="Ingresos"
@@ -254,11 +261,14 @@ const ReportsPage: React.FC = () => {
             </h2>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p>{String(analysis.summary)}</p>
+            <p className="text-sm leading-relaxed break-words">
+              {String(analysis.summary)}
+            </p>
           </CardContent>
         </Card>
       )}
 
+      {/* Gráfico */}
       <Card>
         <CardHeader>
           <h2 className="flex items-center gap-2">
@@ -266,12 +276,18 @@ const ReportsPage: React.FC = () => {
             Rentabilidad por Cliente
           </h2>
         </CardHeader>
-        <CardContent>
-          <Suspense fallback={<div>Cargando gráfico…</div>}>
-            <ProfitabilityByClientChart
-              data={reportKpis.clientProfitability}
-            />
-          </Suspense>
+
+        {/* CLAVE para responsive */}
+        <CardContent className="px-2 sm:px-4">
+          <div className="w-full overflow-x-auto">
+            <div className="min-w-[320px] h-[320px]">
+              <Suspense fallback={<div className="text-sm text-gray-400">Cargando gráfico…</div>}>
+                <ProfitabilityByClientChart
+                  data={reportKpis.clientProfitability}
+                />
+              </Suspense>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

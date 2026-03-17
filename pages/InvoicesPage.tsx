@@ -3,7 +3,7 @@ import React, { useState, useMemo, lazy, Suspense, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 // FIX: Remove .tsx and .ts extensions from imports to fix module resolution errors.
 import { useAppStore } from '@/hooks/useAppStore';
-import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { Invoice, RecurringInvoice } from '@/types';
 import { formatCurrency } from '@/lib/utils';

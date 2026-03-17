@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
-import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import { CheckCircleIcon, CreditCard, Users, RefreshCwIcon, SettingsIcon } from '@/components/icons/Icon';
@@ -115,8 +115,9 @@ const BillingPage: React.FC = () => {
                         />
                         <SubscriptionCard
                             plan="Teams" title="Studio Team" recommended={true}
-                            price={billingCycle === 'monthly' ? "35,95€" : "29,95€"}
-                            period={billingCycle === 'monthly' ? "mes" : "mes (anual)"}
+                            // CORRECCIÓN: Mostramos el precio real que espera Stripe para evitar el error 400
+                            price={billingCycle === 'monthly' ? "35,95€" : "295€"}
+                            period={billingCycle === 'monthly' ? "mes" : "año"}
                             features={["Hasta 5 miembros de equipo", "Roles y permisos avanzados", "Integraciones con Slack y Webhooks", "200 Créditos IA compartidos"]}
                             isCurrent={isTeams} itemKey={billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly'} icon={Users}
                         />

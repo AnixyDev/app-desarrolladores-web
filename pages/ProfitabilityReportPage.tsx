@@ -80,155 +80,297 @@ const SortableHeader: React.FC<{
     >
       <div className="flex items-center gap-2">
         {label}
-        {isSorted ? (
-          sortConfig?.direction === 'ascending' ? (
-            <ChevronUpIcon className="w-4 h-4" />
+        {isSorted &&
+          (sortConfig?.direction === 'ascending' ? (
+            <ChevronUpIcon className="w-4 h-4 text-primary-400" />
           ) : (
-            <ChevronDownIcon className="w-4 h-4" />
-          )
-        ) : (
-          <div className="w-4 h-4" />
-        )}
+            <ChevronDownIcon className="w-4 h-4 text-primary-400" />
+          ))}
       </div>
     </th>
   );
 };
 
 const ProfitabilityReportPage: React.FC = () => {
-  const {
-    projects,
-    clients,
-    invoices,
-    expenses,
-    timeEntries,
-    profile,
-    consumeCredits,
-  } = useAppStore();
-
+  const { projects, clients, invoices, timeEntries, expenses, consumeCredits } =
+    useAppStore();
   const { addToast } = useToast();
 
   const [sortConfig, setSortConfig] = useState<{
     key: keyof ProfitabilityData;
-    direction: 'ascending' | 'descending';
-  }>({ key: 'netProfit', direction: 'descending' });
-
+    direction: string;
+  } | null>(null);
   const [analysis, setAnalysis] = useState<FinancialAnalysis | null>(null);
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const profitabilityData: ProfitabilityData[] = useMemo(() => {
-    if (!profile) return [];
+  const profitabilityData = useMemo(() => {
+    return projects.map((project) => {
+      const projectInvoices = invoices.filter((invoice) => invoice.project_id === project.id);
+      const projectExpenses = expenses.filter((expense) => expense.project_id === project.id);
+      const projectTimeEntries = timeEntries.filter((entry) => entry.project_id === project.id);
 
-    return projects.map(project => {
-      const projectInvoices = invoices.filter(
-        i => i.project_id === project.id && i.paid
-      );
-      const totalIncome = projectInvoices.reduce(
-        (sum, i) => sum + i.subtotal_cents,
+      const totalIncome = projectInvoices.reduce((sum, invoice) => sum + invoice.total_cents, 0);
+      const totalCosts = projectExpenses.reduce((sum, expense) => sum + expense.amount_cents, 0);
+      const totalHours = projectTimeEntries.reduce(
+        (sum, entry) => sum + entry.duration_seconds / 3600,
         0
       );
-
-      const projectExpenses = expenses.filter(
-        e => e.project_id === project.id
-      );
-      const expenseCosts = projectExpenses.reduce(
-        (sum, e) => sum + e.amount_cents,
-        0
-      );
-
-      const projectTimeEntries = timeEntries.filter(
-        t => t.project_id === project.id
-      );
-      const totalSeconds = projectTimeEntries.reduce(
-        (sum, t) => sum + t.duration_seconds,
-        0
-      );
-
-      const totalHours = totalSeconds / 3600;
-      const timeCosts = totalHours * profile.hourly_rate_cents;
-
-      const totalCosts = expenseCosts + timeCosts;
-      const netProfit = totalIncome - totalCosts;
-      const margin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
-      const effectiveHourlyRate =
-        totalHours > 0 ? netProfit / totalHours : 0;
 
       return {
         projectId: project.id,
         projectName: project.name,
-        clientName:
-          clients.find(c => c.id === project.client_id)?.name || 'N/A',
+        clientName: clients.find((client) => client.id === project.client_id)?.name || 'Cliente desconocido',
         totalIncome,
         totalCosts,
-        netProfit,
-        margin,
+        netProfit: totalIncome - totalCosts,
+        margin: totalIncome > 0 ? ((totalIncome - totalCosts) / totalIncome) * 100 : 0,
         totalHours,
-        effectiveHourlyRate,
+        effectiveHourlyRate: totalHours > 0 ? totalIncome / totalHours : 0,
       };
     });
-  }, [projects, clients, invoices, expenses, timeEntries, profile]);
+  }, [projects, clients, invoices, expenses, timeEntries]);
 
-  const handleAiAnalysis = async () => {
-    if (!profile) return;
+  const sortedData = useMemo(() => {
+    if (!sortConfig) return profitabilityData;
 
-    if (profile.ai_credits < AI_CREDIT_COSTS.analyzeProfitability) {
-      setIsBuyCreditsModalOpen(true);
-      return;
+    const sorted = [...profitabilityData].sort((a, b) => {
+      if (a[sortConfig.key] < b[sortConfig.key]) {
+        return sortConfig.direction === 'ascending' ? -1 : 1;
+      }
+      if (a[sortConfig.key] > b[sortConfig.key]) {
+        return sortConfig.direction === 'ascending' ? 1 : -1;
+      }
+      return 0;
+    });
+
+    return sorted;
+  }, [profitabilityData, sortConfig]);
+
+  const requestSort = (key: keyof ProfitabilityData) => {
+    let direction = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
     }
+    setSortConfig({ key, direction });
+  };
 
-    setIsAiLoading(true);
-    setAnalysis(null);
+  const topProfitProject = profitabilityData.reduce(
+    (top, current) => (current.netProfit > top.netProfit ? current : top),
+    profitabilityData[0]
+  );
+
+  const lowestProfitProject = profitabilityData.reduce(
+    (lowest, current) => (current.netProfit < lowest.netProfit ? current : lowest),
+    profitabilityData[0]
+  );
+
+  const handleAnalyze = async () => {
+    setIsAnalyzing(true);
 
     try {
-      const dataToAnalyze = profitabilityData.map(({ projectId, ...rest }) => rest);
-      const result = await analyzeProfitability({ projects: dataToAnalyze });
-
-      setAnalysis({
-        summary: String(result.summary ?? 'Análisis no disponible'),
-        topPerformers: result.topPerformers ?? [],
-        areasForImprovement: result.areasForImprovement ?? [],
-      });
-
       consumeCredits(AI_CREDIT_COSTS.analyzeProfitability);
-      addToast('Análisis de rentabilidad completado.', 'success');
+      const data = await analyzeProfitability(profitabilityData);
+      setAnalysis(data);
     } catch (error) {
-      addToast(String((error as Error).message), 'error');
+      addToast('Error al analizar la rentabilidad. Intenta nuevamente.', 'error');
     } finally {
-      setIsAiLoading(false);
+      setIsAnalyzing(false);
     }
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-white">
-          Panel de Rentabilidad por Proyecto
-        </h1>
-        <Button onClick={handleAiAnalysis} disabled={isAiLoading}>
-          {isAiLoading ? (
-            <RefreshCwIcon className="w-4 h-4 mr-2 animate-spin" />
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <h1 className="text-2xl font-semibold text-white">Rentabilidad</h1>
+        <Button onClick={handleAnalyze} disabled={isAnalyzing}>
+          {isAnalyzing ? (
+            <RefreshCwIcon className="w-4 h-4 animate-spin mr-2" />
           ) : (
             <SparklesIcon className="w-4 h-4 mr-2" />
           )}
-          {isAiLoading ? 'Analizando…' : 'Analizar con IA'}
+          Analizar con IA
         </Button>
       </div>
 
-      {profitabilityData.length === 0 && (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard
+          icon={ArrowUpCircleIcon}
+          title="Proyecto más rentable"
+          value={formatCurrency(topProfitProject?.netProfit || 0)}
+          project={topProfitProject?.projectName}
+          color="text-green-400"
+        />
+        <StatCard
+          icon={ArrowDownCircleIcon}
+          title="Proyecto menos rentable"
+          value={formatCurrency(lowestProfitProject?.netProfit || 0)}
+          project={lowestProfitProject?.projectName}
+          color="text-red-400"
+        />
+        <StatCard
+          icon={DollarSignIcon}
+          title="Margen promedio"
+          value={`${(
+            profitabilityData.reduce((sum, project) => sum + project.margin, 0) /
+              (profitabilityData.length || 1)
+          ).toFixed(1)}%`}
+          color="text-primary-400"
+        />
+      </div>
+
+      {profitabilityData.length === 0 ? (
         <EmptyState
           icon={BriefcaseIcon}
-          title="No hay datos para analizar"
-          message="Registra proyectos, horas y facturas pagadas."
+          title="No hay datos de rentabilidad"
+          message="Crea proyectos, facturas y gastos para ver el reporte."
+          action={{
+            text: 'Crear proyecto',
+            onClick: () => {},
+          }}
         />
+      ) : (
+        <Card>
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-white">
+              Rentabilidad por proyecto
+            </h2>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className="border-b border-gray-800">
+                  <tr>
+                    <SortableHeader
+                      label="Proyecto"
+                      sortKey="projectName"
+                      sortConfig={sortConfig}
+                      requestSort={requestSort}
+                    />
+                    <SortableHeader
+                      label="Cliente"
+                      sortKey="clientName"
+                      sortConfig={sortConfig}
+                      requestSort={requestSort}
+                    />
+                    <SortableHeader
+                      label="Ingresos"
+                      sortKey="totalIncome"
+                      sortConfig={sortConfig}
+                      requestSort={requestSort}
+                    />
+                    <SortableHeader
+                      label="Costes"
+                      sortKey="totalCosts"
+                      sortConfig={sortConfig}
+                      requestSort={requestSort}
+                    />
+                    <SortableHeader
+                      label="Beneficio neto"
+                      sortKey="netProfit"
+                      sortConfig={sortConfig}
+                      requestSort={requestSort}
+                    />
+                    <SortableHeader
+                      label="Margen"
+                      sortKey="margin"
+                      sortConfig={sortConfig}
+                      requestSort={requestSort}
+                    />
+                    <SortableHeader
+                      label="Horas"
+                      sortKey="totalHours"
+                      sortConfig={sortConfig}
+                      requestSort={requestSort}
+                    />
+                    <SortableHeader
+                      label="Tarifa efectiva"
+                      sortKey="effectiveHourlyRate"
+                      sortConfig={sortConfig}
+                      requestSort={requestSort}
+                    />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedData.map((data) => (
+                    <tr
+                      key={data.projectId}
+                      className="border-b border-gray-800 hover:bg-gray-800/50"
+                    >
+                      <td className="p-4 font-semibold text-white">
+                        <Link
+                          to={`/projects/${data.projectId}`}
+                          className="hover:text-primary-400"
+                        >
+                          {data.projectName}
+                        </Link>
+                      </td>
+                      <td className="p-4 text-gray-400">{data.clientName}</td>
+                      <td className="p-4 text-gray-300">
+                        {formatCurrency(data.totalIncome)}
+                      </td>
+                      <td className="p-4 text-gray-300">
+                        {formatCurrency(data.totalCosts)}
+                      </td>
+                      <td className="p-4 text-gray-300">
+                        {formatCurrency(data.netProfit)}
+                      </td>
+                      <td className="p-4 text-gray-300">
+                        {data.margin.toFixed(1)}%
+                      </td>
+                      <td className="p-4 text-gray-300">
+                        {data.totalHours.toFixed(1)}
+                      </td>
+                      <td className="p-4 text-gray-300">
+                        {formatCurrency(data.effectiveHourlyRate)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <Suspense fallback={null}>
-        {isBuyCreditsModalOpen && (
-          <BuyCreditsModal
-            isOpen
-            onClose={() => setIsBuyCreditsModalOpen(false)}
-          />
+        {analysis && (
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-semibold text-white">
+                Análisis de rentabilidad
+              </h2>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-gray-300">{analysis.summary}</p>
+              <div>
+                <h3 className="text-sm font-semibold text-white">
+                  Proyectos más rentables
+                </h3>
+                <ul className="list-disc list-inside text-gray-300">
+                  {analysis.topPerformers.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">
+                  Áreas de mejora
+                </h3>
+                <ul className="list-disc list-inside text-gray-300">
+                  {analysis.areasForImprovement.map((item, index) => (
+                    <li key={index}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
         )}
+
+        <BuyCreditsModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+        />
       </Suspense>
     </div>
   );

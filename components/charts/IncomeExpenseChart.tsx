@@ -1,9 +1,5 @@
-
-
-
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-// FIX: Remove .ts extension from import to fix module resolution error.
 import type { Invoice, Expense } from '@/types';
 
 interface ChartProps {
@@ -13,11 +9,12 @@ interface ChartProps {
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(value / 100);
 
-const processChartData = (invoices: Invoice[], expenses: Expense[]) => {
+const processChartData = (invoices: Invoice[] = [], expenses: Expense[] = []) => {
     const dataByMonth: { [key: string]: { name: string; ingresos: number; gastos: number } } = {};
     const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-    invoices.forEach(invoice => {
+    // FIX: Usamos el operador opcional o inicializamos como array vacío para evitar el error .forEach
+    (invoices || []).forEach(invoice => {
         if (invoice.paid && invoice.payment_date) {
             const date = new Date(invoice.payment_date);
             const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
@@ -28,7 +25,7 @@ const processChartData = (invoices: Invoice[], expenses: Expense[]) => {
         }
     });
 
-    expenses.forEach(expense => {
+    (expenses || []).forEach(expense => {
         const date = new Date(expense.date);
         const monthKey = `${date.getFullYear()}-${date.getMonth()}`;
         if (!dataByMonth[monthKey]) {
@@ -42,6 +39,15 @@ const processChartData = (invoices: Invoice[], expenses: Expense[]) => {
 
 
 const IncomeExpenseChart: React.FC<ChartProps> = ({ invoices, expenses }) => {
+  // Si no hay datos, mostramos un estado de carga amigable en lugar de romper la app
+  if (!invoices && !expenses) {
+    return (
+      <div className="h-[300px] w-full flex items-center justify-center text-gray-500 bg-gray-900/50 rounded-xl border border-gray-800">
+        <p className="animate-pulse">Cargando estadísticas financieras...</p>
+      </div>
+    );
+  }
+
   const data = processChartData(invoices, expenses);
 
   return (
@@ -56,8 +62,8 @@ const IncomeExpenseChart: React.FC<ChartProps> = ({ invoices, expenses }) => {
             formatter={(value: number) => formatCurrency(value)} 
         />
         <Legend wrapperStyle={{ color: '#a0a0a0' }}/>
-        <Bar dataKey="ingresos" fill="#f000b8" name="Ingresos" />
-        <Bar dataKey="gastos" fill="#ef4444" name="Gastos" />
+        <Bar dataKey="ingresos" fill="#f000b8" name="Ingresos" radius={[4, 4, 0, 0]} />
+        <Bar dataKey="gastos" fill="#ef4444" name="Gastos" radius={[4, 4, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

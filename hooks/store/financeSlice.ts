@@ -1,7 +1,7 @@
 
 import { StateCreator } from 'zustand';
 import { Invoice, Expense, RecurringExpense, Budget, Proposal, Contract, RecurringInvoice } from '../../types.ts';
-import { AppState } from '@/useAppStore';
+import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
 
 export interface FinanceSlice {
@@ -54,30 +54,40 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
     contracts: [],
     monthlyGoalCents: 0,
 
-    fetchFinanceData: async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+   fetchFinanceData: async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
 
-        const results = await Promise.all([
-            supabase.from('invoices').select('*').order('created_at', { ascending: false }),
-            supabase.from('expenses').select('*').order('date', { ascending: false }),
-            supabase.from('budgets').select('*').order('created_at', { ascending: false }),
-            supabase.from('proposals').select('*').order('created_at', { ascending: false }),
-            supabase.from('contracts').select('*').order('created_at', { ascending: false }),
-            supabase.from('recurring_invoices').select('*'),
-            supabase.from('recurring_expenses').select('*'),
-        ]);
+  const results = await Promise.allSettled([
+    supabase.from('invoices').select('*').order('created_at', { ascending: false }),
+    // 🔴 FIX: antes era order('date')
+    supabase.from('expenses').select('*').order('created_at', { ascending: false }),
+    supabase.from('budgets').select('*').order('created_at', { ascending: false }),
+    supabase.from('proposals').select('*').order('created_at', { ascending: false }),
+    supabase.from('contracts').select('*').order('created_at', { ascending: false }),
+    supabase.from('recurring_invoices').select('*'),
+    supabase.from('recurring_expenses').select('*'),
+  ]);
 
-        set({
-            invoices: (results[0].data || []) as Invoice[],
-            expenses: (results[1].data || []) as Expense[],
-            budgets: (results[2].data || []) as Budget[],
-            proposals: (results[3].data || []) as Proposal[],
-            contracts: (results[4].data || []) as Contract[],
-            recurringInvoices: (results[5].data || []) as RecurringInvoice[],
-            recurringExpenses: (results[6].data || []) as RecurringExpense[],
-        });
-    },
+  const safeData = <T>(r: PromiseSettledResult<any>): T[] => {
+    if (r.status === 'fulfilled' && !r.value.error) {
+      return r.value.data || [];
+    }
+    console.error('Finance fetch error:', r.value?.error);
+    return [];
+  };
+
+  set({
+    invoices: safeData<Invoice>(results[0]),
+    expenses: safeData<Expense>(results[1]),
+    budgets: safeData<Budget>(results[2]),
+    proposals: safeData<Proposal>(results[3]),
+    contracts: safeData<Contract>(results[4]),
+    recurringInvoices: safeData<RecurringInvoice>(results[5]),
+    recurringExpenses: safeData<RecurringExpense>(results[6]),
+  });
+},
+
 
     addInvoice: async (invoiceData, timeEntryIdsToBill) => {
         const { data: { user } } = await supabase.auth.getUser();

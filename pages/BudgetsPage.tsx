@@ -4,20 +4,15 @@ import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import Modal from '@/components/ui/Modal';
-import Input from '@/components/ui/Input';
 import StatusChip from '@/components/ui/StatusChip';
 import EmptyState from '@/components/ui/EmptyState';
 
-import { Budget, InvoiceItem } from '@/types';
+import { InvoiceItem } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import {
-  PlusIcon,
-  TrashIcon,
   CheckCircleIcon,
   XCircleIcon,
   MessageSquareIcon,
-  SparklesIcon,
 } from '../components/icons/Icon';
 
 import { generateItemsForDocument, AI_CREDIT_COSTS } from '../services/geminiService';
@@ -145,8 +140,16 @@ const BudgetsPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-semibold text-white">Presupuestos</h1>
-        <Button onClick={() => setIsModalOpen(true)}>
+        <h1 className="text-2xl font-semibold text-white">
+          Presupuestos
+        </h1>
+
+        <Button
+          onClick={() => {
+            console.log("CLICK FUNCIONA");
+            setIsModalOpen(true);
+          }}
+        >
           Crear Presupuesto
         </Button>
       </div>
@@ -168,6 +171,7 @@ const BudgetsPage: React.FC = () => {
               Listado de Presupuestos
             </h2>
           </CardHeader>
+
           <CardContent className="p-0">
             <table className="w-full text-left">
               <thead className="border-b border-gray-800">
@@ -180,6 +184,7 @@ const BudgetsPage: React.FC = () => {
                   <th className="p-4 text-right">Acciones</th>
                 </tr>
               </thead>
+
               <tbody>
                 {budgets.map(budget => (
                   <tr
@@ -189,21 +194,26 @@ const BudgetsPage: React.FC = () => {
                     <td className="p-4 font-semibold text-white">
                       {budget.description}
                     </td>
+
                     <td className="p-4 text-primary-400">
                       {getClientById(budget.client_id)?.name}
                     </td>
+
                     <td className="p-4 text-gray-300">
                       {budget.created_at}
                     </td>
+
                     <td className="p-4 text-white">
                       {formatCurrency(budget.amount_cents)}
                     </td>
+
                     <td className="p-4">
                       <StatusChip
                         type="budget"
                         status={budget.status}
                       />
                     </td>
+
                     <td className="p-4 text-right">
                       {budget.status === 'pending' && (
                         <div className="flex justify-end gap-2">
@@ -216,6 +226,7 @@ const BudgetsPage: React.FC = () => {
                           >
                             <CheckCircleIcon className="w-4 h-4 text-green-400" />
                           </Button>
+
                           <Button
                             size="sm"
                             variant="secondary"

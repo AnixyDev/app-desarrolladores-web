@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { useAppStore } from '../../hooks/useAppStore';
+import { useAppStore } from '@/hooks/useAppStore';
 import {
   MenuIcon as Menu,
   BellIcon as Bell,
@@ -11,7 +10,8 @@ import {
   SearchIcon,
   SettingsIcon,
 } from '../icons/Icon';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom'; // Añadido useNavigate
+import { supabase } from '@/lib/supabaseClient'; // Importamos supabase
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -25,6 +25,7 @@ const NotificationIcon = ({ link }: { link: string }) => {
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const { profile, logout, notifications, markAllAsRead, markAsRead } = useAppStore();
+  const navigate = useNavigate(); // Hook para redirección
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -33,6 +34,24 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  // Lógica de logout reforzada
+  const handleLogout = async () => {
+    try {
+      setIsUserMenuOpen(false);
+      // 1. Cerrar sesión en Supabase
+      await supabase.auth.signOut();
+      // 2. Ejecutar el logout del store (Zustand)
+      if (logout) logout();
+      // 3. Limpiar todo rastro local
+      localStorage.clear();
+      // 4. Redirección forzada
+      navigate('/auth/login');
+    } catch (error) {
+      console.error("Error crítico al cerrar sesión:", error);
+      window.location.href = '/auth/login'; // Fallback agresivo
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -194,8 +213,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 <SettingsIcon className="w-4 h-4 mr-3" />
                 Ajustes
               </Link>
+              {/* CAMBIO AQUÍ: Llamamos a la función handleLogout local */}
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="w-full text-left flex items-center px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10"
               >
                 <LogOut className="w-4 h-4 mr-3" />
