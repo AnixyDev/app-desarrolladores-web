@@ -206,18 +206,24 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     },
 
     // FIX: Implemented loginWithGoogle to sync state with Google JWT payload
-    loginWithGoogle: (payload) => {
-        set({
-            isAuthenticated: true,
-            isProfileLoading: false,
-            profile: {
-                ...get().profile,
-                email: payload.email || '',
-                full_name: payload.name || 'Usuario',
-                avatar_url: payload.picture || '',
-            }
-        });
-    },
+    // hooks/store/authSlice.ts
+loginWithGoogle: async (token: string) => {
+    // 1. Iniciamos sesión en Supabase con el token de Google
+    const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token: token,
+    });
+
+    if (error) {
+        console.error("Error login Google:", error.message);
+        return false;
+    }
+    
+    // 2. IMPORTANTE: Una vez logueado, llamamos a refreshProfile 
+    // para traer los datos de las tablas 'clients', 'projects', etc.
+    await get().refreshProfile(); 
+    return !!data.user;
+},
 
     // FIX: Implemented consumeCredits to manage AI credit consumption locally and in Supabase
     consumeCredits: async (amount) => {
