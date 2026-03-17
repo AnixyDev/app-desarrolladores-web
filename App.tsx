@@ -37,7 +37,6 @@ const App: React.FC = () => {
     );
   }
 
-  // ESCENARIO B: Cargando Perfil/Sesión
   if (isProfileLoading) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-gray-950">
@@ -46,7 +45,6 @@ const App: React.FC = () => {
     );
   }
 
-  // ESCENARIO C: Todo OK -> Renderizamos las rutas
   return <AppRoutes />;
 };
 
