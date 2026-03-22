@@ -145,10 +145,7 @@ const BudgetsPage: React.FC = () => {
         </h1>
 
         <Button
-          onClick={() => {
-            console.log("CLICK FUNCIONA");
-            setIsModalOpen(true);
-          }}
+          onClick={() => setIsModalOpen(true)}
         >
           Crear Presupuesto
         </Button>
