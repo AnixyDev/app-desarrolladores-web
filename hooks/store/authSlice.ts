@@ -85,13 +85,27 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                 return;
             }
 
-            const { data: profileData, error: fetchError } = await supabase
+            let { data: profileData, error: fetchError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', session.user.id)
                 .maybeSingle();
 
             if (fetchError) throw fetchError;
+
+            // Usuarios nuevos (OAuth): el trigger puede tardar unos ms en crear
+            // la fila en profiles. Reintentamos hasta 3 veces con 800ms entre intentos.
+            if (!profileData) {
+                for (let i = 0; i < 3; i++) {
+                    await new Promise(r => setTimeout(r, 800));
+                    const retry = await supabase
+                        .from('profiles')
+                        .select('*')
+                        .eq('id', session.user.id)
+                        .maybeSingle();
+                    if (retry.data) { profileData = retry.data; break; }
+                }
+            }
 
             const activeProfile: Profile = {
                 ...initialProfile,
@@ -166,12 +180,13 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         void bootstrapAuth();
 
         // Protección ante bootstrap que nunca resuelve (timeout de seguridad)
+        // 12s para dar tiempo a los 3 reintentos de perfil en usuarios nuevos (3 × 800ms)
         const loadingSafetyTimeout = window.setTimeout(() => {
             if (get().isProfileLoading) {
                 console.warn('Auth bootstrap timeout — liberando estado de carga.');
                 set({ isProfileLoading: false });
             }
-        }, 7000);
+        }, 12000);
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
