@@ -45,7 +45,8 @@ export interface AuthSlice {
 // Flags de módulo — previenen arranques y refresco de perfil concurrentes
 let isInitializing = false;
 let refreshLock = false;
-let profileChannel: RealtimeChannel | null = null; // canal Realtime
+let authBootstrapInFlight = false;       // evita bootstraps duplicados (HEAD)
+let profileChannel: RealtimeChannel | null = null; // canal Realtime (main)
 
 export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, get) => ({
     isAuthenticated: false,
@@ -139,53 +140,83 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     },
 
     initializeAuth: () => {
-        // Idempotente: si ya hay una suscripción activa, no crear otra
         if (isInitializing) return () => {};
         isInitializing = true;
 
-        // onAuthStateChange es la única fuente de verdad.
-        // Supabase emite INITIAL_SESSION al suscribirse con la sesión actual
-        // (o null si no hay sesión), eliminando la necesidad de llamar
-        // manualmente a getSession() y evitando la carrera de locks.
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                if (event === 'SIGNED_OUT' || !session) {
-                    get().resetStore();
-                    return;
+        const bootstrapAuth = async () => {
+            if (authBootstrapInFlight) return;
+            authBootstrapInFlight = true;
+
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const authCode = params.get('code');
+
+                // En OAuth con PKCE intercambiamos el code por sesión explícitamente
+                // para evitar quedarnos en loading si detectSessionInUrl falla.
+                if (authCode) {
+                    const { error: exchangeError } =
+                        await supabase.auth.exchangeCodeForSession(authCode);
+                    if (exchangeError) {
+                        console.error('Error exchanging OAuth code:', exchangeError);
+                    }
+                    const cleanUrl = `${window.location.origin}${window.location.pathname}${window.location.hash}`;
+                    window.history.replaceState({}, document.title, cleanUrl);
                 }
 
-                // SIGNED_IN, TOKEN_REFRESHED, INITIAL_SESSION, USER_UPDATED
-                await get().refreshProfile();
-
-                // Canal Realtime para sincronizar cambios de perfil en tiempo real
-                if (profileChannel) supabase.removeChannel(profileChannel);
-                profileChannel = supabase
-                    .channel(`public:profiles:id=eq.${session.user.id}`)
-                    .on(
-                        'postgres_changes',
-                        {
-                            event: 'UPDATE',
-                            schema: 'public',
-                            table: 'profiles',
-                            filter: `id=eq.${session.user.id}`,
-                        },
-                        (payload) => {
-                            set(state => ({
-                                profile: { ...state.profile, ...payload.new },
-                            }));
-                        }
-                    )
-                    .subscribe();
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    await get().refreshProfile();
+                } else {
+                    get().resetStore();
+                }
+            } catch (error) {
+                console.error('Error during auth bootstrap:', error);
+                set({ isAuthenticated: false, isProfileLoading: false });
+            } finally {
+                authBootstrapInFlight = false;
             }
-        );
+        };
 
-        // Timeout de seguridad — si INITIAL_SESSION no llega en 8s, liberamos
+        void bootstrapAuth();
+
+        // Protección ante bootstrap que nunca resuelve (timeout de seguridad)
+        // 12s para dar tiempo a los 3 reintentos de perfil en usuarios nuevos (3 × 800ms)
         const loadingSafetyTimeout = window.setTimeout(() => {
             if (get().isProfileLoading) {
                 console.warn('Auth bootstrap timeout — liberando estado de carga.');
                 set({ isProfileLoading: false });
             }
-        }, 8000);
+        }, 12000);
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (event, session) => {
+                if (session) {
+                    await get().refreshProfile();
+
+                    // Canal Realtime para sincronizar cambios de perfil en tiempo real
+                    if (profileChannel) supabase.removeChannel(profileChannel);
+                    profileChannel = supabase
+                        .channel(`public:profiles:id=eq.${session.user.id}`)
+                        .on(
+                            'postgres_changes',
+                            {
+                                event: 'UPDATE',
+                                schema: 'public',
+                                table: 'profiles',
+                                filter: `id=eq.${session.user.id}`,
+                            },
+                            (payload) => {
+                                set(state => ({
+                                    profile: { ...state.profile, ...payload.new },
+                                }));
+                            }
+                        )
+                        .subscribe();
+                } else {
+                    get().resetStore();
+                }
+            }
+        );
 
         return () => {
             window.clearTimeout(loadingSafetyTimeout);
