@@ -42,11 +42,10 @@ export interface AuthSlice {
   resetStore: () => void;
 }
 
-// Flags de módulo — previenen arranques y refresco de perfil concurrentes
 let isInitializing = false;
 let refreshLock = false;
-let authBootstrapInFlight = false;       // evita bootstraps duplicados (HEAD)
-let profileChannel: RealtimeChannel | null = null; // canal Realtime (main)
+let authBootstrapInFlight = false;
+let profileChannel: RealtimeChannel | null = null;
 
 export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, get) => ({
     isAuthenticated: false,
@@ -76,25 +75,18 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     refreshProfile: async () => {
         if (refreshLock) return;
         refreshLock = true;
-
         try {
             const { data: { session } } = await supabase.auth.getSession();
-
             if (!session?.user) {
                 get().resetStore();
                 return;
             }
-
             let { data: profileData, error: fetchError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', session.user.id)
                 .maybeSingle();
-
             if (fetchError) throw fetchError;
-
-            // Usuarios nuevos (OAuth): el trigger puede tardar unos ms en crear
-            // la fila en profiles. Reintentamos hasta 3 veces con 800ms entre intentos.
             if (!profileData) {
                 for (let i = 0; i < 3; i++) {
                     await new Promise(r => setTimeout(r, 800));
@@ -106,31 +98,20 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                     if (retry.data) { profileData = retry.data; break; }
                 }
             }
-
             const activeProfile: Profile = {
                 ...initialProfile,
                 ...(profileData || {}),
                 id: session.user.id,
                 email: session.user.email || profileData?.email || '',
-                full_name:
-                    profileData?.full_name ||
-                    session.user.user_metadata?.full_name ||
-                    'Usuario',
+                full_name: profileData?.full_name || session.user.user_metadata?.full_name || 'Usuario',
             };
-
-            set({
-                profile: activeProfile,
-                isAuthenticated: true,
-                isProfileLoading: false,
-            });
-
+            set({ profile: activeProfile, isAuthenticated: true, isProfileLoading: false });
             await Promise.allSettled([
                 get().fetchClients?.(),
                 get().fetchProjects?.(),
                 get().fetchFinanceData?.(),
                 get().fetchNotifications?.(),
             ]);
-
         } catch (error) {
             console.error('Auth Sync Error:', error);
             set({ isProfileLoading: false, isAuthenticated: false });
@@ -146,23 +127,15 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         const bootstrapAuth = async () => {
             if (authBootstrapInFlight) return;
             authBootstrapInFlight = true;
-
             try {
                 const params = new URLSearchParams(window.location.search);
                 const authCode = params.get('code');
-
-                // En OAuth con PKCE intercambiamos el code por sesión explícitamente
-                // para evitar quedarnos en loading si detectSessionInUrl falla.
                 if (authCode) {
-                    const { error: exchangeError } =
-                        await supabase.auth.exchangeCodeForSession(authCode);
-                    if (exchangeError) {
-                        console.error('Error exchanging OAuth code:', exchangeError);
-                    }
+                    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode);
+                    if (exchangeError) console.error('Error exchanging OAuth code:', exchangeError);
                     const cleanUrl = `${window.location.origin}${window.location.pathname}${window.location.hash}`;
                     window.history.replaceState({}, document.title, cleanUrl);
                 }
-
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session?.user) {
                     await get().refreshProfile();
@@ -179,8 +152,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
         void bootstrapAuth();
 
-        // Protección ante bootstrap que nunca resuelve (timeout de seguridad)
-        // 12s para dar tiempo a los 3 reintentos de perfil en usuarios nuevos (3 × 800ms)
         const loadingSafetyTimeout = window.setTimeout(() => {
             if (get().isProfileLoading) {
                 console.warn('Auth bootstrap timeout — liberando estado de carga.');
@@ -190,33 +161,23 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-        if (event === 'SIGNED_OUT' || !session) {
-            get().resetStore();
-            return;
-        }
-
-                    // Canal Realtime para sincronizar cambios de perfil en tiempo real
-                    if (profileChannel) supabase.removeChannel(profileChannel);
-                    profileChannel = supabase
-                        .channel(`public:profiles:id=eq.${session.user.id}`)
-                        .on(
-                            'postgres_changes',
-                            {
-                                event: 'UPDATE',
-                                schema: 'public',
-                                table: 'profiles',
-                                filter: `id=eq.${session.user.id}`,
-                            },
-                            (payload) => {
-                                set(state => ({
-                                    profile: { ...state.profile, ...payload.new },
-                                }));
-                            }
-                        )
-                        .subscribe();
-                } else {
+                if (event === 'SIGNED_OUT' || !session) {
                     get().resetStore();
+                    return;
                 }
+                await get().refreshProfile();
+                if (profileChannel) supabase.removeChannel(profileChannel);
+                profileChannel = supabase
+                    .channel(`public:profiles:id=eq.${session.user.id}`)
+                    .on('postgres_changes', {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'profiles',
+                        filter: `id=eq.${session.user.id}`,
+                    }, (payload) => {
+                        set(state => ({ profile: { ...state.profile, ...payload.new } }));
+                    })
+                    .subscribe();
             }
         );
 
@@ -237,13 +198,12 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     },
 
     logout: async () => {
-    await supabase.auth.signOut();
-    // Resetear flags para permitir re-inicialización tras el login
-    isInitializing = false;
-    authBootstrapInFlight = false;
-    refreshLock = false;
-    get().resetStore();
-},
+        await supabase.auth.signOut();
+        isInitializing = false;
+        authBootstrapInFlight = false;
+        refreshLock = false;
+        get().resetStore();
+    },
 
     register: async (name, email, password) => {
         const { data, error } = await supabase.auth.signUp({
@@ -259,12 +219,10 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             provider: 'google',
             token,
         });
-
         if (error) {
             console.error('Error login Google:', error.message);
             return false;
         }
-
         await get().refreshProfile();
         return !!data.user;
     },
@@ -272,47 +230,27 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     consumeCredits: async (amount) => {
         const { profile, refreshProfile } = get();
         if (profile.ai_credits < amount) return false;
-
         const { data, error } = await supabase
             .from('profiles')
             .update({ ai_credits: profile.ai_credits - amount })
             .eq('id', profile.id)
             .select()
             .single();
-
         if (error) {
             console.error('Error al consumir créditos:', error);
             await refreshProfile();
             return false;
         }
-
-        set(state => ({
-            profile: { ...state.profile, ai_credits: data.ai_credits },
-        }));
-
+        set(state => ({ profile: { ...state.profile, ai_credits: data.ai_credits } }));
         return true;
     },
 
     updateProfile: async (profileData) => {
         const { profile } = get();
         if (!profile.id) return;
-
-        // Excluimos campos que no deben actualizarse directamente desde el cliente
-        const {
-            id, email, plan, ai_credits, role,
-            stripe_account_id, affiliate_code,
-            ...safeData
-        } = profileData as Profile;
-
-        const { error } = await supabase
-            .from('profiles')
-            .update(safeData)
-            .eq('id', profile.id);
-
+        const { id, email, plan, ai_credits, role, stripe_account_id, affiliate_code, ...safeData } = profileData as Profile;
+        const { error } = await supabase.from('profiles').update(safeData).eq('id', profile.id);
         if (error) throw error;
-
-        set(state => ({
-            profile: { ...state.profile, ...safeData },
-        }));
+        set(state => ({ profile: { ...state.profile, ...safeData } }));
     },
 });
