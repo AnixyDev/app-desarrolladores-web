@@ -1,7 +1,8 @@
-import { supabase } from "@/lib/supabaseClient";
+import { supabase } from '@/lib/supabaseClient';
+import { InvoiceItem, KnowledgeArticle } from '@/types';
 
 /* =========================
-   Costes de créditos
+   Costes de créditos IA
 ========================= */
 export const AI_CREDIT_COSTS = {
   chatMessage: 1,
@@ -15,38 +16,59 @@ export const AI_CREDIT_COSTS = {
   generateQuiz: 5,
   generateForecast: 15,
   summarizeApplicant: 10,
-};
+} as const;
 
 /* =========================
-   Helper interno (CORREGIDO EL NOMBRE)
+   Tipos de dominio
 ========================= */
-async function callAI(action: string, payload: any) {
-  // Cambiamos "ai-gemini" por "bright-task" que es tu función real
-  const { data, error } = await supabase.functions.invoke("bright-task", {
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ForecastDataPoint {
+  month: string;
+  ingresos: number;
+  gastos: number;
+  flujoNeto: number;
+}
+
+export interface ProfitabilityData {
+  clientName: string;
+  revenue: number;
+  expenses: number;
+  profit: number;
+}
+
+/* =========================
+   Helper interno
+========================= */
+
+async function callAI(action: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase.functions.invoke('bright-task', {
     body: { action, payload },
   });
 
   if (error) {
-    console.error("Error invoking bright-task:", error);
-    throw new Error(error.message || "AI function error");
+    console.error('Error invoking bright-task:', error);
+    throw new Error(error.message || 'AI function error');
   }
 
   return data;
 }
 
 /* =========================
-   Chat genérico (CORREGIDO PARA HISTORIAL)
+   Chat genérico
 ========================= */
+
 export const getAIResponse = async (
   prompt: string,
-  history: any[] = [] // Ahora acepta el historial del chat
+  history: ChatMessage[] = []
 ): Promise<{ text: string }> => {
-  const res = await callAI("getAIResponse", { prompt, history });
-  return { text: res.text };
+  const res = await callAI('getAIResponse', { prompt, history });
+  return { text: res.text as string };
 };
-
-// ... resto de funciones (generateTimeEntryDescription, etc.) se mantienen igual 
-// ya que todas usan callAI que ahora apunta a bright-task.
 
 /* =========================
    Partes de tiempo
@@ -57,13 +79,8 @@ export const generateTimeEntryDescription = async (
   projectDesc: string,
   keywords: string
 ): Promise<string> => {
-  const res = await callAI("generateTimeEntryDescription", {
-    projectName,
-    projectDesc,
-    keywords,
-  });
-
-  return res.text;
+  const res = await callAI('generateTimeEntryDescription', { projectName, projectDesc, keywords });
+  return res.text as string;
 };
 
 /* =========================
@@ -73,27 +90,31 @@ export const generateTimeEntryDescription = async (
 export const generateItemsForDocument = async (
   prompt: string,
   hourlyRate: number
-) => {
-  return callAI("generateItemsForDocument", {
-    prompt,
-    hourlyRate,
-  });
+): Promise<InvoiceItem[]> => {
+  const res = await callAI('generateItemsForDocument', { prompt, hourlyRate });
+  return res as unknown as InvoiceItem[];
 };
 
 /* =========================
    Previsión financiera
 ========================= */
 
-export const generateFinancialForecast = async (data: any[]) => {
-  return callAI("generateFinancialForecast", { data });
+export const generateFinancialForecast = async (
+  data: ForecastDataPoint[]
+): Promise<{ summary: string; potentialRisks: string[]; suggestions: string[] }> => {
+  const res = await callAI('generateFinancialForecast', { data: data as unknown as Record<string, unknown>[] });
+  return res as unknown as { summary: string; potentialRisks: string[]; suggestions: string[] };
 };
 
 /* =========================
    Informe de rentabilidad
 ========================= */
 
-export const analyzeProfitability = async (data: any) => {
-  return callAI("analyzeProfitability", { data });
+export const analyzeProfitability = async (
+  data: ProfitabilityData[]
+): Promise<{ summary: string; insights: string[] }> => {
+  const res = await callAI('analyzeProfitability', { data: data as unknown as Record<string, unknown>[] });
+  return res as unknown as { summary: string; insights: string[] };
 };
 
 /* =========================
@@ -105,38 +126,20 @@ export const generateProposalText = async (
   context: string,
   profileSummary: string
 ): Promise<string> => {
-  const res = await callAI("getAIResponse", {
-    prompt: `
-Redacta una propuesta comercial profesional.
-
-Título:
-${title}
-
-Requerimientos:
-${context}
-
-Perfil profesional:
-${profileSummary}
-`,
+  const res = await callAI('getAIResponse', {
+    prompt: `Redacta una propuesta comercial profesional.\n\nTítulo:\n${title}\n\nRequerimientos:\n${context}\n\nPerfil profesional:\n${profileSummary}`,
   });
-
-  return res.text;
+  return res.text as string;
 };
 
 export const refineProposalText = async (
   originalText: string,
-  tone: "formal" | "conciso" | "entusiasta"
+  tone: 'formal' | 'conciso' | 'entusiasta'
 ): Promise<string> => {
-  const res = await callAI("getAIResponse", {
-    prompt: `
-Reescribe el siguiente texto con un tono ${tone}.
-
-Texto original:
-${originalText}
-`,
+  const res = await callAI('getAIResponse', {
+    prompt: `Reescribe el siguiente texto con un tono ${tone}.\n\nTexto original:\n${originalText}`,
   });
-
-  return res.text;
+  return res.text as string;
 };
 
 /* =========================
@@ -145,21 +148,12 @@ ${originalText}
 
 export const rankArticlesByRelevance = async (
   query: string,
-  articles: any[]
+  articles: Pick<KnowledgeArticle, 'id' | 'title' | 'tags'>[]
 ): Promise<string[]> => {
-  const res = await callAI("getAIResponse", {
-    prompt: `
-Consulta:
-${query}
-
-Artículos:
-${JSON.stringify(articles.slice(0, 10))}
-
-Devuelve los títulos más relevantes en texto.
-`,
+  const res = await callAI('getAIResponse', {
+    prompt: `Consulta:\n${query}\n\nArtículos:\n${JSON.stringify(articles.slice(0, 10))}\n\nDevuelve los títulos más relevantes en texto.`,
   });
-
-  return [res.text];
+  return [res.text as string];
 };
 
 /* =========================
@@ -171,9 +165,6 @@ export const summarizeApplicant = async (
   applicantProfile: string,
   proposal: string
 ): Promise<{ summary: string }> => {
-  return callAI("summarizeApplicant", {
-    jobDesc,
-    applicantProfile,
-    proposal,
-  });
+  const res = await callAI('summarizeApplicant', { jobDesc, applicantProfile, proposal });
+  return res as unknown as { summary: string };
 };
