@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom'; // Añadido useNavigate
+import { NavLink, useNavigate } from 'react-router-dom';
 import { SIDEBAR_STRUCTURE } from '@/constants';
 import { Logo } from '../icons/Logo';
-import { ChevronDown, X, LogOut } from 'lucide-react'; // Añadido LogOut
+import { ChevronDown, X, LogOut } from 'lucide-react';
 import { DynamicIcon } from '../icons/Icon';
-import { useAppStore } from '@/hooks/useAppStore'; // Añadido para gestionar la sesión
-import { supabase } from '@/lib/supabaseClient'; // Añadido para el signout
+import { useAppStore } from '@/hooks/useAppStore';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -15,7 +14,7 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const navigate = useNavigate();
-  const logoutAction = useAppStore(state => state.logout); // Obtenemos la función logout del store
+  const logout = useAppStore(state => state.logout);
 
   const handleGroupClick = (label: string) => {
     setOpenGroup(openGroup === label ? null : label);
@@ -25,28 +24,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     if (window.innerWidth < 768) onClose();
   };
 
-  // FUNCIÓN DE CIERRE DE SESIÓN REFORZADA
   const handleLogout = async () => {
-  try {
-    // 1. Notificar a Supabase (esto invalida el token en el servidor)
-    await supabase.auth.signOut();
-    
-    // 2. Limpiar el Store de Zustand (esto reinicia los estados a null/false)
-    if (logoutAction) logoutAction();
+    try {
+      // logout() en el store ya llama a supabase.auth.signOut() y resetStore()
+      await logout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      window.location.href = '/login';
+    }
+  };
 
-    // 3. Limpiar SOLO las claves de sesión, no todo el almacenamiento
-    // Ajusta 'auth-storage' al nombre que uses en la persistencia de Zustand
-    localStorage.removeItem('auth-storage'); 
-    
-    // 4. Redirigir usando React Router (evita recargar toda la ventana si no es necesario)
-    navigate('/auth/login', { replace: true });
-    
-  } catch (error) {
-    console.error('Error al cerrar sesión:', error);
-    // Solo como último recurso si falla lo anterior:
-    window.location.href = '/auth/login';
-  }
-};
   const isExternalLink = (url: string) =>
     url.startsWith('http://') || url.startsWith('https://');
 
@@ -105,20 +93,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               }
 
               return (
-               <NavLink
-  key={item.href}
-  to={item.href}
-  // Esto asegura que '/' no coincida con '/clientes', etc.
-  end={item.href === '/'} 
-  onClick={handleLinkClick}
-  className={({ isActive }) =>
-    `${base} ${
-      isActive
-        ? 'bg-primary-600/10 text-primary-400'
-        : 'text-gray-400 hover:bg-gray-900 hover:text-white'
-    }`
-  }
->
+                <NavLink
+                  key={item.href}
+                  to={item.href}
+                  end={item.href === '/'}
+                  onClick={handleLinkClick}
+                  className={({ isActive }) =>
+                    `${base} ${
+                      isActive
+                        ? 'bg-primary-600/10 text-primary-400'
+                        : 'text-gray-400 hover:bg-gray-900 hover:text-white'
+                    }`
+                  }
+                >
                   <DynamicIcon name={item.icon as string} className="w-5 h-5 mr-3" />
                   {item.label}
                 </NavLink>
@@ -182,7 +169,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           })}
         </nav>
 
-        {/* Footer con Botón de Logout */}
+        {/* Footer con botón de logout */}
         <div className="p-4 border-t border-gray-800 space-y-4">
           <button
             onClick={handleLogout}
