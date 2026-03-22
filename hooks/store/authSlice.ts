@@ -190,8 +190,10 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                if (session) {
-                    await get().refreshProfile();
+        if (event === 'SIGNED_OUT' || !session) {
+            get().resetStore();
+            return;
+        }
 
                     // Canal Realtime para sincronizar cambios de perfil en tiempo real
                     if (profileChannel) supabase.removeChannel(profileChannel);
@@ -235,9 +237,13 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     },
 
     logout: async () => {
-        await supabase.auth.signOut();
-        get().resetStore();
-    },
+    await supabase.auth.signOut();
+    // Resetear flags para permitir re-inicialización tras el login
+    isInitializing = false;
+    authBootstrapInFlight = false;
+    refreshLock = false;
+    get().resetStore();
+},
 
     register: async (name, email, password) => {
         const { data, error } = await supabase.auth.signUp({
