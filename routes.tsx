@@ -25,6 +25,7 @@ import TaxLedgerPage from './pages/TaxLedgerPage';
 
 // ── Ventas ──────────────────────────────────────────────────────────────────
 import BudgetsPage from './pages/BudgetsPage';
+import ProposalsPage from './pages/ProposalsPage';
 import ContractsPage from './pages/ContractsPage';
 
 // ── Tiempo ──────────────────────────────────────────────────────────────────
@@ -130,13 +131,7 @@ const AppRoutes: React.FC = () => {
 
         {/* Ventas */}
         <Route path="/budgets" element={<BudgetsPage />} />
-        {/*
-          AVISO: pages/ProposalsPage.tsx contiene por error el código de
-          PortalProposalViewPage. Necesitas crear una ProposalsPage real
-          o usar el componente correcto. Por ahora esta ruta está comentada
-          para evitar un export incorrecto en producción.
-        */}
-        {/* <Route path="/proposals" element={<ProposalsPage />} /> */}
+        <Route path="/proposals" element={<ProposalsPage />} />
         <Route path="/contracts" element={<ContractsPage />} />
 
         {/* Finanzas */}
