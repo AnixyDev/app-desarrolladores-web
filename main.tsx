@@ -5,20 +5,19 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App';
 import './index.css';
 
-// FIX: GoogleOAuthProvider fuera de StrictMode para evitar la doble
-// inicialización de google.accounts.id.initialize() que causa el aviso
-// "[GSI_LOGGER]: google.accounts.id.initialize() is called multiple times"
-// StrictMode monta efectos dos veces en desarrollo, lo que dispara dos
-// inicializaciones del SDK de Google y comportamiento impredecible.
+// IMPORTANTE: React.StrictMode se elimina intencionalmente.
+// StrictMode monta y desmonta efectos dos veces en desarrollo,
+// lo que provoca dos llamadas concurrentes a supabase.auth que
+// compiten por el mismo Web Lock ("devfl-auth-token"), causando:
+//   AbortError: Lock broken by another request with the 'steal' option.
+// Este comportamiento rompe el flujo de autenticación con Google OAuth.
 
 const GOOGLE_CLIENT_ID = '457438236235-n2s8q6nvcjm32u0o3ut2lksd8po8gfqf.apps.googleusercontent.com';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-    <React.StrictMode>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </React.StrictMode>
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </GoogleOAuthProvider>
 );
