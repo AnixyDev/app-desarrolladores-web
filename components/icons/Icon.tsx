@@ -1,28 +1,177 @@
-import React from 'react';
-import * as Icons from 'lucide-react';
-import { LucideProps } from 'lucide-react';
-import { IconName } from '@/types';
+// components/icons/Icon.tsx
+//
+// IMPORTANTE: Este archivo NO usa "import * as Icons from 'lucide-react'".
+// Ese patrón cargaba los ~600 íconos completos en el bundle principal.
+// En su lugar usamos un mapa estático con solo los íconos que realmente
+// se usan en la app. Para añadir un icono nuevo, agrégalo aquí.
 
-// 1. EL COMPONENTE PRO: Permite renderizar cualquier icono pasando solo el nombre
+import React from 'react';
+import { LucideProps } from 'lucide-react';
+
+import {
+  // Navegación y layout
+  LayoutDashboard,
+  ChevronDown,
+  ChevronUp,
+  X,
+  Menu,
+  LogOut,
+  // Entidades
+  Users,
+  Briefcase,
+  Building,
+  User,
+  UserPlus,
+  // Finanzas
+  DollarSign,
+  FileText,
+  BarChart2,
+  BookOpen,
+  Book,
+  CreditCard,
+  // Ventas
+  MessageSquare,
+  FileSignature,
+  // Tiempo
+  Clock,
+  // Análisis
+  TrendingUp,
+  Activity,
+  // Marketplace
+  ShoppingBag,
+  Star,
+  Send,
+  Plus,
+  // IA
+  Sparkles,
+  // Equipo
+  Shield,
+  BrainCircuit,
+  GitBranch,
+  // Configuración
+  Settings,
+  Share2,
+  Zap,
+  // Acciones
+  Edit,
+  Trash,
+  Trash2,
+  Download,
+  Copy,
+  Save,
+  Search,
+  Filter,
+  Link,
+  RefreshCw,
+  Repeat,
+  // Estado
+  CheckCircle,
+  XCircle,
+  PlusCircle,
+  AlertTriangle,
+  // Comunicación
+  Mail,
+  Phone,
+  Bell,
+  Inbox,
+  // Otros
+  PenTool,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  ShieldCheck,
+  ListTodo,
+  Calendar,
+  Pause,
+  Play,
+  Hash,
+  Target,
+  HelpCircle,
+} from 'lucide-react';
+
+// ── Mapa estático — solo los íconos que usa la app ────────────────────────────
+// Añade aquí cualquier icono nuevo antes de usarlo con DynamicIcon.
+const ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
+  LayoutDashboard,
+  ChevronDown,
+  ChevronUp,
+  X,
+  Menu,
+  LogOut,
+  Users,
+  Briefcase,
+  Building,
+  User,
+  UserPlus,
+  DollarSign,
+  FileText,
+  BarChart2,
+  BookOpen,
+  Book,
+  CreditCard,
+  MessageSquare,
+  FileSignature,
+  Clock,
+  TrendingUp,
+  Activity,
+  ShoppingBag,
+  Star,
+  Send,
+  Plus,
+  Sparkles,
+  Shield,
+  BrainCircuit,
+  GitBranch,
+  Settings,
+  Share2,
+  Zap,
+  Edit,
+  Trash,
+  Trash2,
+  Download,
+  Copy,
+  Save,
+  Search,
+  Filter,
+  Link,
+  RefreshCw,
+  Repeat,
+  CheckCircle,
+  XCircle,
+  PlusCircle,
+  AlertTriangle,
+  Mail,
+  Phone,
+  Bell,
+  Inbox,
+  PenTool,
+  ArrowUpCircle,
+  ArrowDownCircle,
+  ShieldCheck,
+  ListTodo,
+  Calendar,
+  Pause,
+  Play,
+  Hash,
+  Target,
+  HelpCircle,
+};
+
+// ── DynamicIcon — renderiza cualquier ícono del mapa por nombre ───────────────
 interface DynamicIconProps extends LucideProps {
   name: string;
-  fallback?: IconName;
+  fallback?: string;
 }
 
-export const DynamicIcon = ({ 
-  name, 
-  fallback = 'HelpCircle', 
-  ...props 
-}: DynamicIconProps) => {
-  // Buscamos el componente en la librería Lucide
-  const IconComponent = (Icons as any)[name] || (Icons as any)[fallback];
-
-  if (!IconComponent) return null;
-
+export const DynamicIcon: React.FC<DynamicIconProps> = ({
+  name,
+  fallback = 'HelpCircle',
+  ...props
+}) => {
+  const IconComponent = ICON_MAP[name] ?? ICON_MAP[fallback] ?? HelpCircle;
   return <IconComponent {...props} />;
 };
 
-// 2. MANTENEMOS TUS EXPORTACIONES ACTUALES (para no romper el resto de la app)
+// ── Re-exportaciones con alias (compatibilidad con el resto de la app) ─────────
 export {
   LayoutDashboard,
   Users,
@@ -79,4 +228,11 @@ export {
   CreditCard,
   Filter,
   Activity as ActivityIcon,
-} from 'lucide-react';
+  ListTodo,
+  Calendar,
+  Pause,
+  Play,
+  Hash,
+  Target,
+  ShieldCheck as ShieldCheckIcon,
+};
