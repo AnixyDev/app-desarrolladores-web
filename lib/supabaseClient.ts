@@ -1,45 +1,36 @@
 import { createClient } from '@supabase/supabase-js';
 
-<<<<<<< HEAD
-// FIX: Access import.meta.env using bracket notation and casting to avoid TS errors in environments where types are not strictly defined.
+// Acceso seguro a las variables de entorno (compatible con TS estricto y Vite)
 const env = (import.meta as any).env;
-const SUPABASE_URL = env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = env.VITE_SUPABASE_ANON_KEY;
-export const supabaseConfigError =
+const SUPABASE_URL: string = env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY: string = env.VITE_SUPABASE_ANON_KEY;
+
+// Error de configuración exportado para que App.tsx pueda mostrarlo en pantalla
+// antes de intentar cualquier conexión a Supabase.
+export const supabaseConfigError: string | null =
   !SUPABASE_URL || !SUPABASE_ANON_KEY
-    ? 'Faltan variables de entorno para Supabase.'
+    ? 'Faltan variables de entorno para Supabase (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).'
     : null;
-=======
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
->>>>>>> main
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Cliente singleton con configuración robusta para RLS y OAuth con PKCE
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    storageKey: 'devfl-auth-token',
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+  },
+});
 
-// AÑADE ESTA FUNCIÓN AL FINAL DEL ARCHIVO
-export const getURL = () => {
-  let url =
-    import.meta.env.VITE_SITE_URL ?? // Configura esto en Vercel si quieres
-    import.meta.env.VITE_VERCEL_URL ?? // Vercel lo da automáticamente
-    'https://devfreelancer.app'; // Tu dominio final
-  
-  // Asegúrate de incluir http/https
+// URL base de la app (usada en callbacks OAuth y emails de Supabase)
+export const getURL = (): string => {
+  let url: string =
+    import.meta.env.VITE_SITE_URL ??
+    import.meta.env.VITE_VERCEL_URL ??
+    'https://devfreelancer.app';
+
   url = url.includes('http') ? url : `https://${url}`;
-  // Quita la barra final si la tiene
-  url = url.charAt(url.length - 1) === '/' ? url.slice(0, -1) : url;
+  url = url.endsWith('/') ? url.slice(0, -1) : url;
   return url;
 };
-<<<<<<< HEAD
-
-// Cliente singleton con configuración robusta para RLS
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-        storageKey: 'devfl-auth-token', 
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        flowType: 'pkce'
-    }
-});
-=======
->>>>>>> main
