@@ -92,9 +92,10 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ isOpen, onClose
                     );
                     
                     setClientSecret(secret);
-                } catch (error: any) {
+                } catch (error: unknown) {
                     console.error("Stripe initialization error:", error);
-                    setInitError(error.message || "Error al conectar con la pasarela de pago segura.");
+                    const msg = error instanceof Error ? error.message : 'Error al conectar con la pasarela de pago segura.';
+                    setInitError(msg);
                 }
             };
             initializePayment();
