@@ -58,9 +58,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         profileChannel = null;
     }
     // Resetear todos los flags para permitir re-inicialización
-    isInitializing = false;
-    authBootstrapInFlight = false;
-    refreshLock = false;
     set({
         isAuthenticated: false,
         profile: initialProfile,
