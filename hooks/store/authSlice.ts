@@ -53,24 +53,28 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     profile: initialProfile,
 
     resetStore: () => {
-        if (profileChannel) {
-            supabase.removeChannel(profileChannel);
-            profileChannel = null;
-        }
-        set({
-            isAuthenticated: false,
-            profile: initialProfile,
-            isProfileLoading: false,
-            clients: [],
-            projects: [],
-            invoices: [],
-            expenses: [],
-            budgets: [],
-            proposals: [],
-            contracts: [],
-            notifications: [],
-        });
-    },
+    if (profileChannel) {
+        supabase.removeChannel(profileChannel);
+        profileChannel = null;
+    }
+    // Resetear todos los flags para permitir re-inicialización
+    isInitializing = false;
+    authBootstrapInFlight = false;
+    refreshLock = false;
+    set({
+        isAuthenticated: false,
+        profile: initialProfile,
+        isProfileLoading: false,
+        clients: [],
+        projects: [],
+        invoices: [],
+        expenses: [],
+        budgets: [],
+        proposals: [],
+        contracts: [],
+        notifications: [],
+    });
+},
 
     refreshProfile: async () => {
         if (refreshLock) return;
