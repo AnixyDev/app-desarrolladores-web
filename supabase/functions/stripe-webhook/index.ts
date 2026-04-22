@@ -19,8 +19,11 @@ serve(async (req) => {
   let event: Stripe.Event
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, endpointSecret!)
+    // En entornos Edge (como Deno/Supabase), se DEBE usar constructEventAsync
+    // porque la API de criptografía Web Crypto es asíncrona.
+    event = await stripe.webhooks.constructEventAsync(body, signature, endpointSecret!)
   } catch (err: any) {
+    console.error(`⚠️ Webhook signature verification failed: ${err.message}`)
     return new Response(`Webhook Error: ${err.message}`, { status: 400 })
   }
 
@@ -55,15 +58,23 @@ serve(async (req) => {
     }
 
     // Registrar evento como procesado exitosamente
-    await supabase.from('processed_stripe_events').insert({ 
+    const { error: insertError } = await supabase.from('processed_stripe_events').insert({ 
       event_id: event.id, 
       type: event.type 
     })
 
+    if (insertError) {
+      console.error(`❌ Error saving processed event to DB:`, insertError)
+      // No fallamos el webhook si solo falló el registro de idempotencia,
+      // pero lo registramos en los logs.
+    }
+
+    console.log(`✅ Successfully processed webhook event: ${event.id} of type ${event.type}`)
     return new Response(JSON.stringify({ received: true }), { status: 200 })
 
   } catch (error: any) {
-    console.error(`❌ Webhook error:`, error)
-    return new Response('Internal Error', { status: 500 })
+    console.error(`❌ Webhook processing error for event ${event?.id || 'unknown'}:`, error)
+    // Devolvemos 400 o 500 para que Stripe reintente el webhook más tarde
+    return new Response(JSON.stringify({ error: 'Internal Error', details: error.message }), { status: 500 })
   }
 })
