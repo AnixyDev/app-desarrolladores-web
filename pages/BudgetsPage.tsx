@@ -17,6 +17,8 @@ import {
 
 import { generateItemsForDocument, AI_CREDIT_COSTS } from '../services/geminiService';
 import { useToast } from '../hooks/useToast';
+// Al principio del archivo
+import CreateBudgetModal from '../components/modals/CreateBudgetModal';
 
 const BuyCreditsModal = lazy(
   () => import('../components/modals/BuyCreditsModal')
@@ -127,6 +129,7 @@ const BudgetsPage: React.FC = () => {
       setIsAiLoading(false);
     }
   };
+  
 
   const totalAmount = useMemo(
     () =>
@@ -243,7 +246,13 @@ const BudgetsPage: React.FC = () => {
           </CardContent>
         </Card>
       )}
-
+      // Al final del JSX, dentro del return
+{isModalOpen && (
+  <CreateBudgetModal 
+    isOpen={isModalOpen} 
+    onClose={() => setIsModalOpen(false)} 
+  />
+)}
       <Suspense fallback={null}>
         {isBuyCreditsModalOpen && (
           <BuyCreditsModal
