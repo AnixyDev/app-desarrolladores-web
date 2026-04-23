@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Logo } from '@/components/icons/Logo';
 import Button from '@/components/ui/Button';
-import { CheckIcon } from '@/components/icons/Icon';
+import { CheckCircleIcon } from '@/components/icons/Icon';
 
 const PricingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -53,12 +53,12 @@ const PricingPage: React.FC = () => {
               <p className="text-gray-400 mb-8">Para empezar a gestionar tus proyectos.</p>
               
               <ul className="space-y-4 mb-8 flex-1">
-                <li className="flex items-center gap-3"><CheckIcon className="w-5 h-5 text-primary-500" /> <span>Hasta 3 proyectos</span></li>
-                <li className="flex items-center gap-3"><CheckIcon className="w-5 h-5 text-primary-500" /> <span>Facturación básica</span></li>
-                <li className="flex items-center gap-3"><CheckIcon className="w-5 h-5 text-primary-500" /> <span>10 créditos IA</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Hasta 3 proyectos</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Facturación básica</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>10 créditos IA</span></li>
               </ul>
               
-              <Button variant="outline" className="w-full" onClick={() => navigate('/auth/register')}>
+              <Button variant="secondary" className="w-full" onClick={() => navigate('/auth/register')}>
                 Empezar Gratis
               </Button>
             </div>
@@ -73,10 +73,10 @@ const PricingPage: React.FC = () => {
               <p className="text-gray-400 mb-8">Para freelancers profesionales a tiempo completo.</p>
               
               <ul className="space-y-4 mb-8 flex-1">
-                <li className="flex items-center gap-3"><CheckIcon className="w-5 h-5 text-primary-500" /> <span>Proyectos ilimitados</span></li>
-                <li className="flex items-center gap-3"><CheckIcon className="w-5 h-5 text-primary-500" /> <span>Facturación avanzada</span></li>
-                <li className="flex items-center gap-3"><CheckIcon className="w-5 h-5 text-primary-500" /> <span>Portal de clientes</span></li>
-                <li className="flex items-center gap-3"><CheckIcon className="w-5 h-5 text-primary-500" /> <span>100 créditos IA/mes</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Proyectos ilimitados</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Facturación avanzada</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Portal de clientes</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>100 créditos IA/mes</span></li>
               </ul>
               
               <Button variant="primary" className="w-full" onClick={() => navigate('/auth/register')}>
@@ -91,13 +91,13 @@ const PricingPage: React.FC = () => {
               <p className="text-gray-400 mb-8">Para agencias y equipos de desarrollo.</p>
               
               <ul className="space-y-4 mb-8 flex-1">
-                <li className="flex items-center gap-3"><CheckIcon className="w-5 h-5 text-primary-500" /> <span>Todo lo de Pro</span></li>
-                <li className="flex items-center gap-3"><CheckIcon className="w-5 h-5 text-primary-500" /> <span>Hasta 5 miembros</span></li>
-                <li className="flex items-center gap-3"><CheckIcon className="w-5 h-5 text-primary-500" /> <span>Gestión de roles</span></li>
-                <li className="flex items-center gap-3"><CheckIcon className="w-5 h-5 text-primary-500" /> <span>500 créditos IA/mes</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Todo lo de Pro</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Hasta 5 miembros</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Gestión de roles</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>500 créditos IA/mes</span></li>
               </ul>
               
-              <Button variant="outline" className="w-full" onClick={() => navigate('/auth/register')}>
+              <Button variant="secondary" className="w-full" onClick={() => navigate('/auth/register')}>
                 Contactar Ventas
               </Button>
             </div>

@@ -46,7 +46,7 @@ const LandingPage: React.FC = () => {
             <Button onClick={() => navigate('/auth/register')} className="px-10 py-4 text-lg bg-primary-600 hover:bg-primary-700">
               Empezar ahora gratis
             </Button>
-            <Button variant="outline" onClick={() => navigate('/auth/login')} className="px-10 py-4 text-lg border-gray-700 hover:bg-gray-800">
+            <Button variant="secondary" onClick={() => navigate('/auth/login')} className="px-10 py-4 text-lg border-gray-700 hover:bg-gray-800">
               Ver demo
             </Button>
           </div>
