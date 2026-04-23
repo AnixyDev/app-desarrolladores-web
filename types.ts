@@ -1,4 +1,3 @@
-// types.ts
 import * as Icons from 'lucide-react';
 
 // Esto crea un tipo de unión con todos los nombres de iconos disponibles
