@@ -44,7 +44,7 @@ const ProjectDetailPage: React.FC = () => {
     }, [timeEntries, projectId]);
 
     const projectStats = useMemo(() => {
-        const completedTasks = tasks.filter(t => t.completed).length;
+        const completedTasks = tasks.filter(t => t.status === 'completed').length;
         const progress = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
         const totalSeconds = projectTimeEntries.reduce((sum, entry) => sum + entry.duration_seconds, 0);
         const hoursTracked = totalSeconds / 3600;
