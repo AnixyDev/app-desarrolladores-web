@@ -8,9 +8,9 @@ export const AppLayout: React.FC = () => {
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Si no está autenticado, mandamos al login
+  // Si no está autenticado, mandamos a la landing page pública
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/landing" replace />;
   }
 
   return (

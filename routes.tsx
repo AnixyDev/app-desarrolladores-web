@@ -66,6 +66,7 @@ import AdminDashboard from './pages/AdminDashboard';
 
 // ── Legal / Público ───────────────────────────────────────────────────────────
 import LandingPage from './pages/LandingPage';
+import PricingPage from './pages/PricingPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfService from './pages/TermsOfService';
 
@@ -86,6 +87,7 @@ const AppRoutes: React.FC = () => {
 
       {/* ── Rutas públicas ─────────────────────────────────────────────── */}
       <Route path="/landing" element={<LandingPage />} />
+      <Route path="/pricing" element={<PricingPage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/terms" element={<TermsOfService />} />
 
@@ -173,7 +175,7 @@ const AppRoutes: React.FC = () => {
       </Route>
 
       {/* ── Fallback ───────────────────────────────────────────────────── */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/landing" replace />} />
 
     </Routes>
   );
