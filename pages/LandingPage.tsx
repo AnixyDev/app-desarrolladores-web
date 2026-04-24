@@ -7,7 +7,7 @@ const LandingPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col font-sans">
+    <div clasName="min-h-screen bg-gray-950 text-white flex flex-col font-sans">
       <nav className="h-20 border-b border-gray-800 flex items-center justify-between px-6 sm:px-12 bg-gray-950/80 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
           <Logo className="h-8 w-8 text-primary-500" />
