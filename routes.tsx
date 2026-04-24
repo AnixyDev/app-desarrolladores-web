@@ -7,7 +7,7 @@ import AuthLayout from './pages/auth/AuthLayout';
 import PortalLayout from './pages/portal/PortalLayout';
 
 // ── Auth ────────────────────────────────────────────────────────────────────
-import LoginPage from './pages/LoginPage';
+import Loginage from './pages/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 
 // ── App core ────────────────────────────────────────────────────────────────
