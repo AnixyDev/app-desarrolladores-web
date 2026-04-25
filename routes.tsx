@@ -6,37 +6,37 @@ import { AppLayout } from './components/layout/AppLayout';
 import AuthLayout from './pages/auth/AuthLayout';
 import PortalLayout from './pages/portal/PortalLayout';
 
-// ── Auth ────────────────────────────────────────────────────────────────────
-import Loginage from './pages/LoginPage';
+// Auth
+import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 
-// ── App core ────────────────────────────────────────────────────────────────
+// App core
 import DashboardPage from './pages/DashboardPage';
 import ProjectPage from './pages/ProjectPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import ClientsPage from './pages/ClientsPage';
 import ClientDetailPage from './pages/ClientDetailPage';
 
-// ── Finanzas ────────────────────────────────────────────────────────────────
+// Finanzas
 import InvoicesPage from './pages/InvoicesPage';
-import CreateInvoicePage from './pages/CreateInvoicePage';
+import CreateInvoicePage from './pages/portal/PortalInvoiceViewPage';
 import ExpensesPage from './pages/ExpensesPage';
 import TaxLedgerPage from './pages/TaxLedgerPage';
 
-// ── Ventas ──────────────────────────────────────────────────────────────────
+// Ventas
 import BudgetsPage from './pages/BudgetsPage';
 import ProposalsPage from './pages/ProposalsPage';
 import ContractsPage from './pages/ContractsPage';
 
-// ── Tiempo ──────────────────────────────────────────────────────────────────
+// Tiempo
 import TimeTrackingPage from './pages/TimeTrackingPage';
 
-// ── Análisis y Reportes ─────────────────────────────────────────────────────
+// Análisis y Reportes
 import ReportsPage from './pages/ReportsPage';
 import ProfitabilityReportPage from './pages/ProfitabilityReportPage';
 import ForecastingPage from './pages/ForecastingPage';
 
-// ── Marketplace ─────────────────────────────────────────────────────────────
+// Marketplace
 import JobMarketDashboard from './pages/JobMarketDashboard';
 import JobDetailPage from './pages/JobDetailPage';
 import JobPostForm from './pages/JobPostForm';
@@ -45,32 +45,32 @@ import SavedJobsPage from './pages/SavedJobsPage';
 import MyApplicationsPage from './pages/MyApplicationsPage';
 import MyJobPostsPage from './pages/MyJobPostsPage';
 
-// ── IA ───────────────────────────────────────────────────────────────────────
+// IA
 import AIAssistantPage from './pages/AIAssistantPage';
 
-// ── Equipo ───────────────────────────────────────────────────────────────────
+// Equipo
 import TeamManagementDashboard from './pages/TeamManagementDashboard';
 import RoleManagement from './pages/RoleManagement';
 import KnowledgeBase from './pages/KnowledgeBase';
 import MyTeamTimesheet from './pages/MyTeamTimesheet';
 
-// ── Configuración ─────────────────────────────────────────────────────────────
+// Configuración
 import SettingsPage from './pages/SettingsPage';
 import PublicProfilePage from './pages/PublicProfilePage';
 import BillingPage from './pages/BillingPage';
 import IntegrationsManager from './pages/IntegrationsManager';
 import AffiliateProgramPage from './pages/AffiliateProgramPage';
 
-// ── Admin ─────────────────────────────────────────────────────────────────────
+// Admin
 import AdminDashboard from './pages/AdminDashboard';
 
-// ── Legal / Público ───────────────────────────────────────────────────────────
+// Legal / Público
 import LandingPage from './pages/LandingPage';
 import PricingPage from './pages/PricingPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfService from './pages/TermsOfService';
 
-// ── Portal de cliente ─────────────────────────────────────────────────────────
+// Portal de cliente
 import PortalLoginPage from './pages/portal/PortalLoginPage';
 import PortalDashboardPage from './pages/portal/PortalDashboardPage';
 import PortalInvoiceViewPage from './pages/portal/PortalInvoiceViewPage';
@@ -79,25 +79,22 @@ import PortalContractViewPage from './pages/portal/PortalContractViewPage';
 import PortalProposalViewPage from './pages/portal/PortalProposalViewPage';
 import PortalProjectFilesPage from './pages/portal/PortalProjectFilesPage';
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 const AppRoutes: React.FC = () => {
   return (
     <Routes>
-
-      {/* ── Rutas públicas ─────────────────────────────────────────────── */}
+      {/* Rutas públicas */}
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/terms" element={<TermsOfService />} />
 
-      {/* ── Auth ───────────────────────────────────────────────────────── */}
+      {/* Auth */}
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Route>
 
-      {/* ── Portal de cliente (layout propio) ──────────────────────────── */}
+      {/* Portal de cliente (layout propio) */}
       <Route path="/portal/login" element={<PortalLoginPage />} />
       <Route path="/portal" element={<PortalLayout />}>
         <Route index element={<PortalDashboardPage />} />
@@ -108,46 +105,29 @@ const AppRoutes: React.FC = () => {
         <Route path="projects/:id/files" element={<PortalProjectFilesPage />} />
       </Route>
 
-      {/* ── Admin ──────────────────────────────────────────────────────── */}
-      {/* NOTA: añade aquí tu guard de rol de admin si aplica */}
+      {/* Admin */}
       <Route path="/admin" element={<AppLayout />}>
         <Route index element={<AdminDashboard />} />
       </Route>
 
-      {/* ── Rutas protegidas ───────────────────────────────────────────── */}
+      {/* Rutas protegidas */}
       <Route element={<AppLayout />}>
-
-        {/* Dashboard */}
         <Route path="/" element={<DashboardPage />} />
-
-        {/* Proyectos */}
         <Route path="/projects" element={<ProjectPage />} />
         <Route path="/projects/:id" element={<ProjectDetailPage />} />
-
-        {/* Clientes */}
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/clients/:id" element={<ClientDetailPage />} />
-
-        {/* Time tracking */}
         <Route path="/time-tracking" element={<TimeTrackingPage />} />
-
-        {/* Ventas */}
         <Route path="/budgets" element={<BudgetsPage />} />
         <Route path="/proposals" element={<ProposalsPage />} />
         <Route path="/contracts" element={<ContractsPage />} />
-
-        {/* Finanzas */}
         <Route path="/invoices" element={<InvoicesPage />} />
         <Route path="/invoices/new" element={<CreateInvoicePage />} />
         <Route path="/expenses" element={<ExpensesPage />} />
         <Route path="/tax-ledger" element={<TaxLedgerPage />} />
-
-        {/* Análisis y Reportes */}
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/reports/profitability" element={<ProfitabilityReportPage />} />
         <Route path="/forecasting" element={<ForecastingPage />} />
-
-        {/* Marketplace */}
         <Route path="/job-market" element={<JobMarketDashboard />} />
         <Route path="/job-market/:id" element={<JobDetailPage />} />
         <Route path="/job-market/:id/applicants" element={<JobApplicantsPage />} />
@@ -155,28 +135,20 @@ const AppRoutes: React.FC = () => {
         <Route path="/saved-jobs" element={<SavedJobsPage />} />
         <Route path="/my-applications" element={<MyApplicationsPage />} />
         <Route path="/my-job-posts" element={<MyJobPostsPage />} />
-
-        {/* Asistente IA */}
         <Route path="/ai-assistant" element={<AIAssistantPage />} />
-
-        {/* Equipo */}
         <Route path="/team" element={<TeamManagementDashboard />} />
         <Route path="/roles" element={<RoleManagement />} />
         <Route path="/knowledge-base" element={<KnowledgeBase />} />
         <Route path="/my-timesheet" element={<MyTeamTimesheet />} />
-
-        {/* Configuración */}
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/public-profile" element={<PublicProfilePage />} />
         <Route path="/billing" element={<BillingPage />} />
         <Route path="/integrations" element={<IntegrationsManager />} />
         <Route path="/affiliate" element={<AffiliateProgramPage />} />
-
       </Route>
 
-      {/* ── Fallback ───────────────────────────────────────────────────── */}
+      {/* Fallback */}
       <Route path="*" element={<Navigate to="/landing" replace />} />
-
     </Routes>
   );
 };
