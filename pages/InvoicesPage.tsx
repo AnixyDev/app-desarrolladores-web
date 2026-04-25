@@ -1,242 +1,210 @@
-
-import React, { useState, useMemo, lazy, Suspense, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-// FIX: Remove .tsx and .ts extensions from imports to fix module resolution errors.
+import React, { useState, useMemo } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
-import Card, { CardContent } from '@/components/ui/Card';
+import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { Invoice, RecurringInvoice } from '@/types';
+import Modal from '@/components/ui/Modal';
+import Input from '@/components/ui/Input';
+import { Invoice, RecurringInvoice, NewInvoice } from '@/types';
 import { formatCurrency } from '@/lib/utils';
-import { generateInvoicePdf } from '@/services/pdfService';
-import { DownloadIcon, TrashIcon, CheckCircleIcon, ClockIcon, RefreshCwIcon, SendIcon, RepeatIcon, LinkIcon } from '@/components/icons/Icon';
-import StatusChip from '@/components/ui/StatusChip';
+import { Plus, Download, Trash, Repeat, Send, Search } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 
-const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
-const InvoiceFromTimeModal = lazy(() => import('@/components/modals/InvoiceFromTimeModal'));
-const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
-
-
 const InvoicesPage: React.FC = () => {
-    const { 
-        invoices,
-        recurringInvoices,
-        profile, 
-        deleteInvoice,
-        deleteRecurringInvoice,
-        markInvoiceAsPaid,
-        getClientById,
-        checkAndGenerateRecurringInvoices,
-    } = useAppStore();
-    const navigate = useNavigate();
-    const { addToast } = useToast();
+  const {
+    invoices,
+    recurringInvoices,
+    clients,
+    addInvoice,
+    deleteInvoice,
+    addRecurringInvoice,
+    deleteRecurringInvoice,
+  } = useAppStore();
+  const { addToast } = useToast();
 
-    const [activeTab, setActiveTab] = useState<'single' | 'recurring'>('single');
-    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-    const [isTimeInvoiceModalOpen, setIsTimeInvoiceModalOpen] = useState(false);
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-    const [itemToDelete, setItemToDelete] = useState<{ id: string, type: 'single' | 'recurring', number?: string } | null>(null);
-    const [isDownloading, setIsDownloading] = useState<string | null>(null);
-    
-    useEffect(() => {
-        checkAndGenerateRecurringInvoices();
-    }, []); // Run once on component mount
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
+  const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-    const monthlyInvoiceCount = useMemo(() => {
-        const today = new Date();
-        const currentMonth = today.getMonth();
-        const currentYear = today.getFullYear();
-        return invoices.filter(i => {
-            const issueDate = new Date(i.created_at);
-            return issueDate.getMonth() === currentMonth && issueDate.getFullYear() === currentYear;
-        }).length;
-    }, [invoices]);
+  const initialInvoiceState: NewInvoice = {
+    client_id: '',
+    project_id: '',
+    items: [{ description: '', quantity: 1, price_cents: 0 }],
+    tax_percent: 21,
+    due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    notes: '',
+  };
 
-    const handleOpenAdd = () => {
-        if (profile.plan === 'Free' && monthlyInvoiceCount >= 3) {
-            setIsUpgradeModalOpen(true);
-        } else {
-            navigate('/invoices/create');
-        }
-    };
+  const [newInvoice, setNewInvoice] = useState<NewInvoice>(initialInvoiceState);
 
-    const handleDownloadPdf = async (invoice: Invoice) => {
-        setIsDownloading(invoice.id);
-        const client = getClientById(invoice.client_id);
-        if (client) {
-            await generateInvoicePdf(invoice, client, profile);
-        }
-        setIsDownloading(null);
-    };
-    
-    const handleGenerateFromTime = (clientId: string, projectId: string, timeEntryIds: string[]) => {
-        setIsTimeInvoiceModalOpen(false);
-        navigate('/invoices/create', { state: { clientId, projectId, timeEntryIds } });
-    };
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter(inv => {
+      const client = clients.find(c => c.id === inv.client_id);
+      return (
+        inv.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client?.name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    });
+  }, [invoices, clients, searchTerm]);
 
-    const handleDeleteClick = (item: Invoice | RecurringInvoice, type: 'single' | 'recurring') => {
-        setItemToDelete({ id: item.id, type, number: (item as Invoice).invoice_number });
-        setIsConfirmModalOpen(true);
-    };
+  const handleAddInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await addInvoice(newInvoice);
+      setIsInvoiceModalOpen(false);
+      setNewInvoice(initialInvoiceState);
+      addToast('Factura creada correctamente', 'success');
+    } catch (error: any) {
+      addToast(error.message || 'Error al crear factura', 'error');
+    }
+  };
 
-    const confirmDelete = () => {
-        if (itemToDelete) {
-            if (itemToDelete.type === 'single') {
-                deleteInvoice(itemToDelete.id);
-            } else {
-                deleteRecurringInvoice(itemToDelete.id);
-            }
-            setIsConfirmModalOpen(false);
-            setItemToDelete(null);
-        }
-    };
-    
-    const handleSendReminder = (invoice: Invoice) => {
-        const client = getClientById(invoice.client_id);
-        if (client) {
-            addToast(`Recordatorio de pago simulado para ${client.name}.`, 'success');
-        }
-    };
-    
-    const handleCopyPaymentLink = (invoiceId: string) => {
-        // Construct URL based on current location to handle different environments/deployments
-        const baseUrl = window.location.href.split('#')[0];
-        const portalLink = `${baseUrl}#/portal/invoice/${invoiceId}`;
-        navigator.clipboard.writeText(portalLink);
-        addToast('Enlace de pago copiado al portapapeles', 'success');
-    };
+  const getClientName = (clientId: string) => {
+    return clients.find(c => c.id === clientId)?.name || 'Cliente desconocido';
+  };
 
-    return (
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-semibold text-white">Facturas</h1>
-                <div className="flex gap-2">
-                    <Button variant="secondary" onClick={() => setIsTimeInvoiceModalOpen(true)}>
-                        <ClockIcon className="w-4 h-4 mr-2" />Facturar Horas
-                    </Button>
-                    <Button onClick={handleOpenAdd}>Crear Factura</Button>
-                </div>
-            </div>
-
-            <div className="mb-6 border-b border-gray-700">
-                <nav className="-mb-px flex space-x-6">
-                    <button onClick={() => setActiveTab('single')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'single' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'}`}>
-                        Facturas Emitidas
-                    </button>
-                    <button onClick={() => setActiveTab('recurring')} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'recurring' ? 'border-primary-500 text-primary-400' : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'}`}>
-                        Facturas Recurrentes
-                    </button>
-                </nav>
-            </div>
-
-            {activeTab === 'single' && (
-                <Card>
-                    <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left min-w-[800px]">
-                                <thead className="border-b border-gray-800">
-                                    <tr>
-                                        <th className="p-4">Nº Factura</th>
-                                        <th className="p-4">Cliente</th>
-                                        <th className="p-4">Fecha Emisión</th>
-                                        <th className="p-4">IRPF</th>
-                                        <th className="p-4">Total</th>
-                                        <th className="p-4">Estado</th>
-                                        <th className="p-4">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {invoices.map(invoice => (
-                                        <tr key={invoice.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                                            <td className="p-4 font-mono text-white">{invoice.invoice_number}</td>
-                                            <td className="p-4 text-primary-400"><Link to={`/clients/${invoice.client_id}`} className="hover:underline">{getClientById(invoice.client_id)?.name}</Link></td>
-                                            <td className="p-4 text-gray-300">{invoice.issue_date}</td>
-                                            <td className="p-4 text-gray-300">{invoice.irpf_percent || 0}%</td>
-                                            <td className="p-4 text-white font-semibold">{formatCurrency(invoice.total_cents)}</td>
-                                            <td className="p-4"><StatusChip type="invoice" status={invoice.paid ? 'paid' : 'pending'} dueDate={invoice.due_date} /></td>
-                                            <td className="p-4">
-                                                <div className="flex gap-2">
-                                                    {!invoice.paid && <Button size="sm" variant="secondary" title="Copiar enlace de pago" onClick={() => handleCopyPaymentLink(invoice.id)}><LinkIcon className="w-4 h-4 text-purple-400"/></Button>}
-                                                    {!invoice.paid && profile.payment_reminders_enabled && <Button size="sm" variant="secondary" title="Enviar Recordatorio" onClick={() => handleSendReminder(invoice)}><SendIcon className="w-4 h-4 text-blue-400"/></Button>}
-                                                    {!invoice.paid && <Button size="sm" variant="secondary" title="Marcar como pagada" aria-label={`Marcar como pagada la factura ${invoice.invoice_number}`} onClick={() => markInvoiceAsPaid(invoice.id)}><CheckCircleIcon className="w-4 h-4 text-green-400"/></Button>}
-                                                    <Button size="sm" variant="secondary" title="Descargar PDF" aria-label={`Descargar PDF de la factura ${invoice.invoice_number}`} onClick={() => handleDownloadPdf(invoice)} disabled={isDownloading === invoice.id}>
-                                                        {isDownloading === invoice.id ? <RefreshCwIcon className="w-4 h-4 animate-spin" /> : <DownloadIcon className="w-4 h-4" />}
-                                                    </Button>
-                                                    <Button size="sm" variant="danger" title="Eliminar" aria-label={`Eliminar factura ${invoice.invoice_number}`} onClick={() => handleDeleteClick(invoice, 'single')}><TrashIcon className="w-4 h-4" /></Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            {activeTab === 'recurring' && (
-                <Card>
-                    <CardContent className="p-0">
-                         <div className="overflow-x-auto">
-                            <table className="w-full text-left min-w-[600px]">
-                                <thead className="border-b border-gray-800">
-                                    <tr>
-                                        <th className="p-4">Cliente</th>
-                                        <th className="p-4">Importe</th>
-                                        <th className="p-4">Frecuencia</th>
-                                        <th className="p-4">Próxima Emisión</th>
-                                        <th className="p-4 text-right">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {recurringInvoices.map(recInvoice => {
-                                        const amount = recInvoice.items.reduce((sum, item) => sum + (item.price_cents * item.quantity), 0) * (1 + recInvoice.tax_percent / 100);
-                                        return (
-                                            <tr key={recInvoice.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                                                <td className="p-4 text-primary-400"><Link to={`/clients/${recInvoice.client_id}`} className="hover:underline">{getClientById(recInvoice.client_id)?.name}</Link></td>
-                                                <td className="p-4 text-white font-semibold">{formatCurrency(amount)}</td>
-                                                <td className="p-4 text-gray-300 capitalize flex items-center gap-2"><RepeatIcon className="w-4 h-4"/>{recInvoice.frequency === 'monthly' ? 'Mensual' : 'Anual'}</td>
-                                                <td className="p-4 text-gray-300">{recInvoice.next_due_date}</td>
-                                                <td className="p-4 text-right">
-                                                    <Button size="sm" variant="danger" title="Eliminar" aria-label={`Eliminar factura recurrente`} onClick={() => handleDeleteClick(recInvoice, 'recurring')}><TrashIcon className="w-4 h-4" /></Button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            <Suspense fallback={null}>
-                {isUpgradeModalOpen && (
-                    <UpgradePromptModal 
-                        isOpen={isUpgradeModalOpen} 
-                        onClose={() => setIsUpgradeModalOpen(false)}
-                        featureName="facturas este mes"
-                    />
-                )}
-                {isTimeInvoiceModalOpen && (
-                    <InvoiceFromTimeModal
-                        isOpen={isTimeInvoiceModalOpen}
-                        onClose={() => setIsTimeInvoiceModalOpen(false)}
-                        onGenerate={handleGenerateFromTime}
-                    />
-                )}
-                {isConfirmModalOpen && (
-                    <ConfirmationModal 
-                        isOpen={isConfirmModalOpen}
-                        onClose={() => setIsConfirmModalOpen(false)}
-                        onConfirm={confirmDelete}
-                        title={itemToDelete?.type === 'single' ? `¿Eliminar Factura?` : `¿Eliminar Factura Recurrente?`}
-                        message={itemToDelete?.type === 'single' ? `¿Estás seguro de que quieres eliminar la factura #${itemToDelete?.number}?` : `¿Estás seguro de que quieres eliminar esta plantilla de factura recurrente? No se generarán más facturas a partir de ella.`}
-                    />
-                )}
-            </Suspense>
+          <h1 className="text-2xl font-bold text-white">Facturación</h1>
+          <p className="text-gray-400">Gestiona tus facturas y cobros recurrentes</p>
         </div>
-    );
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={() => setIsRecurringModalOpen(true)}>
+            <Repeat className="w-4 h-4 mr-2" />
+            Factura Recurrente
+          </Button>
+          <Button onClick={() => setIsInvoiceModalOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Factura
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3 space-y-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Buscar por número o cliente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-10 pr-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+            />
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
+                      <th className="px-6 py-4 font-medium">Nº Factura</th>
+                      <th className="px-6 py-4 font-medium">Cliente</th>
+                      <th className="px-6 py-4 font-medium">Vencimiento</th>
+                      <th className="px-6 py-4 font-medium text-right">Total</th>
+                      <th className="px-6 py-4 font-medium text-center">Estado</th>
+                      <th className="px-6 py-4 font-medium text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-800">
+                    {filteredInvoices.map((inv) => (
+                      <tr key={inv.id} className="text-sm text-gray-300 hover:bg-gray-800/30 transition-colors">
+                        <td className="px-6 py-4 font-mono text-white">{inv.number}</td>
+                        <td className="px-6 py-4">{getClientName(inv.client_id)}</td>
+                        <td className="px-6 py-4">{new Date(inv.due_date).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 text-right font-bold text-white">{formatCurrency(inv.total_cents)}</td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold border ${
+                            inv.paid 
+                              ? 'bg-green-500/10 text-green-400 border-green-500/30' 
+                              : 'bg-orange-500/10 text-orange-400 border-orange-500/30'
+                          }`}>
+                            {inv.paid ? 'PAGADA' : 'PENDIENTE'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center justify-center gap-2">
+                            <button className="p-2 text-gray-400 hover:text-white transition-colors" title="Descargar PDF">
+                              <Download className="w-4 h-4" />
+                            </button>
+                            <button className="p-2 text-gray-400 hover:text-primary-400 transition-colors" title="Enviar por Email">
+                              <Send className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => deleteInvoice(inv.id)}
+                              className="p-2 text-gray-400 hover:text-red-500 transition-colors" 
+                              title="Eliminar"
+                            >
+                              <Trash className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-bold text-white">Facturación Recurrente</h3>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4">
+              {recurringInvoices.map((ri) => (
+                <div key={ri.id} className="p-3 bg-gray-800/50 rounded-lg border border-gray-700 space-y-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-bold text-white">{getClientName(ri.client_id)}</p>
+                      <p className="text-xs text-gray-500 capitalize">{ri.frequency}</p>
+                    </div>
+                    <button 
+                      onClick={() => deleteRecurringInvoice(ri.id)}
+                      className="text-gray-500 hover:text-red-500 transition-colors"
+                    >
+                      <Trash className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <Modal isOpen={isInvoiceModalOpen} onClose={() => setIsInvoiceModalOpen(false)} title="Nueva Factura">
+        <form onSubmit={handleAddInvoice} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-1">Cliente</label>
+            <select
+              className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
+              value={newInvoice.client_id}
+              onChange={(e) => setNewInvoice({ ...newInvoice, client_id: e.target.value })}
+              required
+            >
+              <option value="">Seleccionar cliente</option>
+              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <Input 
+            label="Fecha Vencimiento" 
+            type="date" 
+            value={newInvoice.due_date}
+            onChange={(e) => setNewInvoice({ ...newInvoice, due_date: e.target.value })}
+          />
+          <div className="flex justify-end gap-3 mt-6">
+            <Button type="button" variant="outline" onClick={() => setIsInvoiceModalOpen(false)}>Cancelar</Button>
+            <Button type="submit">Generar Factura</Button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
 };
 
 export default InvoicesPage;

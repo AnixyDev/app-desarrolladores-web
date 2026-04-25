@@ -1,179 +1,145 @@
-
-import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { useAppStore } from '@/hooks/useAppStore';
-import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import React, { useState } from 'react';
+import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import Modal from '@/components/ui/Modal';
-import { 
-    Users as UsersIcon, 
-    SparklesIcon, 
-    RefreshCwIcon, 
-    CheckCircleIcon as CheckCircle, 
-    AlertTriangleIcon as AlertTriangle 
-} from '@/components/icons/Icon';
-import { JobApplication } from '@/types';
-import EmptyState from '@/components/ui/EmptyState';
-import { summarizeApplicant, AI_CREDIT_COSTS } from '@/services/geminiService';
-import { useToast } from '@/hooks/useToast';
+import { Mail, Phone, Download, CheckCircle, XCircle, Clock, Search } from '@/components/icons/Icon';
 
-const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
-const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
-
-interface ApplicantSummary {
-    summary: string;
-    pros: string[];
-    cons: string[];
+interface Applicant {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  position: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  appliedDate: string;
+  experience: string;
 }
 
-const JobApplicantsPage: React.FC = () => {
-    const { jobId } = useParams<{ jobId: string }>();
-    const { getJobById, getApplicationsByJobId, profile, viewApplication, consumeCredits } = useAppStore();
-    const { addToast } = useToast();
-
-    const [selectedApplication, setSelectedApplication] = useState<JobApplication | null>(null);
-    const [summary, setSummary] = useState<ApplicantSummary | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
-    const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-
-    const job = jobId ? getJobById(jobId) : null;
-    const applications = jobId ? getApplicationsByJobId(jobId) : [];
-
-    useEffect(() => {
-        if (selectedApplication) {
-            viewApplication(selectedApplication.id);
-        }
-    }, [selectedApplication, viewApplication]);
-
-    useEffect(() => {
-        if (profile?.plan === 'Free') {
-            setIsUpgradeModalOpen(true);
-        }
-    }, [profile?.plan]);
-    
-    if (isUpgradeModalOpen) {
-        return (
-            <Suspense fallback={null}>
-                <UpgradePromptModal isOpen={true} onClose={() => setIsUpgradeModalOpen(false)} featureName="gestión de candidatos" />
-            </Suspense>
-        );
+const JobApplicantsPage = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [applicants, setApplicants] = useState<Applicant[]>([
+    {
+      id: '1',
+      name: 'Laura García',
+      email: 'laura.garcia@example.com',
+      phone: '+34 600 000 001',
+      position: 'Frontend Developer',
+      status: 'pending',
+      appliedDate: '2026-04-20',
+      experience: '5 años en React y Tailwind CSS'
+    },
+    {
+      id: '2',
+      name: 'Carlos Rodríguez',
+      email: 'carlos.rodriguez@example.com',
+      phone: '+34 600 000 002',
+      position: 'UX/UI Designer',
+      status: 'accepted',
+      appliedDate: '2026-04-18',
+      experience: 'Especialista en Figma y sistemas de diseño'
     }
-    
-    if (!job) {
-        return <div className="text-center text-red-500">Oferta de trabajo no encontrada.</div>;
+  ]);
+
+  const filteredApplicants = applicants.filter(a => 
+    a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    a.position.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const updateStatus = (id: string, newStatus: Applicant['status']) => {
+    setApplicants(prev => prev.map(a => a.id === id ? { ...a, status: newStatus } : a));
+  };
+
+  const statusBadge = (status: Applicant['status']) => {
+    switch (status) {
+      case 'accepted': return <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/30 uppercase">Aceptado</span>;
+      case 'rejected': return <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/30 uppercase">Rechazado</span>;
+      default: return <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/30 uppercase">Pendiente</span>;
     }
+  };
 
-    const handleGenerateSummary = async (app: JobApplication) => {
-        if (profile.ai_credits < AI_CREDIT_COSTS.summarizeApplicant) {
-            setIsBuyCreditsModalOpen(true);
-            return;
-        }
-        
-        setSelectedApplication(app);
-        setIsLoading(true);
-        setIsModalOpen(true);
-        setSummary(null);
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white">Candidatos</h1>
+        <p className="text-gray-400">Gestiona las solicitudes de empleo para tus proyectos o agencia</p>
+      </div>
 
-        try {
-            const applicantProfileSummary = profile.bio ? `${profile.bio}. Habilidades: ${profile.skills?.join(', ')}` : `Habilidades: ${profile.skills?.join(', ')}`;
-            const result = await summarizeApplicant(job.descripcionLarga || job.descripcionCorta, applicantProfileSummary, app.proposalText);
-            setSummary(result);
-            consumeCredits(AI_CREDIT_COSTS.summarizeApplicant);
-            addToast("Resumen del candidato generado.", "success");
-        } catch (error) {
-            addToast((error as Error).message, 'error');
-            setIsModalOpen(false);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    
-    const applicationStatusConfig = {
-        sent: { label: 'Enviada', className: 'bg-blue-500/20 text-blue-400' },
-        viewed: { label: 'En Revisión', className: 'bg-purple-500/20 text-purple-400' },
-        accepted: { label: 'Aceptada', className: 'bg-green-500/20 text-green-400' },
-        rejected: { label: 'Rechazada', className: 'bg-red-500/20 text-red-400' },
-    };
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+        <input
+          type="text"
+          placeholder="Buscar por nombre o puesto..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-10 pr-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+        />
+      </div>
 
-    return (
-        <div className="space-y-6">
-            <div>
-                <Link to="/my-job-posts" className="text-sm text-primary-400 hover:underline">‹ Volver a Mis Ofertas</Link>
-                <h1 className="text-3xl font-bold text-white mt-1">{String(job.titulo)}</h1>
-                <p className="text-lg text-gray-400">Panel de Postulaciones</p>
-            </div>
-            
-            {applications.length === 0 ? (
-                <EmptyState 
-                    icon={UsersIcon}
-                    title="Aún no hay postulaciones"
-                    message="Cuando los freelancers apliquen a tu oferta, aparecerán aquí para que los gestiones."
-                />
-            ) : (
-                <div className="space-y-4">
-                    {applications.map(app => {
-                        const statusInfo = (applicationStatusConfig as any)[app.status] || applicationStatusConfig.sent;
-                        return (
-                            <Card key={app.id}>
-                                <CardHeader className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-semibold text-white text-lg">{String(app.applicantName)}</p>
-                                        <p className="text-sm text-gray-400">Postuló el {new Date(app.appliedAt).toLocaleDateString()}</p>
-                                    </div>
-                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusInfo.className}`}>
-                                        {statusInfo.label}
-                                    </span>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-gray-300 whitespace-pre-wrap border-l-2 border-gray-700 pl-4 italic">"{String(app.proposalText)}"</p>
-                                </CardContent>
-                                <div className="p-4 border-t border-gray-800 flex justify-end gap-2">
-                                    <Button onClick={() => handleGenerateSummary(app)}>
-                                        <SparklesIcon className="w-4 h-4 mr-2" />
-                                        Generar Resumen con IA
-                                    </Button>
-                                </div>
-                            </Card>
-                        )
-                    })}
+      <div className="grid grid-cols-1 gap-4">
+        {filteredApplicants.map(applicant => (
+          <Card key={applicant.id} className="hover:border-gray-600 transition-colors">
+            <CardContent className="p-6">
+              <div className="flex flex-col lg:flex-row justify-between gap-6">
+                <div className="flex-1 space-y-4">
+                  <div className="flex items-start justify-between lg:justify-start lg:gap-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-white">{applicant.name}</h3>
+                      <p className="text-primary-400 font-medium">{applicant.position}</p>
+                    </div>
+                    {statusBadge(applicant.status)}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-400">
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-4 h-4" />
+                      {applicant.email}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      {applicant.phone}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      Aplicó el {new Date(applicant.appliedDate).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-800">
+                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Experiencia</p>
+                    <p className="text-sm text-gray-300">{applicant.experience}</p>
+                  </div>
                 </div>
-            )}
-            
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={`Análisis de IA para ${String(selectedApplication?.applicantName || 'Candidato')}`}>
-                {isLoading ? (
-                    <div className="text-center p-8">
-                        <RefreshCwIcon className="w-10 h-10 text-primary-400 mx-auto animate-spin mb-4" />
-                        <p className="text-white">Analizando perfil y propuesta...</p>
-                    </div>
-                ) : summary ? (
-                    <div className="space-y-4">
-                        <div>
-                            <h3 className="font-semibold text-primary-400 mb-2">Resumen</h3>
-                            <p className="text-gray-300">{String(summary.summary)}</p>
-                        </div>
-                        <div>
-                            <h3 className="font-semibold text-green-400 mb-2 flex items-center gap-2"><CheckCircle className="w-5 h-5"/> Puntos Fuertes</h3>
-                            <ul className="list-disc list-inside space-y-1 text-gray-300">
-                                {summary.pros.map((pro, i) => <li key={i}>{String(pro)}</li>)}
-                            </ul>
-                        </div>
-                         <div>
-                            <h3 className="font-semibold text-yellow-400 mb-2 flex items-center gap-2"><AlertTriangle className="w-5 h-5"/> Puntos a Considerar</h3>
-                            <ul className="list-disc list-inside space-y-1 text-gray-300">
-                                {summary.cons.map((con, i) => <li key={i}>{String(con)}</li>)}
-                            </ul>
-                        </div>
-                    </div>
-                ) : null}
-            </Modal>
-            
-            <Suspense fallback={null}>
-                {isBuyCreditsModalOpen && <BuyCreditsModal isOpen={isBuyCreditsModalOpen} onClose={() => setIsBuyCreditsModalOpen(false)} />}
-            </Suspense>
-        </div>
-    );
+
+                <div className="flex lg:flex-col justify-end gap-2 shrink-0">
+                  <Button variant="outline" size="sm" className="flex-1 lg:flex-none">
+                    <Download className="w-4 h-4 mr-2" /> CV
+                  </Button>
+                  {applicant.status === 'pending' && (
+                    <>
+                      <Button 
+                        size="sm" 
+                        className="flex-1 lg:flex-none bg-green-600 hover:bg-green-700"
+                        onClick={() => updateStatus(applicant.id, 'accepted')}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" /> Aceptar
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="flex-1 lg:flex-none text-red-400 border-red-500/30 hover:bg-red-500/10"
+                        onClick={() => updateStatus(applicant.id, 'rejected')}
+                      >
+                        <XCircle className="w-4 h-4 mr-2" /> Rechazar
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 export default JobApplicantsPage;
