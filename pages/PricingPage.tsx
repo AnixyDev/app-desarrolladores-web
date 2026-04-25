@@ -7,26 +7,24 @@ import { CheckCircleIcon } from '@/components/icons/Icon';
 const PricingPage: React.FC = () => {
   const navigate = useNavigate();
 
-  return 
+  return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col font-sans">
       <nav className="h-20 border-b border-gray-800 flex items-center justify-between px-6 sm:px-12 bg-gray-950/80 backdrop-blur-md sticky top-0 z-[100]">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
           <Logo className="h-8 w-8 text-primary-500" />
           <span className="text-xl font-bold tracking-tighter italic">DEVFREELANCER</span>
         </div>
-        
         <div className="flex items-center gap-6 relative z-[110]">
           <button 
-            onClick={() => navigate('/auth/login')}
+            onClick={() => navigate('/login')}
             className="text-sm font-medium text-gray-400 hover:text-white transition-colors py-2 px-4"
           >
             Entrar
           </button>
-          
           <Button 
             variant="primary" 
-            size="sm" 
-            onClick={() => navigate('/auth/register')}
+            size="sm"
+            onClick={() => navigate('/register')}
             className="hidden sm:block"
           >
             Empezar ahora
@@ -51,14 +49,12 @@ const PricingPage: React.FC = () => {
               <h3 className="text-2xl font-bold mb-2">Free</h3>
               <div className="text-4xl font-black mb-6">€0<span className="text-lg text-gray-500 font-normal">/mes</span></div>
               <p className="text-gray-400 mb-8">Para empezar a gestionar tus proyectos.</p>
-              
               <ul className="space-y-4 mb-8 flex-1">
                 <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Hasta 3 proyectos</span></li>
                 <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Facturación básica</span></li>
                 <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>10 créditos IA</span></li>
               </ul>
-              
-              <Button variant="secondary" className="w-full" onClick={() => navigate('/auth/register')}>
+              <Button variant="secondary" className="w-full" onClick={() => navigate('/register')}>
                 Empezar Gratis
               </Button>
             </div>
@@ -69,41 +65,53 @@ const PricingPage: React.FC = () => {
                 MÁS POPULAR
               </div>
               <h3 className="text-2xl font-bold mb-2">Pro</h3>
-              <div className="text-4xl font-black mb-6">€15<span className="text-lg text-gray-500 font-normal">/mes</span></div>
-              <p className="text-gray-400 mb-8">Para freelancers profesionales a tiempo completo.</p>
-              
+              <div className="text-4xl font-black mb-6">€19<span className="text-lg text-gray-500 font-normal">/mes</span></div>
+              <p className="text-gray-400 mb-8">Todo lo que necesitas para escalar tu negocio.</p>
               <ul className="space-y-4 mb-8 flex-1">
                 <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Proyectos ilimitados</span></li>
-                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Facturación avanzada</span></li>
-                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Portal de clientes</span></li>
-                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>100 créditos IA/mes</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>IA Assistant Avanzado</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Dashboard de métricas</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Soporte prioritario</span></li>
               </ul>
-              
-              <Button variant="primary" className="w-full" onClick={() => navigate('/auth/register')}>
+              <Button variant="primary" className="w-full" onClick={() => navigate('/register?plan=pro')}>
                 Probar Pro
               </Button>
             </div>
 
-            {/* Plan Teams */}
+            {/* Plan Agency */}
             <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 flex flex-col">
-              <h3 className="text-2xl font-bold mb-2">Equipos</h3>
+              <h3 className="text-2xl font-bold mb-2">Agency</h3>
               <div className="text-4xl font-black mb-6">€49<span className="text-lg text-gray-500 font-normal">/mes</span></div>
-              <p className="text-gray-400 mb-8">Para agencias y equipos de desarrollo.</p>
-              
+              <p className="text-gray-400 mb-8">Para equipos y agencias en crecimiento.</p>
               <ul className="space-y-4 mb-8 flex-1">
-                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Todo lo de Pro</span></li>
-                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Hasta 5 miembros</span></li>
-                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Gestión de roles</span></li>
-                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>500 créditos IA/mes</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Hasta 5 usuarios</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Gestión de equipos</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>API Access</span></li>
+                <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>White-labeling</span></li>
               </ul>
-              
-              <Button variant="secondary" className="w-full" onClick={() => navigate('/auth/register')}>
+              <Button variant="secondary" className="w-full" onClick={() => navigate('/register?plan=agency')}>
                 Contactar Ventas
               </Button>
             </div>
           </div>
         </div>
       </main>
+
+      <footer className="py-12 px-6 border-t border-gray-800 bg-gray-950">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="flex items-center gap-3">
+            <Logo className="h-6 w-6 text-primary-500" />
+            <span className="text-lg font-bold tracking-tighter italic">DEVFREELANCER</span>
+          </div>
+          <p className="text-gray-500 text-sm">
+            © 2024 DevFreelancer. Todos los derechos reservados.
+          </p>
+          <div className="flex gap-6">
+            <a href="#" className="text-gray-400 hover:text-white transition-colors">Términos</a>
+            <a href="#" className="text-gray-400 hover:text-white transition-colors">Privacidad</a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
