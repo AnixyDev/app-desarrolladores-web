@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { SendIcon, SparklesIcon, UserIcon, RefreshCwIcon } from '@/components/icons/Icon';
+import { Send, Sparkles, User, RefreshCw } from '@/components/icons/Icon';
 import { getAIResponse, AI_CREDIT_COSTS } from '@/services/geminiService';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';
@@ -22,6 +22,7 @@ const AIAssistantPage = () => {
       sender: 'ai',
     },
   ]);
+
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -37,7 +38,7 @@ const AIAssistantPage = () => {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedInput = input.trim();
-    
+
     if (!trimmedInput || isLoading) return;
 
     // 1. Verificar créditos localmente antes de empezar
@@ -67,86 +68,110 @@ const AIAssistantPage = () => {
 
       const response = await getAIResponse(trimmedInput, chatHistory);
       
-      if (!response || !response.text) {
-        throw new Error('La IA no devolvió una respuesta válida.');
-      }
+      // 3. Consumir créditos en el store/DB
+      await consumeCredits(AI_CREDIT_COSTS.chatMessage);
 
-      // 3. Consumir créditos en la base de datos
-      const wasConsumed = await consumeCredits(AI_CREDIT_COSTS.chatMessage);
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: response,
+        sender: 'ai',
+      };
 
-      if (wasConsumed) {
-        setMessages((prev) => [
-          ...prev,
-          { id: (Date.now() + 1).toString(), text: response.text, sender: 'ai' },
-        ]);
-      } else {
-        throw new Error('Error al procesar los créditos.');
-      }
-
-    } catch (error: any) {
-      console.error("Error en Consultor IA:", error);
-      addToast(error.message || 'Error al conectar con el consultor', 'error');
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now().toString(), text: "⚠️ Lo siento, he tenido un problema técnico. Inténtalo de nuevo.", sender: 'ai' },
-      ]);
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (err: any) {
+      addToast(err.message || 'Error al conectar con el asistente.', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] max-w-5xl mx-auto">
-      <header className="flex justify-between items-center mb-6 px-4">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary-600/20 rounded-xl">
-            <SparklesIcon className="w-6 h-6 text-primary-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-white tracking-tight">Consultor IA</h1>
-            <p className="text-xs text-gray-400">Créditos disponibles: {profile?.ai_credits ?? 0}</p>
-          </div>
+    <div className="max-w-4xl mx-auto h-[calc(100vh-12rem)] flex flex-col">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center">
+            <Sparkles className="w-6 h-6 mr-2 text-fuchsia-400" />
+            Asistente de IA Estratégico
+          </h1>
+          <p className="text-gray-400">Consultoría senior para tu negocio freelance</p>
         </div>
-      </header>
+        <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
+          <span className="text-sm text-gray-400">Créditos disponibles:</span>
+          <span className="ml-2 font-bold text-fuchsia-400">{profile?.ai_credits ?? 0}</span>
+        </div>
+      </div>
 
-      <Card className="flex-1 flex flex-col overflow-hidden border-gray-800 bg-gray-950/50 backdrop-blur-md m-4 md:m-0">
-        <CardContent className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-          {messages.map((message) => (
-            <div key={message.id} className={`flex items-start gap-4 ${message.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-              <div className={`shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg border ${
-                  message.sender === 'user' ? 'bg-primary-600 border-primary-500' : 'bg-gray-800 border-gray-700'
-              }`}>
-                {message.sender === 'user' ? <UserIcon className="w-5 h-5 text-white" /> : <SparklesIcon className="w-5 h-5 text-primary-400" />}
-              </div>
-              <div className={`max-w-[85%] p-5 rounded-2xl text-sm leading-relaxed ${
-                  message.sender === 'user' ? 'bg-primary-600/10 text-white border border-primary-500/20' : 'bg-gray-900/80 text-gray-200 border border-gray-800'
-              }`}>
-                <p className="whitespace-pre-wrap">{message.text}</p>
+      <Card className="flex-1 flex flex-col overflow-hidden border-gray-700 bg-gray-900/50 backdrop-blur-sm">
+        <CardContent className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+          {messages.map((m) => (
+            <div
+              key={m.id}
+              className={`flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
+              <div
+                className={`max-w-[80%] flex ${
+                  m.sender === 'user' ? 'flex-row-reverse' : 'flex-row'
+                } items-start gap-3`}
+              >
+                <div
+                  className={`p-2 rounded-lg ${
+                    m.sender === 'user' ? 'bg-primary-600' : 'bg-gray-800 border border-gray-700'
+                  }`}
+                >
+                  {m.sender === 'user' ? (
+                    <User className="w-5 h-5 text-white" />
+                  ) : (
+                    <Sparkles className="w-5 h-5 text-fuchsia-400" />
+                  )}
+                </div>
+                <div
+                  className={`p-4 rounded-2xl ${
+                    m.sender === 'user'
+                      ? 'bg-primary-600/10 text-white border border-primary-500/20'
+                      : 'bg-gray-800/50 text-gray-200 border border-gray-700'
+                  }`}
+                >
+                  <div className="prose prose-invert prose-sm max-w-none">
+                    {m.text.split('\n').map((line, i) => (
+                      <p key={i}>{line}</p>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           ))}
           {isLoading && (
-            <div className="flex items-center gap-3 animate-pulse">
-              <RefreshCwIcon className="w-4 h-4 animate-spin text-primary-500" />
-              <span className="text-xs text-gray-500 uppercase font-bold tracking-widest">Analizando desafío…</span>
+            <div className="flex justify-start">
+              <div className="flex items-center gap-3 bg-gray-800/50 p-4 rounded-2xl border border-gray-700">
+                <RefreshCw className="w-5 h-5 text-fuchsia-400 animate-spin" />
+                <span className="text-sm text-gray-400">Analizando estrategia...</span>
+              </div>
             </div>
           )}
           <div ref={messagesEndRef} />
         </CardContent>
 
-        <div className="p-4 border-t border-gray-800 bg-gray-900/80">
-          <form onSubmit={handleSend} className="flex gap-4">
+        <div className="p-4 border-t border-gray-700 bg-gray-800/30">
+          <form onSubmit={handleSend} className="flex gap-3">
             <input
-              placeholder="Haz una pregunta estratégica…"
-              className="w-full bg-gray-800 text-white rounded-2xl py-4 px-5 border border-gray-700 outline-none focus:border-primary-500 transition-all"
+              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              placeholder="Pregunta sobre tarifas, contratos, clientes..."
+              className="flex-1 bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
               disabled={isLoading}
             />
-            <Button type="submit" disabled={isLoading || !input.trim()} className="shrink-0 w-14 h-14 rounded-2xl shadow-xl">
-              <SendIcon className="w-6 h-6" />
+            <Button
+              type="submit"
+              disabled={isLoading || !input.trim()}
+              className="rounded-xl px-6"
+            >
+              <Send className="w-5 h-5" />
             </Button>
           </form>
+          <p className="text-[10px] text-center text-gray-500 mt-2">
+            Cada consulta consume {AI_CREDIT_COSTS.chatMessage} créditos de IA.
+          </p>
         </div>
       </Card>
     </div>
