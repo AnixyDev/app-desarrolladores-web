@@ -51,7 +51,7 @@ const ProjectPage: React.FC = () => {
     const getProjectProgress = (projectId: string) => {
         const projectTasks = tasks?.filter(t => t.project_id === projectId) || [];
         if (projectTasks.length === 0) return 0;
-        const completed = projectTasks.filter(t => t.completed).length;
+        const completed = projectTasks.filter(t => t.status === 'completed' || t.status === 'done').length;
         return Math.round((completed / projectTasks.length) * 100);
     };
 

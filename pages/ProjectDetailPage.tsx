@@ -44,7 +44,7 @@ const ProjectDetailPage: React.FC = () => {
     }, [timeEntries, projectId]);
 
     const projectStats = useMemo(() => {
-        const completedTasks = tasks.filter(t => t.status === 'completed').length;
+        const completedTasks = tasks.filter(t => t.status === 'completed' || t.status === 'done').length;
         const progress = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
         const totalSeconds = projectTimeEntries.reduce((sum, entry) => sum + entry.duration_seconds, 0);
         const hoursTracked = totalSeconds / 3600;
@@ -265,12 +265,12 @@ const ProjectDetailPage: React.FC = () => {
                                 {tasks.map(task => (
                                     <li key={task.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
                                         <div className="flex items-center gap-3">
-                                            <button onClick={() => toggleTask(task.id)} aria-label={task.completed ? `Marcar tarea '${task.description}' como incompleta` : `Marcar tarea '${task.description}' como completada`}>
-                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${task.completed ? 'border-primary-500 bg-primary-500' : 'border-gray-500'}`}>
-                                                    {task.completed && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                            <button onClick={() => toggleTask(task.id)} aria-label={(task.status === 'completed' || task.status === 'done') ? `Marcar tarea '${task.description}' como incompleta` : `Marcar tarea '${task.description}' como completada`}>
+                                                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${(task.status === 'completed' || task.status === 'done') ? 'border-primary-500 bg-primary-500' : 'border-gray-500'}`}>
+                                                    {(task.status === 'completed' || task.status === 'done') && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                                                 </div>
                                             </button>
-                                            <span className={` ${task.completed ? 'line-through text-gray-500' : 'text-white'}`}>{task.description}</span>
+                                            <span className={` ${(task.status === 'completed' || task.status === 'done') ? 'line-through text-gray-500' : 'text-white'}`}>{task.description}</span>
                                         </div>
                                         <Button size="sm" variant="danger" onClick={() => handleDeleteClick(task)} aria-label={`Eliminar tarea '${task.description}'`}>
                                             <TrashIcon className="w-4 h-4"/>

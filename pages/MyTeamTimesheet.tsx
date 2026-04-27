@@ -111,20 +111,20 @@ const MyTeamTimesheet: React.FC = () => {
   const buttonStyle = 'px-4 py-2 font-semibold rounded-lg transition duration-200 shadow-md shadow-fuchsia-500/30 flex items-center justify-center';
 
   const TaskCard: React.FC<{ task: Task }> = ({ task }) => (
-    <div className={`bg-gray-800 p-4 rounded-xl shadow-lg border-l-4 ${task.completed ? 'border-gray-500' : 'border-fuchsia-500'}`}>
+    <div className={`bg-gray-800 p-4 rounded-xl shadow-lg border-l-4 ${(task.status === 'completed' || task.status === 'done') ? 'border-gray-500' : 'border-fuchsia-500'}`}>
       <div className="flex justify-between items-start">
-        <h3 className={`font-semibold text-lg ${task.completed ? 'text-gray-500 line-through' : 'text-white'}`}>{task.description}</h3>
+        <h3 className={`font-semibold text-lg ${(task.status === 'completed' || task.status === 'done') ? 'text-gray-500 line-through' : 'text-white'}`}>{task.description}</h3>
         <button 
           onClick={() => toggleTask(task.id)}
-          className={`p-1 rounded-full transition-colors ${task.completed ? 'bg-gray-700 text-gray-400 hover:text-white' : 'bg-green-700 text-white hover:bg-green-600'}`}
-          aria-label={task.completed ? 'Marcar como Pendiente' : 'Marcar como Completada'}
+          className={`p-1 rounded-full transition-colors ${(task.status === 'completed' || task.status === 'done') ? 'bg-gray-700 text-gray-400 hover:text-white' : 'bg-green-700 text-white hover:bg-green-600'}`}
+          aria-label={(task.status === 'completed' || task.status === 'done') ? 'Marcar como Pendiente' : 'Marcar como Completada'}
         >
-          {task.completed ? <ListTodo className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+          {(task.status === 'completed' || task.status === 'done') ? <ListTodo className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
         </button>
       </div>
       <p className="text-sm text-gray-400 mt-1 flex items-center"><GitBranch className="w-4 h-4 mr-2" /> {projects.find(p => p.id === task.project_id)?.name}</p>
       
-      {!task.completed && (
+      {!(task.status === 'completed' || task.status === 'done') && (
         <div className="mt-4 pt-3 border-t border-gray-700 flex justify-end">
           <button 
             onClick={() => toggleTimer(task)}
@@ -176,14 +176,14 @@ const MyTeamTimesheet: React.FC = () => {
           <div className="lg:col-span-2">
             <h2 className="text-xl font-semibold text-white mb-4 flex items-center"><ListTodo className="w-5 h-5 mr-2 text-fuchsia-500" /> Mis Tareas Asignadas</h2>
             <div className="space-y-4">
-              {relevantTasks.filter(t => !t.completed).map(task => (
+              {relevantTasks.filter(t => !(t.status === 'completed' || t.status === 'done')).map(task => (
                 <TaskCard key={task.id} task={task} />
               ))}
-              {relevantTasks.filter(t => !t.completed).length === 0 && <p className="text-gray-500 text-center py-4">¡No tienes tareas pendientes!</p>}
+              {relevantTasks.filter(t => !(t.status === 'completed' || t.status === 'done')).length === 0 && <p className="text-gray-500 text-center py-4">¡No tienes tareas pendientes!</p>}
               <div className="mt-6 pt-4 border-t border-gray-800">
                 <h3 className="text-lg font-semibold text-gray-500 mb-3">Completadas</h3>
                 <div className="space-y-3">
-                  {relevantTasks.filter(t => t.completed).map(task => (
+                  {relevantTasks.filter(t => t.status === 'completed' || t.status === 'done').map(task => (
                     <TaskCard key={task.id} task={task} />
                   ))}
                 </div>

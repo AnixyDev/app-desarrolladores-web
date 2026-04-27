@@ -62,6 +62,8 @@ export interface Project {
   priority: ProjectPriority;
 }
 
+export type TaskStatus = 'todo' | 'in_progress' | 'completed' | 'done' | 'blocked';
+
 export interface Task {
   id: string;
   user_id: string;

@@ -17,7 +17,7 @@ export interface ProjectSlice {
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
   updateProjectStatus: (id: string, status: Project['status']) => Promise<void>;
   getTasksByProjectId: (projectId: string) => Task[];
-  addTask: (task: Omit<Task, 'id'|'user_id'|'created_at'|'completed'|'invoice_id'>) => Promise<void>;
+  addTask: (task: Omit<Task, 'id'|'user_id'|'created_at'|'status'|'invoice_id'>) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   addTimeEntry: (entry: Omit<NewTimeEntry, 'user_id'>) => Promise<void>;
@@ -95,7 +95,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const newTaskData = { ...task, user_id: user.id, completed: false };
+        const newTaskData = { ...task, user_id: user.id, status: 'todo' as const };
         const { data, error } = await supabase.from('tasks').insert(newTaskData).select().single();
 
         if (!error && data) {
@@ -107,12 +107,15 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         const task = get().tasks.find(t => t.id === id);
         if (!task) return;
 
-        const newCompleted = !task.completed;
-        set(state => ({ tasks: state.tasks.map(t => t.id === id ? { ...t, completed: newCompleted } : t) }));
+        // Alterna entre 'todo' y 'completed'
+        const isDone = task.status === 'completed' || task.status === 'done';
+        const newStatus = isDone ? 'todo' : 'completed';
+        set(state => ({ tasks: state.tasks.map(t => t.id === id ? { ...t, status: newStatus } : t) }));
 
-        const { error } = await supabase.from('tasks').update({ completed: newCompleted }).eq('id', id);
+        const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
         if (error) {
-            set(state => ({ tasks: state.tasks.map(t => t.id === id ? { ...t, completed: !newCompleted } : t) }));
+            // Revertir en caso de error
+            set(state => ({ tasks: state.tasks.map(t => t.id === id ? { ...t, status: task.status } : t) }));
         }
     },
 
