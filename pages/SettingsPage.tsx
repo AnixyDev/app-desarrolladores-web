@@ -3,7 +3,7 @@ import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import { User, Bell, Shield, CreditCard, Globe } from '@/components/icons/Icon';
+import { UserIcon as User, BellIcon as Bell, ShieldIcon as Shield, CreditCard, Globe } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 
 const SettingsPage: React.FC = () => {

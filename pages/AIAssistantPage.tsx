@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { Send, Sparkles, User, RefreshCw } from '@/components/icons/Icon';
+import { SendIcon as Send, SparklesIcon as Sparkles, UserIcon as User, RefreshCwIcon as RefreshCw } from '@/components/icons/Icon';
 import { getAIResponse, AI_CREDIT_COSTS } from '@/services/geminiService';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';

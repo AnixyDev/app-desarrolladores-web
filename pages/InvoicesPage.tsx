@@ -6,7 +6,7 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { Invoice, RecurringInvoice, NewInvoice } from '@/types';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Download, Trash, Repeat, Send, Search } from '@/components/icons/Icon';
+import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 
 const InvoicesPage: React.FC = () => {

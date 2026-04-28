@@ -86,6 +86,7 @@ import {
   Hash,
   Target,
   HelpCircle,
+  Globe,
 } from 'lucide-react';
 
 // ── Mapa estático — solo los íconos que usa la app ────────────────────────────
@@ -154,6 +155,7 @@ const ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   Hash,
   Target,
   HelpCircle,
+  Globe,
 };
 
 // ── DynamicIcon — renderiza cualquier ícono del mapa por nombre ───────────────
@@ -235,4 +237,5 @@ export {
   Hash,
   Target,
   ShieldCheck as ShieldCheckIcon,
+  Globe,
 };

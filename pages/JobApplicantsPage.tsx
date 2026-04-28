@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { Mail, Phone, Download, CheckCircle, XCircle, Clock, Search } from '@/components/icons/Icon';
+import { MailIcon as Mail, PhoneIcon as Phone, DownloadIcon as Download, CheckCircleIcon as CheckCircle, XCircleIcon as XCircle, ClockIcon as Clock, SearchIcon as Search } from '@/components/icons/Icon';
 
 interface Applicant {
   id: string;

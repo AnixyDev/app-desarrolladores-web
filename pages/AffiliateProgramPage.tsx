@@ -4,7 +4,7 @@ import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';
-import { Share2, Copy, Users, DollarSign, CheckCircle } from '@/components/icons/Icon';
+import { Share2Icon as Share2, CopyIcon as Copy, Users, DollarSignIcon as DollarSign, CheckCircleIcon as CheckCircle } from '@/components/icons/Icon';
 import { formatCurrency } from '@/lib/utils';
 
 const AffiliateProgramPage = () => {
