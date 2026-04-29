@@ -1,13 +1,13 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useMemo } from 'react';
 import { useAppStore } from '../hooks/useAppStore';
-import { Sparkles, TrendingUp, Users, Briefcase } from 'lucide-react';
+import { Sparkles, TrendingUp, Users, Briefcase, Clock } from 'lucide-react';
 
 // Carga diferida — los gráficos no bloquean el chunk principal
 const IncomeExpenseChart = lazy(() => import('../components/charts/IncomeExpenseChart'));
 const WeeklyHoursChart   = lazy(() => import('../components/charts/WeeklyHoursChart'));
 const SmartInboxWidget   = lazy(() => import('../components/dashboard/SmartInboxWidget'));
 
-// ── Subcomponente tipado (elimina el any del StatCard original) ───────────────
+// ── Subcomponente tipado ───────────────────────────────────────────────────────
 interface StatCardProps {
   title: string;
   value: string;
@@ -40,7 +40,61 @@ const ChartSkeleton: React.FC<{ height?: string }> = ({ height = 'h-[300px]' }) 
 
 // ── Página principal ──────────────────────────────────────────────────────────
 const DashboardPage: React.FC = () => {
-  const { profile, invoices, expenses } = useAppStore();
+  const { profile, invoices, expenses, projects, clients, timeEntries } = useAppStore();
+
+  // ── Ingresos del mes actual (facturas pagadas con issue_date en este mes) ──
+  const monthlyIncome = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return invoices
+      .filter(i => {
+        if (!i.paid) return false;
+        const d = new Date(i.issue_date);
+        return d >= startOfMonth && d <= endOfMonth;
+      })
+      .reduce((sum, i) => sum + (i.total_cents ?? 0), 0) / 100;
+  }, [invoices]);
+
+  // ── Proyectos activos ──────────────────────────────────────────────────────
+  const activeProjects = useMemo(
+    () => projects.filter(p => p.status === 'in-progress').length,
+    [projects]
+  );
+
+  // ── Total de clientes ──────────────────────────────────────────────────────
+  const totalClients = clients.length;
+
+  // ── Horas registradas esta semana ─────────────────────────────────────────
+  const weeklyHours = useMemo(() => {
+    const now = new Date();
+    // Lunes de la semana actual
+    const dayOfWeek = now.getDay(); // 0=Dom, 1=Lun...
+    const diffToMonday = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() + diffToMonday);
+    startOfWeek.setHours(0, 0, 0, 0);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    const totalSeconds = timeEntries
+      .filter(t => {
+        const d = new Date(t.start_time);
+        return d >= startOfWeek && d <= endOfWeek;
+      })
+      .reduce((sum, t) => sum + (t.duration_seconds ?? 0), 0);
+
+    return Math.round(totalSeconds / 3600);
+  }, [timeEntries]);
+
+  // ── Formatear ingresos ─────────────────────────────────────────────────────
+  const formattedIncome = monthlyIncome.toLocaleString('es-ES', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
 
   return (
     <div className="space-y-6">
@@ -60,12 +114,32 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats rápidas */}
+      {/* Stats rápidas — valores calculados desde Supabase */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Ingresos Mes"       value="2.450€" icon={TrendingUp} trend="+12%"  color="text-green-400"  />
-        <StatCard title="Proyectos Activos"  value="5"      icon={Briefcase}               color="text-blue-400"   />
-        <StatCard title="Clientes"           value="12"     icon={Users}                   color="text-purple-400" />
-        <StatCard title="Horas esta semana"  value="32h"    icon={TrendingUp} trend="80%"  color="text-orange-400" />
+        <StatCard
+          title="Ingresos Mes"
+          value={formattedIncome}
+          icon={TrendingUp}
+          color="text-green-400"
+        />
+        <StatCard
+          title="Proyectos Activos"
+          value={String(activeProjects)}
+          icon={Briefcase}
+          color="text-blue-400"
+        />
+        <StatCard
+          title="Clientes"
+          value={String(totalClients)}
+          icon={Users}
+          color="text-purple-400"
+        />
+        <StatCard
+          title="Horas esta semana"
+          value={`${weeklyHours}h`}
+          icon={Clock}
+          color="text-orange-400"
+        />
       </div>
 
       {/* Gráfico principal + Inbox */}
