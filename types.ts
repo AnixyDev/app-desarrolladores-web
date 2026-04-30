@@ -117,6 +117,8 @@ export interface Proposal {
   content: string;
   amount_cents: number;
   status: ProposalStatus;
+  items: InvoiceItem[];
+  valid_until: string | null;
   created_at: string;
 }
 
