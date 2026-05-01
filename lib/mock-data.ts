@@ -10,7 +10,7 @@ const clients: Client[] = [
 
 // --- Proyectos ---
 const projects: Project[] = [
-    { id: 'p-1', user_id: USER_ID, name: 'Website Redesign', client_id: 'c-1', description: 'Complete redesign of the corporate website.', status: 'completed', start_date: '2024-10-05', due_date: '2024-10-20', budget_cents: 200000, created_at: '2024-10-05', category: 'Web Development', priority: 'High' }
+    { id: 'p-1', user_id: USER_ID, name: 'Website Redesign', client_id: 'c-1', // description: 'Complete redesign of the corporate website.', status: 'completed', start_date: '2024-10-05', due_date: '2024-10-20', budget_cents: 200000, created_at: '2024-10-05', category: 'Web Development', priority: 'High' }
 ];
 
 // --- Tareas ---
@@ -27,10 +27,10 @@ const invoices: Invoice[] = [
         issue_date: '2024-10-22',
         due_date: '2024-11-21',
         items: [
-            { description: 'Diseño y Maquetación de Landing Page (HTML/CSS)', quantity: 1, price_cents: 50000 },
-            { description: 'Desarrollo de Componentes Interactivos (JavaScript)', quantity: 1, price_cents: 40000 },
-            { description: 'Configuración de Formulario de Contacto y Lógica de Envío', quantity: 1, price_cents: 15000 },
-            { description: 'Optimización para Dispositivos Móviles (Responsive Design)', quantity: 1, price_cents: 15000 }
+            { // description: 'Diseño y Maquetación de Landing Page (HTML/CSS)', quantity: 1, price_cents: 50000 },
+            { // description: 'Desarrollo de Componentes Interactivos (JavaScript)', quantity: 1, price_cents: 40000 },
+            { // description: 'Configuración de Formulario de Contacto y Lógica de Envío', quantity: 1, price_cents: 15000 },
+            { // description: 'Optimización para Dispositivos Móviles (Responsive Design)', quantity: 1, price_cents: 15000 }
         ],
         subtotal_cents: 120000,
         tax_percent: 21,
@@ -57,8 +57,8 @@ const articles: KnowledgeArticle[] = [];
 const jobs: Job[] = [
     {
         id: 'job-1',
-        titulo: 'Desarrollador Full-Stack para E-commerce con Next.js',
-        descripcionCorta: 'Buscamos un desarrollador experimentado para construir una tienda online moderna utilizando Next.js, Stripe y Vercel.',
+        title: 'Desarrollador Full-Stack para E-commerce con Next.js',
+        // description: 'Buscamos un desarrollador experimentado para construir una tienda online moderna utilizando Next.js, Stripe y Vercel.',
         descripcionLarga: '## Sobre el Proyecto\n\nNecesitamos desarrollar desde cero una plataforma de e-commerce para una marca de moda sostenible. El objetivo es crear una experiencia de usuario fluida, rápida y visualmente atractiva.\n\n### Responsabilidades:\n- Desarrollar el frontend con Next.js y Tailwind CSS.\n- Implementar la lógica de backend (gestión de productos, usuarios, pedidos) usando serverless functions.\n- Integrar la pasarela de pago de Stripe.\n- Desplegar y mantener la aplicación en Vercel.\n\n### Requisitos:\n- 3+ años de experiencia con React y Node.js.\n- Experiencia demostrable con Next.js en producción.\n- Sólidos conocimientos de TypeScript.',
         presupuesto: 8000,
         duracionSemanas: 10,
@@ -71,8 +71,8 @@ const jobs: Job[] = [
     },
     {
         id: 'job-2',
-        titulo: 'Backend Developer (Python/Django) para API de Análisis de Datos',
-        descripcionCorta: 'Se requiere un desarrollador de backend para crear una API RESTful que procese y sirva grandes volúmenes de datos.',
+        title: 'Backend Developer (Python/Django) para API de Análisis de Datos',
+        // description: 'Se requiere un desarrollador de backend para crear una API RESTful que procese y sirva grandes volúmenes de datos.',
         descripcionLarga: 'Estamos construyendo una plataforma de análisis de datos para el sector financiero. Tu rol será diseñar, desarrollar y mantener la API principal que alimentará nuestro dashboard. Buscamos a alguien con experiencia en optimización de consultas y manejo de bases de datos PostgreSQL.',
         presupuesto: 6500,
         duracionSemanas: 8,
@@ -85,8 +85,8 @@ const jobs: Job[] = [
     },
     {
         id: 'job-3',
-        titulo: 'Maquetador Web con Experiencia en Animaciones (Tailwind CSS)',
-        descripcionCorta: 'Necesitamos un especialista en maquetación para convertir diseños de Figma en componentes de React animados e interactivos.',
+        title: 'Maquetador Web con Experiencia en Animaciones (Tailwind CSS)',
+        // description: 'Necesitamos un especialista en maquetación para convertir diseños de Figma en componentes de React animados e interactivos.',
         descripcionLarga: 'Nuestra agencia de diseño necesita un freelancer con un ojo increíble para el detalle. Trabajarás directamente con nuestros diseñadores para dar vida a interfaces complejas. El proyecto principal es un landing page interactivo para un evento tecnológico.',
         presupuesto: 3000,
         duracionSemanas: 4,

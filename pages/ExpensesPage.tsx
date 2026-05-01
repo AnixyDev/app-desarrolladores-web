@@ -28,9 +28,9 @@ const ExpensesPage: React.FC = () => {
     const [itemToDelete, setItemToDelete] = useState<{ id: string; type: 'single' | 'recurring' } | null>(null);
 
     const initialExpenseState: Omit<Expense, 'id' | 'user_id' | 'created_at'> = {
-        description: '',
+        // description: '',
         amount_cents: 0,
-        tax_percent: 21,
+        // tax_percent: 21,
         date: new Date().toISOString().split('T')[0],
         category: 'Software',
         project_id: '',
@@ -38,7 +38,7 @@ const ExpensesPage: React.FC = () => {
     const [newExpense, setNewExpense] = useState(initialExpenseState);
 
     const initialRecurringState: Omit<RecurringExpense, 'id' | 'user_id' | 'created_at' | 'next_due_date'> = {
-        description: '',
+        // description: '',
         amount_cents: 0,
         category: 'Software',
         frequency: 'monthly',
@@ -62,7 +62,7 @@ const ExpensesPage: React.FC = () => {
         addExpense({
             ...newExpense,
             amount_cents: Math.round(Number(newExpense.amount_cents) * 100),
-            tax_percent: Number(newExpense.tax_percent) || 0,
+            // tax_percent: Number(newExpense.tax_percent) || 0,
         });
         setIsExpenseModalOpen(false);
         setNewExpense(initialExpenseState);
@@ -127,7 +127,7 @@ const ExpensesPage: React.FC = () => {
                             <tbody>
                                 {expenses.map(expense => (
                                     <tr key={expense.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                                        <td className="p-4 text-white">{expense.description}</td>
+                                        <td className="p-4 text-white">{(expense as any).description}</td>
                                         <td className="p-4 text-gray-300">{expense.date}</td>
                                         <td className="p-4 text-white font-semibold">{formatCurrency(expense.amount_cents)}</td>
                                         <td className="p-4 text-right">
@@ -159,8 +159,8 @@ const ExpensesPage: React.FC = () => {
                             <tbody>
                                 {recurringExpenses.map(expense => (
                                     <tr key={expense.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                                        <td className="p-4 text-white">{expense.description}</td>
-                                        <td className="p-4 text-gray-300">{expense.next_due_date}</td>
+                                        <td className="p-4 text-white">{(expense as any).description}</td>
+                                        <td className="p-4 text-gray-300">{(expense as any).next_date}</td>
                                         <td className="p-4 text-white font-semibold">{formatCurrency(expense.amount_cents)}</td>
                                         <td className="p-4 text-right">
                                             <Button size="sm" variant="danger" onClick={() => handleDeleteClick(expense.id, 'recurring')}>

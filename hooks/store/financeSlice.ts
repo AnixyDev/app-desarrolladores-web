@@ -15,7 +15,7 @@ import { supabase } from '@/lib/supabaseClient';
 // ─── Tipos de entrada (sin campos que genera el servidor) ─────────────────────
 
 type NewInvoiceInput = Omit<Invoice, 'id' | 'user_id' | 'created_at' | 'invoice_number' | 'subtotal_cents' | 'total_cents' | 'paid' | 'payment_date'>;
-type NewRecurringInvoiceInput = Omit<RecurringInvoice, 'id' | 'user_id' | 'created_at' | 'next_due_date'>;
+type NewRecurringInvoiceInput = Omit<RecurringInvoice, 'id' | 'user_id' | 'created_at' | 'next_date'>;
 type NewBudgetInput = Omit<Budget, 'id' | 'user_id' | 'created_at' | 'amount_cents' | 'status'> & { items: InvoiceItem[] };
 type NewProposalInput = Omit<Proposal, 'id' | 'user_id' | 'created_at'>;
 type NewContractInput = Omit<Contract, 'id' | 'user_id' | 'created_at' | 'signed_by' | 'signed_at'>;
@@ -45,7 +45,7 @@ export interface FinanceSlice {
   addExpense: (expense: Omit<Expense, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
 
-  addRecurringExpense: (expense: Omit<RecurringExpense, 'id' | 'user_id' | 'created_at' | 'next_due_date'>) => Promise<void>;
+  addRecurringExpense: (expense: Omit<RecurringExpense, 'id' | 'user_id' | 'created_at' | 'next_date'>) => Promise<void>;
   deleteRecurringExpense: (id: string) => Promise<void>;
 
   addBudget: (budget: NewBudgetInput) => Promise<void>;
@@ -186,7 +186,7 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
 
     const { data, error } = await supabase
       .from('recurring_invoices')
-      .insert({ ...recurringData, user_id: user.id, next_due_date: recurringData.start_date })
+      .insert({ ...recurringData, user_id: user.id, next_date: recurringData.start_date })
       .select()
       .single();
 
@@ -212,7 +212,7 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
     today.setHours(0, 0, 0, 0);
 
     for (const rec of get().recurringInvoices) {
-      const nextDueDate = new Date(rec.next_due_date);
+      const nextDueDate = new Date(rec.next_date);
       if (nextDueDate <= today) {
         await get().addInvoice({
           client_id: rec.client_id,
@@ -223,7 +223,7 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
           tax_percent: rec.tax_percent,
         });
 
-        const newNextDueDate = new Date(rec.next_due_date);
+        const newNextDueDate = new Date(rec.next_date);
         if (rec.frequency === 'monthly') {
           newNextDueDate.setMonth(newNextDueDate.getMonth() + 1);
         } else {
@@ -232,7 +232,7 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
 
         await supabase
           .from('recurring_invoices')
-          .update({ next_due_date: newNextDueDate.toISOString().split('T')[0] })
+          .update({ next_date: newNextDueDate.toISOString().split('T')[0] })
           .eq('id', rec.id);
       }
     }
@@ -269,7 +269,7 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
 
     const { data, error } = await supabase
       .from('recurring_expenses')
-      .insert({ ...expense, user_id: user.id, next_due_date: expense.start_date })
+      .insert({ ...expense, user_id: user.id, next_date: expense.start_date })
       .select()
       .single();
 

@@ -5,7 +5,6 @@ export type ContractStatus = 'draft' | 'sent' | 'signed';
 export type JobApplicationStatus = 'sent' | 'viewed' | 'accepted' | 'rejected';
 export type ProjectStatus = 'planning' | 'in-progress' | 'completed' | 'on-hold';
 export type ProposalStatus = 'draft' | 'sent' | 'accepted' | 'rejected';
-export type TaskStatus = 'todo' | 'in_progress' | 'done' | 'blocked';
 export type ProjectPriority = 'Low' | 'Medium' | 'High';
 
 export interface Profile {
@@ -152,3 +151,21 @@ export interface Referral {
   status: 'Registered' | 'Subscribed';
   commission_cents: number;
 }
+
+// Added missing types
+export interface UserData { id: string; name: string; email: string; role: string; }
+export interface Job { id: string; title: string; company: string; location: string; type: string; salary: string; posted_at: string; }
+export interface KnowledgeArticle { id: string; title: string; content: string; category: string; }
+
+// Additional missing types
+export type IconName = string;
+export type PlanType = 'free' | 'pro' | 'teams';
+export type UserRole = 'admin' | 'user' | 'manager';
+export interface Expense { id: string; user_id: string; amount_cents: number; category: string; date: string; description?: string; }
+export interface RecurringExpense { id: string; user_id: string; amount_cents: number; category: string; frequency: string; next_date: string; }
+export interface RecurringInvoice { id: string; user_id: string; client_id: string; amount_cents: number; frequency: string; next_date: string; }
+export interface NewProject { name: string; client_id: string; status: string; }
+export interface TimeEntry { id: string; user_id: string; project_id: string; task_id?: string; duration_seconds: number; start_time: string; end_time?: string; }
+export interface NewTimeEntry { project_id: string; task_id?: string; duration_seconds: number; start_time: string; }
+export interface Notification { id: string; user_id: string; title: string; message: string; read: boolean; created_at: string; }
+export interface NewClient { name: string; email: string; company?: string; phone?: string; }

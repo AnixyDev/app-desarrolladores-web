@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../useAppStore';
-import { Profile, PlanType, UserRole } from '@/types';
+import { Profile, any, UserRole } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
@@ -11,7 +11,7 @@ const initialProfile: Profile = {
     business_name: '',
     tax_id: '',
     avatar_url: '',
-    plan: 'Free' as PlanType,
+    plan: 'Free' as any,
     role: 'Developer' as UserRole,
     ai_credits: 10,
     hourly_rate_cents: 0,

@@ -78,7 +78,7 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
                 jobId: data.job_id,
                 userId: data.applicant_id,
                 applicantName: String(profile.full_name || 'Freelancer'),
-                jobTitle: String(job.titulo || 'Oferta'), // Fix prop name
+                jobTitle: String(job.title || 'Oferta'), // Fix prop name
                 proposalText: String(data.proposal_text),
                 status: data.status,
                 appliedAt: data.created_at

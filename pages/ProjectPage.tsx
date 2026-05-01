@@ -5,7 +5,7 @@ import { ProjectCard } from '@/components/projects/ProjectCard';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
-import { Project, NewProject } from '@/types';
+import { Project } from '@/types';
 import { useToast } from '@/hooks/useToast';
 
 // DND Kit
@@ -51,7 +51,7 @@ const ProjectPage: React.FC = () => {
     const getProjectProgress = (projectId: string) => {
         const projectTasks = tasks?.filter(t => t.project_id === projectId) || [];
         if (projectTasks.length === 0) return 0;
-        const completed = projectTasks.filter(t => t.status === 'completed' || t.status === 'done').length;
+        const completed = projectTasks.filter(t => t.status === 'done' || t.status === 'done').length;
         return Math.round((completed / projectTasks.length) * 100);
     };
 

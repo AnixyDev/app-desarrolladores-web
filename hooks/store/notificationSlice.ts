@@ -5,7 +5,7 @@ import { AppState } from '../useAppStore';
 export interface NotificationSlice {
   notifications: Notification[];
   notifiedEvents: string[];
-  addNotification: (message: string, link: string) => void;
+  addNotification: (message: string, link?: string) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
   checkInvoiceStatuses: () => void;

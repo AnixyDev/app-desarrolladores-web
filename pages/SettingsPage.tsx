@@ -14,8 +14,8 @@ const SettingsPage: React.FC = () => {
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || '',
     email: profile?.email || '',
-    company_name: profile?.company_name || '',
-    website: profile?.website || '',
+    company_name: (profile as any)?.company_name || '',
+    website: (profile as any)?.website || '',
   });
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -108,10 +108,10 @@ const SettingsPage: React.FC = () => {
             </CardHeader>
             <CardContent className="flex items-center justify-between">
               <div>
-                <p className="text-lg font-bold text-white uppercase">{profile?.plan_id || 'Free'}</p>
+                <p className="text-lg font-bold text-white uppercase">{(profile as any)?.plan_id || 'Free'}</p>
                 <p className="text-sm text-gray-400">Tu plan actual incluye todas las funciones básicas.</p>
               </div>
-              <Button variant="outline">Cambiar Plan</Button>
+              <Button variant="secondary">Cambiar Plan</Button>
             </CardContent>
           </Card>
         </div>

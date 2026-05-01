@@ -111,10 +111,10 @@ export const generateFinancialForecast = async (
 ========================= */
 
 export const analyzeProfitability = async (
-  data: ProfitabilityData[]
-): Promise<{ summary: string; insights: string[] }> => {
+  data: ProfitabilityData[] | Record<string, unknown>
+): Promise<{ summary: string; insights: string[]; topPerformers?: any[]; areasForImprovement?: any[] }> => {
   const res = await callAI('analyzeProfitability', { data: data as unknown as Record<string, unknown>[] });
-  return res as unknown as { summary: string; insights: string[] };
+  return res as unknown as { summary: string; insights: string[]; topPerformers?: any[]; areasForImprovement?: any[] };
 };
 
 /* =========================
