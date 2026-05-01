@@ -52,6 +52,8 @@ export interface FinanceSlice {
   updateBudgetStatus: (id: string, status: Budget['status']) => Promise<void>;
 
   addProposal: (proposal: NewProposalInput) => Promise<void>;
+  updateProposal: (id: string, updates: Partial<Proposal>) => Promise<void>;
+  deleteProposal: (id: string) => Promise<void>;
 
   addContract: (contract: NewContractInput) => Promise<void>;
   updateContract: (id: string, updates: Partial<Contract>) => Promise<void>;
@@ -328,6 +330,20 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
 
     if (!error && data) {
       set(state => ({ proposals: [data as Proposal, ...state.proposals] }));
+    }
+  },
+  updateProposal: async (id, updates) => {
+    const { error } = await supabase.from('proposals').update(updates).eq('id', id);
+    if (!error) {
+      set(state => ({
+        proposals: state.proposals.map(p => (p.id === id ? { ...p, ...updates } : p)),
+      }));
+    }
+  },
+  deleteProposal: async (id) => {
+    const { error } = await supabase.from('proposals').delete().eq('id', id);
+    if (!error) {
+      set(state => ({ proposals: state.proposals.filter(p => p.id !== id) }));
     }
   },
 

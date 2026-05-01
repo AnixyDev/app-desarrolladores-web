@@ -11,7 +11,8 @@ import {
   FileSignatureIcon, 
   PlusIcon, 
   TrashIcon, 
-  SearchIcon
+  SearchIcon,
+  FileTextIcon
 } from '../components/icons/Icon';
 import { useToast } from '../hooks/useToast';
 import { Proposal } from '@/types';
@@ -20,7 +21,7 @@ import { Proposal } from '@/types';
 type FilterStatus = 'all' | Proposal['status'];
 
 const ProposalsPage: React.FC = () => {
-  const { proposals, clients, addProposal, deleteProposal, profile } = useAppStore();
+  const { proposals, clients, addProposal, deleteProposal, updateProposal, addInvoice, profile } = useAppStore();
   const { addToast } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,6 +72,30 @@ const ProposalsPage: React.FC = () => {
       .reduce((sum, p) => sum + (p.amount_cents || 0), 0) || 0;
     return { total, accepted, pending, totalValue };
   }, [proposals]);
+
+  const handleConvertToInvoice = async (proposal: any) => {
+    const today = new Date();
+    const dueDate = new Date(today);
+    dueDate.setDate(dueDate.getDate() + 30);
+    const invoiceItems = proposal.items && proposal.items.length > 0
+      ? proposal.items
+      : [{ description: proposal.title, quantity: 1, price_cents: proposal.amount_cents }];
+    try {
+      await addInvoice({
+        client_id: proposal.client_id,
+        project_id: null,
+        issue_date: today.toISOString().split('T')[0],
+        due_date: dueDate.toISOString().split('T')[0],
+        items: invoiceItems,
+        tax_percent: 21,
+        irpf_percent: 0,
+      });
+      await updateProposal(proposal.id, { status: 'accepted' });
+      addToast('✅ Propuesta convertida en factura correctamente.', 'success');
+    } catch (e) {
+      addToast('❌ Error al convertir la propuesta en factura.', 'error');
+    }
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -219,6 +244,15 @@ const ProposalsPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
+                           {proposal.status === 'accepted' && (
+                             <button
+                               onClick={() => handleConvertToInvoice(proposal)}
+                               title="Convertir en Factura"
+                               className="p-2 text-gray-500 hover:text-green-400 hover:bg-green-400/10 rounded-lg transition-all"
+                             >
+                               <FileTextIcon className="w-4 h-4" />
+                             </button>
+                           )}
                            <button className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-all"><FileSignatureIcon className="w-4 h-4" /></button>
                            <button onClick={() => handleDelete(proposal.id)} className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"><TrashIcon className="w-4 h-4" /></button>
                         </div>
