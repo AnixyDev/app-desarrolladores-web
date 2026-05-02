@@ -97,6 +97,16 @@ export interface Invoice {
   irpf_percent?: number;
 }
 
+export interface NewInvoice {
+  client_id: string;
+  project_id?: string | null;
+  items: InvoiceItem[];
+  tax_percent: number;
+  irpf_percent?: number;
+  due_date: string;
+  notes?: string;
+}
+
 export interface Budget {
   id: string;
   user_id: string;
@@ -155,7 +165,7 @@ export interface Referral {
 // Added missing types
 export interface UserData { id: string; name: string; email: string; role: string; }
 export interface Job { id: string; title: string; company: string; location: string; type: string; salary: string; posted_at: string; }
-export interface KnowledgeArticle { id: string; title: string; content: string; category: string; }
+export interface KnowledgeArticle { id: string; title: string; content: string; category: string; tags?: string[]; }
 
 // Additional missing types
 export type IconName = string;

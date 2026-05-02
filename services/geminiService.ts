@@ -65,9 +65,9 @@ async function callAI(action: string, payload: Record<string, unknown>): Promise
 export const getAIResponse = async (
   prompt: string,
   history: ChatMessage[] = []
-): Promise<{ text: string }> => {
+): Promise<string> => {
   const res = await callAI('getAIResponse', { prompt, history });
-  return { text: res.text as string };
+  return (res.text as string) ?? '';
 };
 
 /* =========================

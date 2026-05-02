@@ -40,7 +40,7 @@ const InvoicesPage: React.FC = () => {
     return invoices.filter(inv => {
       const client = clients.find(c => c.id === inv.client_id);
       return (
-        inv.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client?.name.toLowerCase().includes(searchTerm.toLowerCase())
       );
     });
@@ -111,7 +111,7 @@ const InvoicesPage: React.FC = () => {
                   <tbody className="divide-y divide-gray-800">
                     {filteredInvoices.map((inv) => (
                       <tr key={inv.id} className="text-sm text-gray-300 hover:bg-gray-800/30 transition-colors">
-                        <td className="px-6 py-4 font-mono text-white">{inv.number}</td>
+                        <td className="px-6 py-4 font-mono text-white">{inv.invoice_number}</td>
                         <td className="px-6 py-4">{getClientName(inv.client_id)}</td>
                         <td className="px-6 py-4">{new Date(inv.due_date).toLocaleDateString()}</td>
                         <td className="px-6 py-4 text-right font-bold text-white">{formatCurrency(inv.total_cents)}</td>
