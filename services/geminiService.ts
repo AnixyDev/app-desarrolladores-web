@@ -46,12 +46,13 @@ export interface ProfitabilityData {
 ========================= */
 
 async function callAI(action: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-  const { data, error } = await supabase.functions.invoke('ai-gemini', {
+  // bright-task es la Edge Function activa en Supabase con soporte completo de Gemini
+  const { data, error } = await supabase.functions.invoke('bright-task', {
     body: { action, payload },
   });
 
   if (error) {
-    console.error('Error invoking ai-gemini:', error);
+    console.error('Error invoking bright-task:', error);
     throw new Error(error.message || 'Error en la función de IA. Inténtalo de nuevo.');
   }
 

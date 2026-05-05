@@ -122,6 +122,8 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             // Cargamos uno por uno para que no choquen las peticiones de token
             if (get().fetchClients) await get().fetchClients();
             if (get().fetchProjects) await get().fetchProjects();
+            if (get().fetchTasks) await get().fetchTasks();
+            if (get().fetchTimeEntries) await get().fetchTimeEntries();
             if (get().fetchFinanceData) await get().fetchFinanceData();
             if (get().fetchNotifications) await get().fetchNotifications();
 
