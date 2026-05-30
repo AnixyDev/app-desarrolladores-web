@@ -126,6 +126,7 @@ export const redirectToCheckout = async (
     mode: item.mode,
     amount: itemKey === 'invoicePayment' ? extraParams.amount_cents : undefined,
     productName: itemKey === 'invoicePayment' ? `Factura ${extraParams.invoice_number}` : undefined,
+    client_reference_id: extraParams.client_reference_id,
     metadata: {
       ...extraParams,
       itemKey,

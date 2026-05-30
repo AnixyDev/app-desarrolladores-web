@@ -47,7 +47,7 @@ export interface ProfitabilityData {
 
 async function callAI(action: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
   // bright-task es la Edge Function activa en Supabase con soporte completo de Gemini
-  const { data, error } = await supabase.functions.invoke('bright-task', {
+    const { data, error } = await supabase.functions.invoke('ai-gemini', {
     body: { action, payload },
   });
 

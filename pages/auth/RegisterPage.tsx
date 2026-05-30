@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import AuthCard from '@/components/auth/AuthCard';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
@@ -45,6 +45,7 @@ const GoogleConfigAlert: React.FC<{ origin: string }> = ({ origin }) => (
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const register = useAppStore(state => state.register);
   const loginWithGoogle = useAppStore(state => state.loginWithGoogle);
 
@@ -68,8 +69,11 @@ const RegisterPage: React.FC = () => {
 
     setLoading(true);
     try {
+      const ref = searchParams.get('ref');
       const success = await register(name, email, password);
       if (success) {
+        // Si hay un referido, podríamos guardarlo en el perfil o metadata del usuario
+        // Por ahora, nos aseguramos de que el flujo de registro continúe.
         navigate('/');
       } else {
         setError('No se pudo crear la cuenta. Verifica tus datos o intenta con otro email.');

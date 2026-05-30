@@ -250,6 +250,11 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
       .insert({ ...expense, user_id: user.id })
       .select()
       .single();
+    
+    if (error) {
+      console.error('Error adding expense:', error);
+      throw error;
+    }
 
     if (!error && data) {
       set(state => ({ expenses: [data as Expense, ...state.expenses] }));
@@ -356,6 +361,11 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
       .insert({ ...contractData, user_id: user.id })
       .select()
       .single();
+
+    if (error) {
+      console.error('Error adding contract:', error);
+      throw error;
+    }
 
     if (!error && data) {
       set(state => ({ contracts: [data as Contract, ...state.contracts] }));

@@ -134,7 +134,7 @@ const BillingPage: React.FC = () => {
                         <div className="space-y-2">
                             <h4 className="text-xl font-bold text-white">¿Necesitas un plan personalizado?</h4>
                             <p className="text-gray-400 text-sm">Si eres una agencia de más de 20 personas, ofrecemos despliegues en infraestructura privada (On-Premise) y soporte dedicado.</p>
-                            <button className="text-primary-400 text-sm font-bold hover:underline mt-2">Hablar con ventas →</button>
+                            <a href="mailto:ventas@devfreelancer.app" className="text-primary-400 text-sm font-bold hover:underline mt-2 inline-block">Hablar con ventas →</a>
                         </div>
                     </CardContent>
                 </Card>

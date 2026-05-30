@@ -26,7 +26,7 @@ const ClientDetailPage = lazy(() => import('./pages/ClientDetailPage'));
 
 // Finanzas
 const InvoicesPage = lazy(() => import('./pages/InvoicesPage'));
-const CreateInvoicePage = lazy(() => import('./pages/portal/PortalInvoiceViewPage'));
+const CreateInvoicePage = lazy(() => import('./pages/CreateInvoicePage'));
 const ExpensesPage = lazy(() => import('./pages/ExpensesPage'));
 const TaxLedgerPage = lazy(() => import('./pages/TaxLedgerPage'));
 

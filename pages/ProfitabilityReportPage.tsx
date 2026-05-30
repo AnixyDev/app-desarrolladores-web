@@ -91,10 +91,20 @@ const ProfitabilityReportPage: React.FC = () => {
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     try {
-      consumeCredits(AI_CREDIT_COSTS.analyzeProfitability);
-      const data = await analyzeProfitability(profitabilityData) as unknown as FinancialAnalysis;
-      setAnalysis(data);
-    } catch {
+      const success = await consumeCredits(AI_CREDIT_COSTS.analyzeProfitability);
+      if (!success) {
+        setIsBuyCreditsOpen(true);
+        return;
+      }
+      const data = await analyzeProfitability(profitabilityData) as any;
+      // Normalización de la respuesta para evitar fallos en la UI
+      setAnalysis({
+        summary: data.summary || 'No se pudo generar el resumen.',
+        topPerformers: data.topPerformers || [],
+        areasForImprovement: data.areasForImprovement || []
+      });
+    } catch (error) {
+      console.error('AI Analysis error:', error);
       addToast('Error al analizar la rentabilidad. Intenta nuevamente.', 'error');
     } finally {
       setIsAnalyzing(false);

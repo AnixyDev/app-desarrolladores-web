@@ -52,6 +52,7 @@ serve(async (req) => {
       amount,
       productName,
       metadata,
+      client_reference_id,
     } = body;
 
     // ----------------------------
@@ -102,6 +103,7 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode,
+      client_reference_id: client_reference_id || undefined,
 
       line_items: priceId
         ? [

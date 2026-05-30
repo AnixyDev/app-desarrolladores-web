@@ -34,3 +34,16 @@ CREATE TRIGGER on_auth_user_created
   EXECUTE FUNCTION public.handle_new_user();
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Los usuarios pueden actualizar su propio perfil" 
+ON public.profiles 
+FOR UPDATE 
+TO authenticated 
+USING (auth.uid() = id) 
+WITH CHECK (auth.uid() = id);
+
+CREATE POLICY "Los usuarios pueden ver su propio perfil" 
+ON public.profiles 
+FOR SELECT 
+TO authenticated 
+USING (auth.uid() = id);

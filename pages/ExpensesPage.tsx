@@ -27,18 +27,18 @@ const ExpensesPage: React.FC = () => {
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<{ id: string; type: 'single' | 'recurring' } | null>(null);
 
-    const initialExpenseState: Omit<Expense, 'id' | 'user_id' | 'created_at'> = {
-        // description: '',
+    const initialExpenseState: Omit<Expense, 'id' | 'user_id' | 'created_at'> & { description: string; tax_percent: number } = {
+        description: '',
         amount_cents: 0,
-        // tax_percent: 21,
+        tax_percent: 21,
         date: new Date().toISOString().split('T')[0],
         category: 'Software',
         project_id: '',
     };
     const [newExpense, setNewExpense] = useState(initialExpenseState);
 
-    const initialRecurringState: Omit<RecurringExpense, 'id' | 'user_id' | 'created_at' | 'next_due_date'> = {
-        // description: '',
+    const initialRecurringState: Omit<RecurringExpense, 'id' | 'user_id' | 'created_at' | 'next_date'> & { description: string } = {
+        description: '',
         amount_cents: 0,
         category: 'Software',
         frequency: 'monthly',
@@ -62,8 +62,8 @@ const ExpensesPage: React.FC = () => {
         addExpense({
             ...newExpense,
             amount_cents: Math.round(Number(newExpense.amount_cents) * 100),
-            // tax_percent: Number(newExpense.tax_percent) || 0,
-        });
+            tax_percent: Number(newExpense.tax_percent) || 0,
+        } as any);
         setIsExpenseModalOpen(false);
         setNewExpense(initialExpenseState);
     };
