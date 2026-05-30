@@ -47,3 +47,18 @@ ON public.profiles
 FOR SELECT 
 TO authenticated 
 USING (auth.uid() = id);
+
+CREATE TABLE public.referrals (
+    id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+    affiliate_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    referred_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    amount_cents integer NOT NULL,
+    status text NOT NULL DEFAULT 'pending',
+    stripe_session_id text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+ALTER TABLE public.referrals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Solo los afiliados pueden ver sus referidos" ON public.referrals FOR SELECT TO authenticated USING (auth.uid() = affiliate_id);
+CREATE POLICY "Los usuarios autenticados pueden insertar referidos" ON public.referrals FOR INSERT TO authenticated WITH CHECK (true);

@@ -30,7 +30,7 @@ const CreateInvoicePage: React.FC = () => {
 
   const initialInvoiceState = {
     client_id: clients[0]?.id || '',
-    // project_id: '',
+    project_id: null,
     issue_date: new Date().toISOString().split('T')[0],
     due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     items: [{ description: '', quantity: 1, price_cents: 0 }] as InvoiceItem[],
@@ -67,7 +67,7 @@ const CreateInvoicePage: React.FC = () => {
         setNewInvoice((prev) => ({
           ...prev,
           client_id: clientId,
-          // project_id: projectId,
+          project_id: projectId,
           items: [newItem],
         }));
         addToast('Horas cargadas correctamente.', 'info');
@@ -76,12 +76,12 @@ const CreateInvoicePage: React.FC = () => {
       setNewInvoice((prev) => ({
         ...prev,
         client_id: clientId,
-        // project_id: projectId,
+        project_id: projectId,
         items: budgetItems,
       }));
       addToast('Datos importados del presupuesto.', 'info');
     } else if (clientId && projectId) {
-      setNewInvoice((prev) => ({ ...prev, client_id: clientId, // project_id: projectId }));
+      setNewInvoice((prev) => ({ ...prev, client_id: clientId, project_id: projectId }));
     }
 
     window.history.replaceState({}, document.title);
@@ -140,7 +140,7 @@ const CreateInvoicePage: React.FC = () => {
     if (newInvoice.isRecurring) {
       addRecurringInvoice({
         client_id: newInvoice.client_id,
-        // project_id: newInvoice.project_id || null,
+        project_id: newInvoice.project_id || null,
         items: newInvoice.items,
         tax_percent: newInvoice.tax_percent,
         frequency: newInvoice.frequency,
@@ -150,7 +150,7 @@ const CreateInvoicePage: React.FC = () => {
       addInvoice(
         {
           client_id: newInvoice.client_id,
-          // project_id: newInvoice.project_id || null,
+          project_id: newInvoice.project_id || null,
           issue_date: newInvoice.issue_date,
           due_date: newInvoice.due_date,
           items: newInvoice.items,

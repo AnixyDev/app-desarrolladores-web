@@ -46,15 +46,47 @@ serve(async (req) => {
   try {
     // Lógica de negocio (simplificada para post-release)
     switch (event.type) {
-      case 'checkout.session.completed':
+      case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         const userId = session.metadata?.supabase_user_id
+        const clientReferenceId = session.client_reference_id // El ref_id del afiliado
+        
         if (userId) {
-           // Actualizar plan/créditos (esto dispara el trigger de auditoría SQL)
-           // ... implementación específica validada ...
+          // 1. Actualizar créditos/plan del usuario según el itemKey en metadata
+          const itemKey = session.metadata?.itemKey
+          if (itemKey === 'proPlan') {
+            await supabase.from('profiles').update({ plan: 'Pro', ai_credits: 50 }).eq('id', userId)
+          } else if (itemKey?.startsWith('aiCredits')) {
+            const creditsToAdd = parseInt(session.metadata?.credits || '0')
+            const { data: profile } = await supabase.from('profiles').select('ai_credits').eq('id', userId).single()
+            if (profile) {
+              await supabase.from('profiles').update({ ai_credits: (profile.ai_credits || 0) + creditsToAdd }).eq('id', userId)
+            }
+          }
+
+          // 2. Procesar comisión si hay un clientReferenceId (afiliado)
+          if (clientReferenceId && session.amount_total) {
+            // Buscamos al afiliado por su código
+            const { data: affiliate } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('affiliate_code', clientReferenceId)
+              .single()
+
+            if (affiliate) {
+              const commissionCents = Math.round(session.amount_total * 0.20) // 20% de comisión
+              await supabase.from('referrals').insert({
+                affiliate_id: affiliate.id,
+                referred_id: userId,
+                amount_cents: commissionCents,
+                status: 'Subscribed',
+                stripe_session_id: session.id
+              })
+            }
+          }
         }
         break;
-      // ... otros casos ...
+      }
     }
 
     // Registrar evento como procesado exitosamente

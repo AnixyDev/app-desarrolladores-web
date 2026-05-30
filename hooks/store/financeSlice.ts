@@ -38,7 +38,7 @@ export interface FinanceSlice {
   deleteInvoice: (id: string) => Promise<void>;
   markInvoiceAsPaid: (id: string) => Promise<void>;
 
-  addRecurringInvoice: (recurringData: NewRecurringInvoiceInput) => Promise<void>;
+  addRecurringInvoice: (recurringData: Omit<RecurringInvoice, 'id' | 'user_id' | 'created_at' | 'next_date'>) => Promise<void>;
   deleteRecurringInvoice: (id: string) => Promise<void>;
   checkAndGenerateRecurringInvoices: () => Promise<void>;
 
@@ -186,7 +186,7 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
 
     const { data, error } = await supabase
       .from('recurring_invoices')
-      .insert({ ...recurringData, user_id: user.id, next_date: recurringData.start_date })
+      .insert({ ...recurringData, user_id: user.id, next_date: recurringData.start_date, items: recurringData.items, tax_percent: recurringData.tax_percent })
       .select()
       .single();
 
