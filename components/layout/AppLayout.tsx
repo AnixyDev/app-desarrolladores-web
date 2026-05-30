@@ -3,6 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAppStore } from '../../hooks/useAppStore';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import ErrorBoundary from '../ErrorBoundary';
 
 export const AppLayout: React.FC = () => {
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
@@ -22,7 +23,9 @@ export const AppLayout: React.FC = () => {
         
         <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
           <div className="max-w-7xl mx-auto">
-            <Outlet /> {/* Aquí se cargan las páginas como DashboardPage, etc. */}
+            <ErrorBoundary>
+              <Outlet /> {/* Aquí se cargan las páginas como DashboardPage, etc. */}
+            </ErrorBoundary>
           </div>
         </main>
       </div>

@@ -206,37 +206,8 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
   },
 
   checkAndGenerateRecurringInvoices: async () => {
-    // Nota: idealmente esto vive en una Edge Function + cron de Supabase.
-    // Esta implementación client-side sirve de fallback mientras no existe el cron.
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    for (const rec of get().recurringInvoices) {
-      const nextDueDate = new Date(rec.next_date);
-      if (nextDueDate <= today) {
-        await get().addInvoice({
-          client_id: rec.client_id,
-          project_id: rec.project_id,
-          issue_date: new Date().toISOString().split('T')[0],
-          due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          items: rec.items,
-          tax_percent: rec.tax_percent,
-        });
-
-        const newNextDueDate = new Date(rec.next_date);
-        if (rec.frequency === 'monthly') {
-          newNextDueDate.setMonth(newNextDueDate.getMonth() + 1);
-        } else {
-          newNextDueDate.setFullYear(newNextDueDate.getFullYear() + 1);
-        }
-
-        await supabase
-          .from('recurring_invoices')
-          .update({ next_date: newNextDueDate.toISOString().split('T')[0] })
-          .eq('id', rec.id);
-      }
-    }
-
+    // Esta función ahora solo refresca los datos, ya que la lógica real 
+    // se ejecuta en una Supabase Edge Function mediante un CRON job.
     const { data } = await supabase.from('recurring_invoices').select('*');
     if (data) set({ recurringInvoices: data as RecurringInvoice[] });
   },
