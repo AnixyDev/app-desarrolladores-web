@@ -1,13 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const env = (import.meta as any).env;
-const SUPABASE_URL: string = env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY: string = env.VITE_SUPABASE_ANON_KEY;
+// En Next.js, las variables se acceden a través de process.env
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export const supabaseConfigError: string | null =
-  !SUPABASE_URL || !SUPABASE_ANON_KEY
-    ? 'Faltan variables de entorno para Supabase (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).'
-    : null;
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error('Faltan variables de entorno NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY');
+}
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
@@ -19,11 +18,11 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 });
 
 export const getURL = (): string => {
-  let url: string =
-    import.meta.env.VITE_SITE_URL ??
-    import.meta.env.VITE_VERCEL_URL ??
-    'https://devfreelancer.app';
+  // En Vercel, NEXT_PUBLIC_VERCEL_URL se define automáticamente
+  let url = process.env.NEXT_PUBLIC_SITE_URL ?? 
+            process.env.NEXT_PUBLIC_VERCEL_URL ?? 
+            'https://devfreelancer.app';
+            
   url = url.includes('http') ? url : `https://${url}`;
-  url = url.endsWith('/') ? url.slice(0, -1) : url;
-  return url;
+  return url.replace(/\/$/, "");
 };
