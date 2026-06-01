@@ -119,47 +119,36 @@ export const redirectToCheckout = async (
   const item = STRIPE_ITEMS[itemKey];
   if (!item) throw new Error('El artículo de compra no es válido.');
 
-  const currentUrl = getURL().replace(/\/$/, "");
+  // Obtener sesión con manejo de errores
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !session) throw new Error('Sesión expirada.');
 
   const bodyPayload = {
-    priceId: item.priceId || undefined,
+    priceId: item.priceId,
     mode: item.mode,
-    amount: itemKey === 'invoicePayment' ? extraParams.amount_cents : undefined,
-    productName: itemKey === 'invoicePayment' ? `Factura ${extraParams.invoice_number}` : undefined,
+    // Eliminamos undefined del payload para evitar errores de serialización JSON
+    ...(itemKey === 'invoicePayment' && { 
+        amount: extraParams.amount_cents,
+        productName: `Factura ${extraParams.invoice_number}` 
+    }),
     client_reference_id: extraParams.client_reference_id,
-    metadata: {
-      ...extraParams,
-      itemKey,
-      origin: currentUrl,
-    },
+    metadata: { ...extraParams, itemKey, origin: window.location.origin },
   };
 
-  // Obtenemos sesión explícita para asegurar que el token viaja
-  await supabase.auth.getSession();
-
-  const { data, error } = await supabase.functions.invoke(
-    'create-checkout-session',
-    {
-      body: bodyPayload,
-      headers: {
-        'Content-Type': 'application/json'
-      }
+  const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+    body: bodyPayload,
+    // El cliente de supabase ya inyecta el Auth header automáticamente si está configurado,
+    // pero si falla, puedes añadirlo aquí:
+    headers: { 
+      'Authorization': `Bearer ${session.access_token}` 
     }
-  );
+  });
 
-  if (error) {
-    console.error('Supabase Function Invoke Error:', error);
-    throw new Error('Sesión de pago fallida. Revisa tu conexión o vuelve a iniciar sesión.');
-  }
+  if (error) throw new Error('Error al conectar con el servicio de pago.');
+  if (!data?.url) throw new Error('URL de sesión no generada.');
 
-  if (data?.url) {
-    // window.location.href es más fiable para evitar bloqueos de popups y CORS
-    window.location.href = data.url;
-  } else {
-    throw new Error('La pasarela de pago no devolvió una URL válida.');
-  }
+  window.location.href = data.url;
 };
-
 /* -------------------------
    Payment sheet
 -------------------------- */
