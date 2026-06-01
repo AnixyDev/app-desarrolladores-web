@@ -27,3 +27,6 @@ dist-ssr
 .env
 .env.*
 metadata.json
+*.pdf
+*.png
+DEVFREELANCER ai-APIS*
