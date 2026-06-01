@@ -110,49 +110,43 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
     });
   },
 
-  addInvoice: async (invoiceData, timeEntryIdsToBill) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  // En financeSlice.ts
 
-    const subtotal = invoiceData.items.reduce(
-      (sum, item) => sum + item.price_cents * item.quantity,
-      0
-    );
-    const taxAmount = subtotal * ((invoiceData.tax_percent || 0) / 100);
-    const irpfAmount = subtotal * ((invoiceData.irpf_percent || 0) / 100);
-    const total = Math.round(subtotal + taxAmount - irpfAmount);
+addInvoice: async (invoiceData, timeEntryIdsToBill) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Usuario no autenticado");
 
-    const newInvoiceData = {
+  // Cálculos de negocio (mantener lógica)
+  const subtotal = invoiceData.items.reduce((sum, item) => sum + item.price_cents * item.quantity, 0);
+  const total = Math.round(subtotal + (subtotal * ((invoiceData.tax_percent || 0) / 100)) - (subtotal * ((invoiceData.irpf_percent || 0) / 100)));
+
+  const { data, error } = await supabase
+    .from('invoices')
+    .insert({
       ...invoiceData,
-      user_id: user.id,
+      user_id: user.id, // Opcional si RLS usa auth.uid()
       invoice_number: `INV-${Date.now().toString().slice(-6)}`,
       subtotal_cents: subtotal,
       total_cents: total,
-      paid: false,
-      payment_date: null,
-    };
+      paid: false
+    })
+    .select()
+    .single();
 
-    const { data, error } = await supabase
-      .from('invoices')
-      .insert(newInvoiceData)
-      .select()
-      .single();
+  if (error) {
+    console.error('Supabase Error:', error);
+    // Lanzar error para que el componente UI pueda capturarlo (ej: toast de error)
+    throw error; 
+  }
 
-    if (!error && data) {
-      set(state => ({ invoices: [data as Invoice, ...state.invoices] }));
-      get().addNotification(`Nueva factura #${data.invoice_number} creada.`, '/invoices');
-
-      if (timeEntryIdsToBill && timeEntryIdsToBill.length > 0) {
-        await supabase
-          .from('time_entries')
-          .update({ invoice_id: data.id })
-          .in('id', timeEntryIdsToBill);
-
-        get().fetchTimeEntries?.();
-      }
-    }
-  },
-
+  // Actualización de estado solo si la DB confirma éxito
+  set(state => ({ invoices: [data, ...state.invoices] }));
+  
+  if (timeEntryIdsToBill?.length) {
+    await supabase.from('time_entries').update({ invoice_id: data.id }).in('id', timeEntryIdsToBill);
+    get().fetchTimeEntries?.();
+  }
+},
   deleteInvoice: async (id) => {
     const { error } = await supabase.from('invoices').delete().eq('id', id);
     if (!error) {
