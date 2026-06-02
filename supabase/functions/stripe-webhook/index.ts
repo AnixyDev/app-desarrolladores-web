@@ -9,7 +9,11 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
   typescript: true,
 })
 
-const endpointSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')
+const endpointSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+
+// AÑADE ESTO PARA DEBUGUEAR (mira los logs después de hacer el despliegue)
+console.log("¿Existe el secreto?", !!endpointSecret);
+console.log("Longitud del secreto:", endpointSecret?.length);
 
 serve(async (req) => {
   const signature = req.headers.get('Stripe-Signature') || req.headers.get('stripe-signature')
