@@ -16,18 +16,18 @@ console.log("¿Existe el secreto?", !!endpointSecret);
 console.log("Longitud del secreto:", endpointSecret?.length);
 
 serve(async (req) => {
-  const signature = req.headers.get('Stripe-Signature') || req.headers.get('stripe-signature')
-  if (!signature) return new Response('Missing signature', { status: 400 })
-  
+  const signature = req.headers.get('stripe-signature') || req.headers.get('Stripe-Signature')
   const body = await req.text()
-  let event: Stripe.Event
+  
+  // LOGUEAR PARA DEPURAR
+  console.log("Firma recibida:", signature);
+  console.log("Secreto usado:", endpointSecret?.substring(0, 8) + "...");
 
   try {
-    // En entornos Edge (como Deno/Supabase), se DEBE usar constructEventAsync
-    // porque la API de criptografía Web Crypto es asíncrona.
-    event = await stripe.webhooks.constructEventAsync(body, signature, endpointSecret!)
+    event = await stripe.webhooks.constructEventAsync(body, signature!, endpointSecret!)
   } catch (err: any) {
-    console.error(`⚠️ Webhook signature verification failed: ${err.message}`)
+    console.error(`❌ ERROR: Firma recibida: ${signature}`);
+    console.error(`❌ ERROR: Mensaje de Stripe: ${err.message}`);
     return new Response(`Webhook Error: ${err.message}`, { status: 400 })
   }
 
