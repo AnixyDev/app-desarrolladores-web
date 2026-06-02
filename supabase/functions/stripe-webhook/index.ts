@@ -9,7 +9,7 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
   typescript: true,
 })
 
-const endpointSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+const endpointSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')!; // El signo ! le dice a TS que confías en que no es null
 
 // AÑADE ESTO PARA DEBUGUEAR (mira los logs después de hacer el despliegue)
 console.log("¿Existe el secreto?", !!endpointSecret);
