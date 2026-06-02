@@ -12,7 +12,7 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
 const endpointSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')
 
 serve(async (req) => {
-  const signature = req.headers.get('Stripe-Signature')
+  const signature = req.headers.get('Stripe-Signature') || req.headers.get('stripe-signature')
   if (!signature) return new Response('Missing signature', { status: 400 })
   
   const body = await req.text()
