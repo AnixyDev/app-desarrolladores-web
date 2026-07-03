@@ -20,8 +20,8 @@ const getEnv = (key: string): string => {
 };
 
 const STRIPE_PUBLIC_KEY =
-  getEnv('VITE_STRIPE_PUBLIC_KEY') ||
-  getEnv('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY');
+  getEnv('VITE_STRIPE_PUBLISHABLE_KEY') ||   // ← nombre correcto, coincide con el que vas a poner en Vercel
+  getEnv('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY'); // fallback por si el redeploy aún no propagó
 
 /* -------------------------
    Stripe loader (singleton)
