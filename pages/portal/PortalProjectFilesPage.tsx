@@ -14,5 +14,13 @@ const PortalProjectFilesPage: React.FC = () => {
         </div>
     );
 };
+const { data: { user } } = await supabase.auth.getUser();
+
+await supabase.from('portal_comments').insert({
+  entityid: entityId,
+  username: user?.user_metadata?.full_name ?? 'Usuario',
+  text: commentText,
+  user_id: user?.id,        // 👈 línea nueva, obligatoria ahora
+});
 
 export default PortalProjectFilesPage;
