@@ -3,7 +3,6 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 interface Props {
   children: ReactNode;
 }
-
 interface State {
   hasError: boolean;
   error: Error | null;
@@ -46,7 +45,7 @@ class ErrorBoundary extends Component<Props, State> {
                 Ir al inicio
               </button>
             </div>
-            {process.env.NODE_ENV === 'development' && (
+            {import.meta.env.DEV && (
               <details className="mt-6 text-left bg-black/40 p-4 rounded-xl overflow-auto max-h-40">
                 <summary className="text-xs text-red-400 cursor-pointer">Detalles del error (Solo Dev)</summary>
                 <pre className="text-[10px] text-gray-500 mt-2 whitespace-pre-wrap">
@@ -58,8 +57,8 @@ class ErrorBoundary extends Component<Props, State> {
         </div>
       );
     }
-
-    return this.children;
+    // ✅ FIX: los children se reciben vía this.props.children, no this.children
+    return this.props.children;
   }
 }
 
