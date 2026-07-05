@@ -4,9 +4,9 @@
     "useDefineForClassFields": true,
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "baseUrl": ".",
-"paths": {
-  "@/*": ["*"]
-},
+    "paths": {
+      "@/*": ["*"]
+    },
 
     "module": "ESNext",
     "moduleResolution": "Bundler",
@@ -33,13 +33,13 @@
     "lib",
     "main.tsx",
     "index.tsx",
-     "**/*.ts",
-     "**/*.tsx"
+    "**/*.ts",
+    "**/*.tsx"
   ],
 
   "exclude": [
     "node_modules",
     "dist",
-    "supabase/functions"
+    "supabase/functions/**/*"
   ]
-}
+};
