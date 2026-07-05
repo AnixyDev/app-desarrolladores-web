@@ -16,6 +16,12 @@ interface PaymentSummary {
   count: number;
 }
 
+interface InvoiceItemDraft {
+  description: string;
+  quantity: number;
+  price_cents: number;
+}
+
 const InvoicesPage: React.FC = () => {
   const {
     invoices,
@@ -32,7 +38,7 @@ const InvoicesPage: React.FC = () => {
   const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 🆕 Estado de pagos: mapa invoice_id -> { paidCents, count }
+  // Estado de pagos: mapa invoice_id -> { paidCents, count }
   const [paymentsByInvoice, setPaymentsByInvoice] = useState<Record<string, PaymentSummary>>({});
   const [paymentModalInvoiceId, setPaymentModalInvoiceId] = useState<string | null>(null);
 
@@ -47,7 +53,41 @@ const InvoicesPage: React.FC = () => {
 
   const [newInvoice, setNewInvoice] = useState<NewInvoice>(initialInvoiceState);
 
-  // 🆕 Carga la suma de pagos de todas las facturas visibles de una sola vez
+  // Editor de líneas de la factura nueva
+  const [invoiceItems, setInvoiceItems] = useState<InvoiceItemDraft[]>([
+    { description: '', quantity: 1, price_cents: 0 },
+  ]);
+  const [taxPercent, setTaxPercent] = useState(21);
+  const [irpfPercent, setIrpfPercent] = useState(0);
+
+  const addItemRow = () => {
+    setInvoiceItems(prev => [...prev, { description: '', quantity: 1, price_cents: 0 }]);
+  };
+
+  const removeItemRow = (index: number) => {
+    setInvoiceItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateItemRow = (index: number, field: 'description' | 'quantity' | 'price_cents', value: string) => {
+    setInvoiceItems(prev => prev.map((item, i) => {
+      if (i !== index) return item;
+      if (field === 'description') return { ...item, description: value };
+      if (field === 'quantity') return { ...item, quantity: Number(value) || 0 };
+      // price_cents: el usuario escribe en euros, lo convertimos a céntimos
+      return { ...item, price_cents: Math.round(Number(value) * 100) || 0 };
+    }));
+  };
+
+  // Cálculo en vivo para mostrar en el modal
+  const invoicePreview = useMemo(() => {
+    const subtotal = invoiceItems.reduce((sum, item) => sum + item.price_cents * item.quantity, 0);
+    const taxAmount = Math.round(subtotal * (taxPercent / 100));
+    const irpfAmount = Math.round(subtotal * (irpfPercent / 100));
+    const total = subtotal + taxAmount - irpfAmount;
+    return { subtotal, taxAmount, irpfAmount, total };
+  }, [invoiceItems, taxPercent, irpfPercent]);
+
+  // Carga la suma de pagos de todas las facturas visibles de una sola vez
   const fetchPaymentsSummary = useCallback(async () => {
     if (invoices.length === 0) return;
     const invoiceIds = invoices.map(inv => inv.id);
@@ -86,47 +126,72 @@ const InvoicesPage: React.FC = () => {
     });
   }, [invoices, clients, searchTerm]);
 
- const handleAddInvoice = async (e: React.FormEvent) => {
-  e.preventDefault();
-  try {
-    const payload = {
-      ...newInvoice,
-      project_id: newInvoice.project_id || null,
-      notes: newInvoice.notes || null,
-      issue_date: new Date().toISOString().split('T')[0], // 🆕 fecha de emisión = hoy
-    };
-    await addInvoice(payload);
+  const handleAddInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (invoiceItems.some(item => !item.description.trim())) {
+      addToast('Todas las líneas necesitan una descripción.', 'error');
+      return;
+    }
+    if (invoicePreview.subtotal <= 0) {
+      addToast('El importe de la factura no puede ser 0€.', 'error');
+      return;
+    }
+
+    try {
+      const payload = {
+        ...newInvoice,
+        items: invoiceItems,
+        tax_percent: taxPercent,
+        irpf_percent: irpfPercent,
+        project_id: newInvoice.project_id || null,
+        notes: newInvoice.notes || null,
+        issue_date: new Date().toISOString().split('T')[0],
+      };
+      await addInvoice(payload);
+      setIsInvoiceModalOpen(false);
+      setNewInvoice(initialInvoiceState);
+      setInvoiceItems([{ description: '', quantity: 1, price_cents: 0 }]);
+      setTaxPercent(21);
+      setIrpfPercent(0);
+      addToast('Factura creada correctamente', 'success');
+    } catch (error: any) {
+      addToast(error.message || 'Error al crear factura', 'error');
+    }
+  };
+
+  const handleCloseInvoiceModal = () => {
     setIsInvoiceModalOpen(false);
     setNewInvoice(initialInvoiceState);
-    addToast('Factura creada correctamente', 'success');
-  } catch (error: any) {
-    addToast(error.message || 'Error al crear factura', 'error');
-  }
-};
+    setInvoiceItems([{ description: '', quantity: 1, price_cents: 0 }]);
+    setTaxPercent(21);
+    setIrpfPercent(0);
+  };
 
   const getClientName = (clientId: string) => {
     return clients.find(c => c.id === clientId)?.name || 'Cliente desconocido';
   };
 
-  // 🆕 Devuelve el estado real de cobro combinando `paid` (booleano, sincronizado por trigger)
-  // con el importe parcial acumulado, para mostrar 3 estados: pagada / parcial / pendiente
- const getPaymentStatus = (invoiceId: string, totalCents: number, isPaidFlag: boolean) => {
-  const summary = paymentsByInvoice[invoiceId];
-  const trackedPaidCents = summary?.paidCents ?? 0;
+  // Devuelve el estado real de cobro combinando `paid` (booleano, sincronizado por trigger)
+  // con el importe parcial acumulado, para mostrar 4 estados: pagada / parcial / pendiente / sin importe
+  const getPaymentStatus = (invoiceId: string, totalCents: number, isPaidFlag: boolean) => {
+    const summary = paymentsByInvoice[invoiceId];
+    const trackedPaidCents = summary?.paidCents ?? 0;
+    const paidCents = isPaidFlag && trackedPaidCents === 0 ? totalCents : trackedPaidCents;
 
-  // Si el flag legacy `paid` ya está en true pero no hay pagos registrados en la tabla nueva
-  // (facturas marcadas como pagadas antes de este sistema), mostramos el total como cobrado
-  // para no dar una imagen visual contradictoria.
-  const paidCents = isPaidFlag && trackedPaidCents === 0 ? totalCents : trackedPaidCents;
-
-  if (isPaidFlag || paidCents >= totalCents) {
-    return { label: 'PAGADA', className: 'bg-green-500/10 text-green-400 border-green-500/30', paidCents };
-  }
-  if (paidCents > 0) {
-    return { label: 'PARCIAL', className: 'bg-blue-500/10 text-blue-400 border-blue-500/30', paidCents };
-  }
-  return { label: 'PENDIENTE', className: 'bg-orange-500/10 text-orange-400 border-orange-500/30', paidCents };
-};
+    // Una factura sin importe nunca debe considerarse "pagada" —
+    // exigimos totalCents > 0 explícitamente para evitar el caso 0 >= 0
+    if (totalCents > 0 && (isPaidFlag || paidCents >= totalCents)) {
+      return { label: 'PAGADA', className: 'bg-green-500/10 text-green-400 border-green-500/30', paidCents };
+    }
+    if (paidCents > 0) {
+      return { label: 'PARCIAL', className: 'bg-blue-500/10 text-blue-400 border-blue-500/30', paidCents };
+    }
+    if (totalCents === 0) {
+      return { label: 'SIN IMPORTE', className: 'bg-gray-500/10 text-gray-400 border-gray-500/30', paidCents };
+    }
+    return { label: 'PENDIENTE', className: 'bg-orange-500/10 text-orange-400 border-orange-500/30', paidCents };
+  };
 
   return (
     <div className="space-y-6">
@@ -190,7 +255,6 @@ const InvoicesPage: React.FC = () => {
                           <td className="px-6 py-4">{new Date(inv.due_date).toLocaleDateString()}</td>
                           <td className="px-6 py-4 text-right font-bold text-white">{formatCurrency(inv.total_cents)}</td>
 
-                          {/* 🆕 Columna de cobro: barra de progreso + importe cobrado/restante */}
                           <td className="px-6 py-4 min-w-[140px]">
                             <div className="flex justify-between text-[10px] text-gray-500 mb-1">
                               <span>{formatCurrency(status.paidCents)}</span>
@@ -272,8 +336,8 @@ const InvoicesPage: React.FC = () => {
         </div>
       </div>
 
-      <Modal isOpen={isInvoiceModalOpen} onClose={() => setIsInvoiceModalOpen(false)} title="Nueva Factura">
-        <form onSubmit={handleAddInvoice} className="space-y-4">
+      <Modal isOpen={isInvoiceModalOpen} onClose={handleCloseInvoiceModal} title="Nueva Factura">
+        <form onSubmit={handleAddInvoice} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Cliente</label>
             <select
@@ -286,20 +350,114 @@ const InvoicesPage: React.FC = () => {
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
+
           <Input
             label="Fecha Vencimiento"
             type="date"
             value={newInvoice.due_date}
             onChange={(e) => setNewInvoice({ ...newInvoice, due_date: e.target.value })}
           />
+
+          {/* Editor de líneas */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-400">Conceptos</label>
+              <button type="button" onClick={addItemRow} className="text-xs text-primary-400 hover:underline">
+                + Añadir línea
+              </button>
+            </div>
+            <div className="space-y-2">
+              {invoiceItems.map((item, index) => (
+                <div key={index} className="flex gap-2 items-start">
+                  <input
+                    type="text"
+                    placeholder="Descripción"
+                    value={item.description}
+                    onChange={(e) => updateItemRow(index, 'description', e.target.value)}
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
+                    required
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="Cant."
+                    value={item.quantity}
+                    onChange={(e) => updateItemRow(index, 'quantity', e.target.value)}
+                    className="w-16 bg-gray-800 border border-gray-700 rounded-md px-2 py-2 text-sm text-white"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    placeholder="€/ud"
+                    value={item.price_cents / 100}
+                    onChange={(e) => updateItemRow(index, 'price_cents', e.target.value)}
+                    className="w-24 bg-gray-800 border border-gray-700 rounded-md px-2 py-2 text-sm text-white"
+                  />
+                  {invoiceItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeItemRow(index)}
+                      className="text-gray-500 hover:text-red-500 px-2"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* IVA / IRPF */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">IVA (%)</label>
+              <input
+                type="number"
+                min={0}
+                value={taxPercent}
+                onChange={(e) => setTaxPercent(Number(e.target.value) || 0)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">IRPF (%)</label>
+              <input
+                type="number"
+                min={0}
+                value={irpfPercent}
+                onChange={(e) => setIrpfPercent(Number(e.target.value) || 0)}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
+              />
+            </div>
+          </div>
+
+          {/* Resumen en vivo */}
+          <div className="bg-gray-800/50 rounded-lg p-3 space-y-1 text-sm">
+            <div className="flex justify-between text-gray-400">
+              <span>Subtotal</span><span>{formatCurrency(invoicePreview.subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-gray-400">
+              <span>IVA ({taxPercent}%)</span><span>+{formatCurrency(invoicePreview.taxAmount)}</span>
+            </div>
+            {irpfPercent > 0 && (
+              <div className="flex justify-between text-gray-400">
+                <span>IRPF ({irpfPercent}%)</span><span>-{formatCurrency(invoicePreview.irpfAmount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-white font-bold pt-1 border-t border-gray-700">
+              <span>Total</span><span>{formatCurrency(invoicePreview.total)}</span>
+            </div>
+          </div>
+
           <div className="flex justify-end gap-3 mt-6">
-            <Button type="button" variant="outline" onClick={() => setIsInvoiceModalOpen(false)}>Cancelar</Button>
+            <Button type="button" variant="outline" onClick={handleCloseInvoiceModal}>Cancelar</Button>
             <Button type="submit">Generar Factura</Button>
           </div>
         </form>
       </Modal>
 
-      {/* 🆕 Modal de registro de pagos parciales */}
+      {/* Modal de registro de pagos parciales */}
       {paymentModalInvoiceId && (() => {
         const inv = invoices.find(i => i.id === paymentModalInvoiceId);
         if (!inv) return null;
