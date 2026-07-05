@@ -37,7 +37,10 @@ const InvoicesPage: React.FC = () => {
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [sourceBudgetId, setSourceBudgetId] = useState<string>('');
+  const [sourceContractId, setSourceContractId] = useState<string>('');
 
+const { budgets, contracts } = useAppStore(); // añade budgets y contracts a la desestructuración de arriba
   // Estado de pagos: mapa invoice_id -> { paidCents, count }
   const [paymentsByInvoice, setPaymentsByInvoice] = useState<Record<string, PaymentSummary>>({});
   const [paymentModalInvoiceId, setPaymentModalInvoiceId] = useState<string | null>(null);
@@ -140,14 +143,16 @@ const InvoicesPage: React.FC = () => {
 
     try {
       const payload = {
-        ...newInvoice,
-        items: invoiceItems,
-        tax_percent: taxPercent,
-        irpf_percent: irpfPercent,
-        project_id: newInvoice.project_id || null,
-        notes: newInvoice.notes || null,
-        issue_date: new Date().toISOString().split('T')[0],
-      };
+  ...newInvoice,
+  items: invoiceItems,
+  tax_percent: taxPercent,
+  irpf_percent: irpfPercent,
+  project_id: newInvoice.project_id || null,
+  notes: newInvoice.notes || null,
+  issue_date: new Date().toISOString().split('T')[0],
+  budget_id: sourceBudgetId || null,      // 🆕
+  contract_id: sourceContractId || null,  // 🆕
+};
       await addInvoice(payload);
       setIsInvoiceModalOpen(false);
       setNewInvoice(initialInvoiceState);
@@ -167,6 +172,32 @@ const InvoicesPage: React.FC = () => {
     setTaxPercent(21);
     setIrpfPercent(0);
   };
+
+  const availableBudgets = useMemo(() => {
+  if (!newInvoice.client_id) return [];
+  return budgets.filter(b => b.client_id === newInvoice.client_id && b.status === 'accepted');
+}, [budgets, newInvoice.client_id]);
+
+const availableContracts = useMemo(() => {
+  if (!newInvoice.client_id) return [];
+  return contracts.filter(c => c.client_id === newInvoice.client_id && c.status === 'signed');
+}, [contracts, newInvoice.client_id]);
+
+const handleSelectBudget = (budgetId: string) => {
+  setSourceBudgetId(budgetId);
+  if (!budgetId) return;
+
+  const budget = budgets.find(b => b.id === budgetId);
+  if (budget?.items && Array.isArray(budget.items) && budget.items.length > 0) {
+    setInvoiceItems(budget.items.map((item: any) => ({
+      description: item.description,
+      quantity: item.quantity,
+      price_cents: item.price_cents,
+    })));
+    addToast('Líneas e importe autorrellenados desde el presupuesto.', 'success');
+  }
+};
+
 
   const getClientName = (clientId: string) => {
     return clients.find(c => c.id === clientId)?.name || 'Cliente desconocido';
@@ -349,6 +380,48 @@ const InvoicesPage: React.FC = () => {
               <option value="">Seleccionar cliente</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+              {newInvoice.client_id && (
+  <>
+    <div>
+      <label className="block text-sm font-medium text-gray-400 mb-1">
+        Origen — Presupuesto (opcional, autorrellena importe)
+      </label>
+      <select
+        className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
+        value={sourceBudgetId}
+        onChange={(e) => handleSelectBudget(e.target.value)}
+      >
+        <option value="">Sin presupuesto — rellenar manualmente</option>
+        {availableBudgets.map(b => (
+          <option key={b.id} value={b.id}>
+            {b.description} — {formatCurrency(b.amount_cents || 0)}
+          </option>
+        ))}
+      </select>
+      {availableBudgets.length === 0 && (
+        <p className="text-xs text-gray-500 mt-1">Este cliente no tiene presupuestos aceptados.</p>
+      )}
+    </div>
+
+    <div>
+      <label className="block text-sm font-medium text-gray-400 mb-1">
+        Contrato relacionado (opcional, solo trazabilidad)
+      </label>
+      <select
+        className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
+        value={sourceContractId}
+        onChange={(e) => setSourceContractId(e.target.value)}
+      >
+        <option value="">Sin contrato vinculado</option>
+        {availableContracts.map(c => (
+          <option key={c.id} value={c.id}>
+            Contrato firmado el {c.signed_at ? new Date(c.signed_at).toLocaleDateString() : '—'}
+          </option>
+        ))}
+      </select>
+    </div>
+  </>
+)}
           </div>
 
           <Input
