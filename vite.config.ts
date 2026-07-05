@@ -14,29 +14,26 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
-        // manualChunks como FUNCIÓN (requerido por Rolldown en Vite 8)
-        // Mantiene exactamente la misma segmentación que tenías antes
         manualChunks(id) {
-  if (!id.includes('node_modules')) return;
+          if (!id.includes('node_modules')) return;
 
-  if (id.includes('react-router-dom') || id.includes('/react-dom/') || id.includes('/react/')) {
-    return 'vendor-react';
-  }
-  if (id.includes('recharts')) return 'vendor-recharts';
-  if (id.includes('jspdf')) return 'vendor-pdf';
-  if (id.includes('@stripe/stripe-js') || id.includes('@stripe/react-stripe-js')) return 'vendor-stripe';
-  if (id.includes('@google/generative-ai')) return 'vendor-ai';
-  if (id.includes('marked')) return 'vendor-markdown';
-  if (id.includes('@dnd-kit')) return 'vendor-dnd';
-  if (id.includes('@supabase/supabase-js')) return 'vendor-supabase';
-  // Nuevos: separan el resto del "cajón de sastre" en grupos más pequeños
-  if (id.includes('@react-oauth/google')) return 'vendor-google-auth';
-  if (id.includes('lucide-react')) return 'vendor-icons';
-  if (id.includes('zustand') || id.includes('uuid')) return 'vendor-utils';
+          if (id.includes('react-router-dom') || id.includes('/react-dom/') || id.includes('/react/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('recharts')) return 'vendor-recharts';
+          if (id.includes('jspdf')) return 'vendor-pdf';
+          if (id.includes('@stripe/stripe-js') || id.includes('@stripe/react-stripe-js')) return 'vendor-stripe';
+          if (id.includes('@google/generative-ai')) return 'vendor-ai';
+          if (id.includes('marked')) return 'vendor-markdown';
+          if (id.includes('@dnd-kit')) return 'vendor-dnd';
+          if (id.includes('@supabase/supabase-js')) return 'vendor-supabase';
+          if (id.includes('@react-oauth/google')) return 'vendor-google-auth';
+          if (id.includes('lucide-react')) return 'vendor-icons';
+          if (id.includes('zustand') || id.includes('uuid')) return 'vendor-utils';
 
-  return 'vendor';
-}
+          return 'vendor';
+        },
       },
     },
-  };
-    });
+  },
+});
