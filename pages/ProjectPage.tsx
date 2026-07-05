@@ -29,7 +29,7 @@ const initialForm: NewProject = {
 
 const selectClass = 'w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary-500';
 
-// 🆕 Subcomponente de columna: aquí vive el useDroppable, que registra
+// Subcomponente de columna: aquí vive el useDroppable, que registra
 // la columna entera como zona de destino válida para dnd-kit.
 interface KanbanColumnProps {
     id: Project['status'];
@@ -41,7 +41,6 @@ interface KanbanColumnProps {
 }
 
 const KanbanColumn: React.FC<KanbanColumnProps> = ({ id, label, color, projects, getProjectProgress, getClientName }) => {
-    // 🆕 Esto es lo que faltaba: registra `id` (ej. 'planning') como destino real de dnd-kit
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
@@ -87,6 +86,11 @@ const ProjectPage: React.FC = () => {
     const [form, setForm] = useState<NewProject>(initialForm);
     const [saving, setSaving] = useState(false);
 
+    // Estado temporal: qué proyecto se está arrastrando y a qué columna "pertenece" en este instante.
+    // Necesario porque con SortableContext separado por columna, dnd-kit no detecta bien
+    // el destino solo con onDragEnd al cruzar entre contenedores distintos.
+    const [activeDragStatus, setActiveDragStatus] = useState<Record<string, Project['status']>>({});
+
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
     const KANBAN_COLUMNS: { id: Project['status']; label: string; color: string }[] = [
@@ -103,9 +107,8 @@ const ProjectPage: React.FC = () => {
         return Math.round((completed / projectTasks.length) * 100);
     };
 
-    // 🆕 Resuelve la columna destino tanto si sueltas sobre el hueco vacío (over.id = column.id)
-    // como si sueltas sobre otra tarjeta (over.id = id de otro proyecto) — en ese caso,
-    // buscamos a qué columna pertenece esa tarjeta.
+    // Resuelve la columna destino tanto si sueltas sobre el hueco vacío (over.id = column.id)
+    // como si sueltas sobre otra tarjeta (over.id = id de otro proyecto).
     const resolveTargetStatus = (overId: string): Project['status'] | null => {
         const directColumn = KANBAN_COLUMNS.find(col => col.id === overId);
         if (directColumn) return directColumn.id;
@@ -114,19 +117,38 @@ const ProjectPage: React.FC = () => {
         return targetProject ? targetProject.status : null;
     };
 
-    const handleDragEnd = (event: DragEndEvent) => {
+    // Se dispara continuamente MIENTRAS arrastras — necesario para que dnd-kit
+    // "enganche" bien el destino al cruzar de una columna a otra.
+    const handleDragOver = (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over) return;
 
-        const projectId = active.id as string;
+        const activeId = active.id as string;
         const overId = over.id as string;
-        const targetStatus = resolveTargetStatus(overId);
-        const draggedProject = projects.find(p => p.id === projectId);
+        const newStatus = resolveTargetStatus(overId);
 
-        // Evita llamadas innecesarias si sueltas en la misma columna de origen
-        if (targetStatus && draggedProject && draggedProject.status !== targetStatus) {
-            updateProject(projectId, { status: targetStatus });
+        if (newStatus) {
+            setActiveDragStatus(prev => ({ ...prev, [activeId]: newStatus }));
         }
+    };
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        const activeId = active.id as string;
+        const draggedProject = projects.find(p => p.id === activeId);
+
+        // Usamos el status calculado durante el arrastre (onDragOver) como fuente de verdad,
+        // con fallback al cálculo directo por si acaso.
+        const finalStatus = activeDragStatus[activeId]
+            ?? (over ? resolveTargetStatus(over.id as string) : null);
+
+        console.log('[Kanban] drop:', { activeId, overId: over?.id, finalStatus, currentStatus: draggedProject?.status });
+
+        if (finalStatus && draggedProject && draggedProject.status !== finalStatus) {
+            updateProject(activeId, { status: finalStatus });
+        }
+
+        setActiveDragStatus({});
     };
 
     const filteredProjects = useMemo(() => {
@@ -208,7 +230,12 @@ const ProjectPage: React.FC = () => {
                 />
             </div>
 
-            <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+            >
                 {viewMode === 'kanban' ? (
                     <div className="flex gap-6 overflow-x-auto pb-6">
                         {KANBAN_COLUMNS.map(column => (
