@@ -29,7 +29,7 @@ const InvoicesPage = lazy(() => import('./pages/InvoicesPage'));
 const CreateInvoicePage = lazy(() => import('./pages/CreateInvoicePage'));
 const ExpensesPage = lazy(() => import('./pages/ExpensesPage'));
 const TaxLedgerPage = lazy(() => import('./pages/TaxLedgerPage'));
-
+const InboxPage = lazy(() => import('./pages/InboxPage'));
 // Ventas
 const BudgetsPage = lazy(() => import('./pages/BudgetsPage'));
 const ProposalsPage = lazy(() => import('./pages/ProposalsPage'));
@@ -153,6 +153,7 @@ const AppRoutes: React.FC = () => {
           <Route path="/billing" element={<BillingPage />} />
           <Route path="/integrations" element={<IntegrationsManager />} />
           <Route path="/affiliate" element={<AffiliateProgramPage />} />
+          <Route path="/inbox" element={<InboxPage />} />
         </Route>
 
         {/* Fallback */}

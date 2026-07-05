@@ -243,7 +243,7 @@ const BudgetsPage: React.FC = () => {
           </CardContent>
         </Card>
       )}
-      // Al final del JSX, dentro del return
+     
 {isModalOpen && (
   <CreateBudgetModal 
     isOpen={isModalOpen} 
