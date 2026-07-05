@@ -86,17 +86,23 @@ const InvoicesPage: React.FC = () => {
     });
   }, [invoices, clients, searchTerm]);
 
-  const handleAddInvoice = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await addInvoice(newInvoice);
-      setIsInvoiceModalOpen(false);
-      setNewInvoice(initialInvoiceState);
-      addToast('Factura creada correctamente', 'success');
-    } catch (error: any) {
-      addToast(error.message || 'Error al crear factura', 'error');
-    }
-  };
+ const handleAddInvoice = async (e: React.FormEvent) => {
+  e.preventDefault();
+  try {
+    // Limpieza: Postgres rechaza '' como uuid, hay que mandar null si no hay proyecto seleccionado
+    const payload = {
+      ...newInvoice,
+      project_id: newInvoice.project_id || null,
+      notes: newInvoice.notes || null,
+    };
+    await addInvoice(payload);
+    setIsInvoiceModalOpen(false);
+    setNewInvoice(initialInvoiceState);
+    addToast('Factura creada correctamente', 'success');
+  } catch (error: any) {
+    addToast(error.message || 'Error al crear factura', 'error');
+  }
+};
 
   const getClientName = (clientId: string) => {
     return clients.find(c => c.id === clientId)?.name || 'Cliente desconocido';
@@ -104,18 +110,23 @@ const InvoicesPage: React.FC = () => {
 
   // 🆕 Devuelve el estado real de cobro combinando `paid` (booleano, sincronizado por trigger)
   // con el importe parcial acumulado, para mostrar 3 estados: pagada / parcial / pendiente
-  const getPaymentStatus = (invoiceId: string, totalCents: number, isPaidFlag: boolean) => {
-    const summary = paymentsByInvoice[invoiceId];
-    const paidCents = summary?.paidCents ?? 0;
+ const getPaymentStatus = (invoiceId: string, totalCents: number, isPaidFlag: boolean) => {
+  const summary = paymentsByInvoice[invoiceId];
+  const trackedPaidCents = summary?.paidCents ?? 0;
 
-    if (isPaidFlag || paidCents >= totalCents) {
-      return { label: 'PAGADA', className: 'bg-green-500/10 text-green-400 border-green-500/30', paidCents };
-    }
-    if (paidCents > 0) {
-      return { label: 'PARCIAL', className: 'bg-blue-500/10 text-blue-400 border-blue-500/30', paidCents };
-    }
-    return { label: 'PENDIENTE', className: 'bg-orange-500/10 text-orange-400 border-orange-500/30', paidCents };
-  };
+  // Si el flag legacy `paid` ya está en true pero no hay pagos registrados en la tabla nueva
+  // (facturas marcadas como pagadas antes de este sistema), mostramos el total como cobrado
+  // para no dar una imagen visual contradictoria.
+  const paidCents = isPaidFlag && trackedPaidCents === 0 ? totalCents : trackedPaidCents;
+
+  if (isPaidFlag || paidCents >= totalCents) {
+    return { label: 'PAGADA', className: 'bg-green-500/10 text-green-400 border-green-500/30', paidCents };
+  }
+  if (paidCents > 0) {
+    return { label: 'PARCIAL', className: 'bg-blue-500/10 text-blue-400 border-blue-500/30', paidCents };
+  }
+  return { label: 'PENDIENTE', className: 'bg-orange-500/10 text-orange-400 border-orange-500/30', paidCents };
+};
 
   return (
     <div className="space-y-6">
