@@ -9,7 +9,7 @@ import { Project } from '@/types';
 import { useToast } from '@/hooks/useToast';
 
 // DND Kit
-import { DndContext, closestCorners, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCorners, DragEndEvent, PointerSensor, useSensor, useSensors, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 const TODAY = new Date().toISOString().split('T')[0];
@@ -28,6 +28,54 @@ const initialForm: NewProject = {
 };
 
 const selectClass = 'w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary-500';
+
+// 🆕 Subcomponente de columna: aquí vive el useDroppable, que registra
+// la columna entera como zona de destino válida para dnd-kit.
+interface KanbanColumnProps {
+    id: Project['status'];
+    label: string;
+    color: string;
+    projects: Project[];
+    getProjectProgress: (id: string) => number;
+    getClientName: (clientId: string) => string | undefined;
+}
+
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ id, label, color, projects, getProjectProgress, getClientName }) => {
+    // 🆕 Esto es lo que faltaba: registra `id` (ej. 'planning') como destino real de dnd-kit
+    const { setNodeRef, isOver } = useDroppable({ id });
+
+    return (
+        <div className="min-w-[300px] flex flex-col gap-4">
+            <div className="flex items-center gap-2 px-2">
+                <span className={`w-2 h-2 rounded-full ${color}`} />
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    {label}
+                </h3>
+            </div>
+            <SortableContext
+                id={id}
+                items={projects.map(p => p.id)}
+                strategy={verticalListSortingStrategy}
+            >
+                <div
+                    ref={setNodeRef}
+                    className={`flex-1 border border-dashed rounded-3xl p-2 min-h-[500px] transition-colors ${
+                        isOver ? 'bg-primary-500/10 border-primary-500' : 'bg-gray-900/20 border-gray-800'
+                    }`}
+                >
+                    {projects.map(project => (
+                        <ProjectCard
+                            key={project.id}
+                            project={project}
+                            progress={getProjectProgress(project.id)}
+                            clientName={getClientName(project.client_id)}
+                        />
+                    ))}
+                </div>
+            </SortableContext>
+        </div>
+    );
+};
 
 const ProjectPage: React.FC = () => {
     const { projects, tasks, clients, getClientById, addProject, updateProject } = useAppStore();
@@ -55,14 +103,29 @@ const ProjectPage: React.FC = () => {
         return Math.round((completed / projectTasks.length) * 100);
     };
 
+    // 🆕 Resuelve la columna destino tanto si sueltas sobre el hueco vacío (over.id = column.id)
+    // como si sueltas sobre otra tarjeta (over.id = id de otro proyecto) — en ese caso,
+    // buscamos a qué columna pertenece esa tarjeta.
+    const resolveTargetStatus = (overId: string): Project['status'] | null => {
+        const directColumn = KANBAN_COLUMNS.find(col => col.id === overId);
+        if (directColumn) return directColumn.id;
+
+        const targetProject = projects.find(p => p.id === overId);
+        return targetProject ? targetProject.status : null;
+    };
+
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over) return;
+
         const projectId = active.id as string;
         const overId = over.id as string;
-        const isValidStatus = KANBAN_COLUMNS.some(col => col.id === overId);
-        if (isValidStatus) {
-            updateProject(projectId, { status: overId as Project['status'] });
+        const targetStatus = resolveTargetStatus(overId);
+        const draggedProject = projects.find(p => p.id === projectId);
+
+        // Evita llamadas innecesarias si sueltas en la misma columna de origen
+        if (targetStatus && draggedProject && draggedProject.status !== targetStatus) {
+            updateProject(projectId, { status: targetStatus });
         }
     };
 
@@ -73,7 +136,6 @@ const ProjectPage: React.FC = () => {
         );
     }, [projects, searchTerm, getClientById]);
 
-    // ── Formulario ──────────────────────────────────────────────────────────
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setForm(prev => ({ ...prev, [name]: value }));
@@ -112,7 +174,6 @@ const ProjectPage: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <h1 className="text-2xl font-bold text-white">Proyectos</h1>
                 <div className="flex gap-2">
@@ -136,7 +197,6 @@ const ProjectPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Buscador */}
             <div className="relative">
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                 <input
@@ -148,40 +208,19 @@ const ProjectPage: React.FC = () => {
                 />
             </div>
 
-            {/* Kanban / Grid */}
             <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
                 {viewMode === 'kanban' ? (
                     <div className="flex gap-6 overflow-x-auto pb-6">
                         {KANBAN_COLUMNS.map(column => (
-                            <div key={column.id} className="min-w-[300px] flex flex-col gap-4">
-                                <div className="flex items-center gap-2 px-2">
-                                    <span className={`w-2 h-2 rounded-full ${column.color}`} />
-                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                                        {column.label}
-                                    </h3>
-                                </div>
-                                <SortableContext
-                                    id={column.id}
-                                    items={filteredProjects.filter(p => p.status === column.id).map(p => p.id)}
-                                    strategy={verticalListSortingStrategy}
-                                >
-                                    <div
-                                        id={column.id}
-                                        className="flex-1 bg-gray-900/20 border border-dashed border-gray-800 rounded-3xl p-2 min-h-[500px]"
-                                    >
-                                        {filteredProjects
-                                            .filter(p => p.status === column.id)
-                                            .map(project => (
-                                                <ProjectCard
-                                                    key={project.id}
-                                                    project={project}
-                                                    progress={getProjectProgress(project.id)}
-                                                    clientName={getClientById(project.client_id)?.name}
-                                                />
-                                            ))}
-                                    </div>
-                                </SortableContext>
-                            </div>
+                            <KanbanColumn
+                                key={column.id}
+                                id={column.id}
+                                label={column.label}
+                                color={column.color}
+                                projects={filteredProjects.filter(p => p.status === column.id)}
+                                getProjectProgress={getProjectProgress}
+                                getClientName={(clientId) => getClientById(clientId)?.name}
+                            />
                         ))}
                     </div>
                 ) : (
@@ -198,11 +237,8 @@ const ProjectPage: React.FC = () => {
                 )}
             </DndContext>
 
-            {/* Modal — Nuevo Proyecto */}
             <Modal isOpen={isProjectModalOpen} onClose={handleClose} title="Nuevo Proyecto">
                 <form onSubmit={handleSubmit} className="space-y-4">
-
-                    {/* Nombre */}
                     <Input
                         label="Nombre del proyecto"
                         name="name"
@@ -211,8 +247,6 @@ const ProjectPage: React.FC = () => {
                         placeholder="Ej: Rediseño web corporativa"
                         required
                     />
-
-                    {/* Cliente */}
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">Cliente</label>
                         <select name="client_id" value={form.client_id} onChange={handleChange} className={selectClass} required>
@@ -222,8 +256,6 @@ const ProjectPage: React.FC = () => {
                             ))}
                         </select>
                     </div>
-
-                    {/* Descripción */}
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1">Descripción</label>
                         <textarea
@@ -235,8 +267,6 @@ const ProjectPage: React.FC = () => {
                             className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary-500 resize-none"
                         />
                     </div>
-
-                    {/* Estado + Prioridad */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1">Estado</label>
@@ -256,8 +286,6 @@ const ProjectPage: React.FC = () => {
                             </select>
                         </div>
                     </div>
-
-                    {/* Fechas */}
                     <div className="grid grid-cols-2 gap-3">
                         <Input
                             label="Fecha inicio"
@@ -274,8 +302,6 @@ const ProjectPage: React.FC = () => {
                             onChange={handleChange}
                         />
                     </div>
-
-                    {/* Presupuesto */}
                     <Input
                         label="Presupuesto (€)"
                         name="budget_cents"
@@ -286,8 +312,6 @@ const ProjectPage: React.FC = () => {
                         onChange={handleChange}
                         placeholder="0.00"
                     />
-
-                    {/* Categoría */}
                     <Input
                         label="Categoría (opcional)"
                         name="category"
@@ -295,8 +319,6 @@ const ProjectPage: React.FC = () => {
                         onChange={handleChange}
                         placeholder="Ej: Web, Mobile, Consultoría…"
                     />
-
-                    {/* Acciones */}
                     <div className="flex justify-end gap-3 pt-2">
                         <Button type="button" variant="secondary" onClick={handleClose}>
                             Cancelar
