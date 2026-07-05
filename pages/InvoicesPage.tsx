@@ -89,11 +89,11 @@ const InvoicesPage: React.FC = () => {
  const handleAddInvoice = async (e: React.FormEvent) => {
   e.preventDefault();
   try {
-    // Limpieza: Postgres rechaza '' como uuid, hay que mandar null si no hay proyecto seleccionado
     const payload = {
       ...newInvoice,
       project_id: newInvoice.project_id || null,
       notes: newInvoice.notes || null,
+      issue_date: new Date().toISOString().split('T')[0], // 🆕 fecha de emisión = hoy
     };
     await addInvoice(payload);
     setIsInvoiceModalOpen(false);
