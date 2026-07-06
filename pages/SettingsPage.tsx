@@ -11,11 +11,11 @@ const SettingsPage: React.FC = () => {
   const { addToast } = useToast();
   const [loading, setLoading] = useState(false);
 
+  // 🔧 Usamos los campos reales de Profile: business_name (no company_name),
+  // sin 'website' (no existe en el esquema) ni 'email' (no se debe reenviar, es de solo lectura)
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || '',
-    email: profile?.email || '',
-    company_name: (profile as any)?.company_name || '',
-    website: (profile as any)?.website || '',
+    business_name: profile?.business_name || '',
   });
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -69,28 +69,22 @@ const SettingsPage: React.FC = () => {
             <CardContent>
               <form onSubmit={handleUpdateProfile} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input 
-                    label="Nombre Completo" 
+                  <Input
+                    label="Nombre Completo"
                     value={formData.full_name}
                     onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                   />
-                  <Input 
-                    label="Correo Electrónico" 
-                    disabled 
-                    value={formData.email}
+                  <Input
+                    label="Correo Electrónico"
+                    disabled
+                    value={profile?.email || ''}
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input 
-                    label="Nombre de Empresa" 
-                    value={formData.company_name}
-                    onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                  />
-                  <Input 
-                    label="Sitio Web" 
-                    placeholder="https://..."
-                    value={formData.website}
-                    onChange={(e) => setFormData({ ...formData, website: e.target.value })}
+                  <Input
+                    label="Nombre de Empresa"
+                    value={formData.business_name}
+                    onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
                   />
                 </div>
                 <div className="flex justify-end pt-4">
@@ -108,7 +102,7 @@ const SettingsPage: React.FC = () => {
             </CardHeader>
             <CardContent className="flex items-center justify-between">
               <div>
-                <p className="text-lg font-bold text-white uppercase">{(profile as any)?.plan_id || 'Free'}</p>
+                <p className="text-lg font-bold text-white uppercase">{profile?.plan || 'Free'}</p>
                 <p className="text-sm text-gray-400">Tu plan actual incluye todas las funciones básicas.</p>
               </div>
               <Button variant="secondary">Cambiar Plan</Button>
