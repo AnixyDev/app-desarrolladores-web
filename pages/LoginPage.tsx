@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import { Logo } from '@/components/icons/Logo';
 import Button from '@/components/ui/Button';
+import { useRef } from 'react';
+
 // 1. Añadimos el import necesario
 import { GoogleLogin } from '@react-oauth/google';
 
@@ -11,6 +13,8 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isGoogleLoginInProgress = useRef(false);
+
   
   // 2. Extraemos la función de login con Google del store (asumiendo que se llama loginWithGoogle)
   const { login, loginWithGoogle } = useAppStore(); 
@@ -91,18 +95,26 @@ const LoginPage: React.FC = () => {
 
           <div className="flex justify-center w-full">
             <GoogleLogin
-              onSuccess={async (credentialResponse) => {
-                const success = await loginWithGoogle(credentialResponse.credential || '');
-                if (success) navigate('/');
-              }}
-              onError={() => {
-                setError('Error al iniciar sesión con Google');
-              }}
-              theme="filled_black"
-              width="320"
-              text="continue_with"
-              shape="pill"
-            />
+  onSuccess={async (credentialResponse) => {
+    if (isGoogleLoginInProgress.current) return; // 🆕 ignora la segunda llamada duplicada
+    isGoogleLoginInProgress.current = true;
+
+    const success = await loginWithGoogle(credentialResponse.credential || '');
+    if (success) {
+      navigate('/');
+    } else {
+      isGoogleLoginInProgress.current = false; // permite reintentar si falló
+    }
+  }}
+  onError={() => {
+    isGoogleLoginInProgress.current = false;
+    setError('Error al iniciar sesión con Google');
+  }}
+  theme="filled_black"
+  width="320"
+  text="continue_with"
+  shape="pill"
+/>
           </div>
         </div>
 
