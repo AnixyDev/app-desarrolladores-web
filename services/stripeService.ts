@@ -72,10 +72,10 @@ export const STRIPE_ITEMS = {
     name: 'Plan de equipos (Mensual)',
   },
   teamsPlanYearly: {
-    priceId: 'price_1SOggV8oC5awQy15Ppz7bUj0', 
-    mode: 'payment' as const, 
+    priceId: 'price_1TqEIe8oC5awQy15hnNqSypf', // 🆕 Price recurrente anual real (antes era one_time)
+    mode: 'subscription' as const,               // 🔧 antes: 'payment' — bug corregido
     name: 'Plan de equipos (Anual)',
-  },
+},
   aiCredits100: {
     priceId: 'price_1SOgpy8oC5awQy15TW22fBot',
     mode: 'payment' as const,
