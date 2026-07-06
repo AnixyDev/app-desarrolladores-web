@@ -37,7 +37,7 @@ export interface AuthSlice {
   loginWithGoogle: (token: string) => Promise<boolean>;
   consumeCredits: (amount: number) => Promise<boolean>;
   updateProfile: (profileData: Partial<Profile>) => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: (sessionOverride?: any) => Promise<void>;
   initializeAuth: () => () => void;
   resetStore: () => void;
 }
@@ -71,9 +71,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         });
     },
 
-    // 🔧 refreshProfile YA NO llama a getSession() — recibe la sesión ya resuelta
-    // como parámetro desde quien la invoque (onAuthStateChange), evitando una
-    // segunda llamada de Auth concurrente que compita por el Web Lock.
     refreshProfile: async (sessionOverride?: any) => {
         if (refreshLock) return;
         refreshLock = true;
@@ -131,36 +128,44 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         }
     },
 
-    // 🔧 initializeAuth simplificado: UNA SOLA fuente de verdad (onAuthStateChange).
-    // Ya no llama a getSession() por su cuenta — el listener dispara un evento
-    // INITIAL_SESSION automáticamente al registrarse, con la sesión ya resuelta.
+    // 🔧 Único punto de arranque: getSession() directo, SIN pasar por onAuthStateChange.
     initializeAuth: () => {
         if (isInitializing) return () => {};
         isInitializing = true;
 
-        // El intercambio de code de OAuth (Google redirect) sigue siendo necesario,
-        // pero NO llamamos a getSession() después — dejamos que dispare su propio
-        // evento SIGNED_IN a través del listener de abajo.
-        const params = new URLSearchParams(window.location.search);
-        const authCode = params.get('code');
+        const bootstrapAuth = async () => {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const authCode = params.get('code');
 
-        if (authCode) {
-            void (async () => {
-                try {
+                if (authCode) {
                     await supabase.auth.exchangeCodeForSession(authCode);
-                } catch (error) {
-                    console.error('Error exchanging OAuth code:', error);
+                    const cleanUrl = window.location.origin + window.location.pathname;
+                    window.history.replaceState({}, document.title, cleanUrl);
                 }
-                const cleanUrl = window.location.origin + window.location.pathname;
-                window.history.replaceState({}, document.title, cleanUrl);
-            })();
-        }
 
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session?.user) {
+                    await get().refreshProfile(session);
+                } else {
+                    set({ isProfileLoading: false });
+                }
+            } catch (error) {
+                console.error('Error during auth bootstrap:', error);
+                set({ isProfileLoading: false });
+            }
+        };
+
+        void bootstrapAuth();
+
+        // 🔧 CLAVE: el callback ya NO es async, y la llamada a refreshProfile()
+        // se difiere con setTimeout(0) para salir del contexto de lock interno
+        // de Supabase — así evitamos el interbloqueo documentado.
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
-                if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-                    if (session) {
-                        await get().refreshProfile(session); // 🔧 pasamos la sesión ya resuelta
+            (event, session) => {
+                if (event === 'SIGNED_IN' && session) {
+                    setTimeout(() => {
+                        get().refreshProfile(session);
 
                         if (profileChannel) supabase.removeChannel(profileChannel);
                         profileChannel = supabase
@@ -174,11 +179,9 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                                 set(state => ({ profile: { ...state.profile, ...payload.new } }));
                             })
                             .subscribe();
-                    } else {
-                        set({ isProfileLoading: false });
-                    }
+                    }, 0);
                 } else if (event === 'SIGNED_OUT') {
-                    get().resetStore();
+                    setTimeout(() => get().resetStore(), 0);
                 }
             }
         );
@@ -221,7 +224,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             console.error('Error login Google:', error.message);
             return false;
         }
-        // Sin llamada manual a refreshProfile — onAuthStateChange se encarga solo.
         return !!data.user;
     },
 
