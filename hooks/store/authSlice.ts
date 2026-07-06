@@ -12,7 +12,7 @@ const initialProfile: Profile = {
     tax_id: '',
     avatar_url: '',
     plan: 'Free' as any,
-    role: 'Developer' as UserRole,
+    role: 'Developer' as Profile['role'], // 🔧 antes: 'as UserRole' (tipo no relacionado)
     ai_credits: 10,
     hourly_rate_cents: 0,
     pdf_color: '#d9009f',
@@ -73,29 +73,33 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     },
 
     refreshProfile: async () => {
-        if (refreshLock) return;
+        console.log('[DIAG] refreshProfile: entrada, refreshLock =', refreshLock);
+        if (refreshLock) { console.log('[DIAG] refreshProfile: bloqueado por lock, saliendo'); return; }
         refreshLock = true;
         
         try {
-            // 1. Obtenemos sesión de forma atómica para evitar colisiones de "Lock"
+            console.log('[DIAG] refreshProfile: pidiendo sesión...');
             const { data: { session } } = await supabase.auth.getSession();
+            console.log('[DIAG] refreshProfile: sesión obtenida =', !!session?.user, session?.user?.id);
             
             if (!session?.user) {
+                console.log('[DIAG] refreshProfile: sin sesión, reset store');
                 get().resetStore();
                 return;
             }
 
-            // 2. Intentamos obtener el perfil
+            console.log('[DIAG] refreshProfile: pidiendo perfil...');
             let { data: profileData, error: fetchError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', session.user.id)
                 .maybeSingle();
+            console.log('[DIAG] refreshProfile: perfil obtenido, error =', fetchError, 'data =', !!profileData);
 
             if (fetchError) throw fetchError;
 
-            // Reintento rápido si el perfil acaba de ser creado (OAuth)
             if (!profileData) {
+                console.log('[DIAG] refreshProfile: sin perfil, reintentando...');
                 for (let i = 0; i < 3; i++) {
                     await new Promise(r => setTimeout(r, 1000));
                     const retry = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
@@ -111,72 +115,86 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                 full_name: profileData?.full_name || session.user.user_metadata?.full_name || 'Usuario',
             };
 
-            // 3. Establecemos estado de autenticación primario
+            console.log('[DIAG] refreshProfile: seteando isAuthenticated=true, isProfileLoading=false');
             set({ 
                 profile: activeProfile, 
                 isAuthenticated: true, 
                 isProfileLoading: false 
             });
 
-            // 4. CARGA SECUENCIAL: Evita saturar el canal de Auth y soluciona el error de consola
-            // Cargamos uno por uno para que no choquen las peticiones de token
+            console.log('[DIAG] refreshProfile: cargando datos secuenciales...');
             if (get().fetchClients) await get().fetchClients();
+            console.log('[DIAG] refreshProfile: fetchClients OK');
             if (get().fetchProjects) await get().fetchProjects();
+            console.log('[DIAG] refreshProfile: fetchProjects OK');
             if (get().fetchTasks) await get().fetchTasks();
+            console.log('[DIAG] refreshProfile: fetchTasks OK');
             if (get().fetchTimeEntries) await get().fetchTimeEntries();
+            console.log('[DIAG] refreshProfile: fetchTimeEntries OK');
             if (get().fetchFinanceData) await get().fetchFinanceData();
+            console.log('[DIAG] refreshProfile: fetchFinanceData OK');
             if (get().fetchNotifications) await get().fetchNotifications();
+            console.log('[DIAG] refreshProfile: fetchNotifications OK — TERMINADO');
 
         } catch (error) {
-            console.error('Auth Sync Error:', error);
+            console.error('[DIAG] refreshProfile: EXCEPCIÓN', error);
             set({ isProfileLoading: false, isAuthenticated: false });
         } finally {
             refreshLock = false;
+            console.log('[DIAG] refreshProfile: finally, lock liberado');
         }
     },
 
     initializeAuth: () => {
-        if (isInitializing) return () => {};
+        console.log('[DIAG] initializeAuth: llamado, isInitializing =', isInitializing);
+        if (isInitializing) { console.log('[DIAG] initializeAuth: ya inicializando, saliendo'); return () => {}; }
         isInitializing = true;
 
         const bootstrapAuth = async () => {
-            if (authBootstrapInFlight) return;
+            console.log('[DIAG] bootstrapAuth: entrada, authBootstrapInFlight =', authBootstrapInFlight);
+            if (authBootstrapInFlight) { console.log('[DIAG] bootstrapAuth: ya en curso, saliendo'); return; }
             authBootstrapInFlight = true;
             
             try {
-                // Manejo de códigos OAuth/Google
                 const params = new URLSearchParams(window.location.search);
                 const authCode = params.get('code');
+                console.log('[DIAG] bootstrapAuth: authCode =', authCode);
                 
                 if (authCode) {
+                    console.log('[DIAG] bootstrapAuth: canjeando code por sesión...');
                     await supabase.auth.exchangeCodeForSession(authCode);
                     const cleanUrl = window.location.origin + window.location.pathname;
                     window.history.replaceState({}, document.title, cleanUrl);
+                    console.log('[DIAG] bootstrapAuth: code canjeado, URL limpiada');
                 }
 
+                console.log('[DIAG] bootstrapAuth: pidiendo sesión...');
                 const { data: { session } } = await supabase.auth.getSession();
+                console.log('[DIAG] bootstrapAuth: sesión =', !!session?.user);
                 if (session?.user) {
+                    console.log('[DIAG] bootstrapAuth: llamando a refreshProfile()...');
                     await get().refreshProfile();
+                    console.log('[DIAG] bootstrapAuth: refreshProfile() terminó');
                 } else {
+                    console.log('[DIAG] bootstrapAuth: sin sesión, isProfileLoading=false');
                     set({ isProfileLoading: false });
                 }
             } catch (error) {
-                console.error('Error during auth bootstrap:', error);
+                console.error('[DIAG] bootstrapAuth: EXCEPCIÓN', error);
                 set({ isProfileLoading: false });
             } finally {
                 authBootstrapInFlight = false;
+                console.log('[DIAG] bootstrapAuth: finally');
             }
         };
 
         void bootstrapAuth();
 
-        // Escucha de cambios de estado (Login/Logout)
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
+                console.log('[DIAG] onAuthStateChange evento =', event);
                 if (event === 'SIGNED_IN' && session) {
                     await get().refreshProfile();
-                    
-                    // Suscripción Realtime al perfil para cambios de créditos/plan
                     if (profileChannel) supabase.removeChannel(profileChannel);
                     profileChannel = supabase
                         .channel(`profile-updates-${session.user.id}`)
@@ -233,7 +251,9 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             console.error('Error login Google:', error.message);
             return false;
         }
-        await get().refreshProfile();
+        // 🔧 SIN await get().refreshProfile() aquí — signInWithIdToken() dispara
+        // el evento SIGNED_IN, y onAuthStateChange ya llama a refreshProfile() una vez.
+        // Llamarlo también aquí duplicaba la ejecución (condición de carrera).
         return !!data.user;
     },
 
@@ -261,7 +281,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         const { profile } = get();
         if (!profile.id) return;
         
-        // Evitamos actualizar campos protegidos
         const { id, email, plan, ai_credits, role, ...safeData } = profileData as any;
         
         const { error } = await supabase.from('profiles').update(safeData).eq('id', profile.id);
