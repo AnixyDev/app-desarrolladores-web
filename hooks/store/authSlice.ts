@@ -1,6 +1,6 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../useAppStore';
-import { Profile, any, UserRole } from '@/types';
+import { Profile, UserRole } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { RealtimeChannel } from '@supabase/supabase-js';
 
