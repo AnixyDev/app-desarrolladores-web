@@ -216,16 +216,22 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     },
 
     loginWithGoogle: async (token: string) => {
-        const { data, error } = await supabase.auth.signInWithIdToken({
-            provider: 'google',
-            token,
-        });
-        if (error) {
-            console.error('Error login Google:', error.message);
-            return false;
-        }
-        return !!data.user;
-    },
+    const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'google',
+        token,
+    });
+    if (error) {
+        console.error('Error login Google:', error.message);
+        return false;
+    }
+    if (!data.session) return false;
+
+    // 🔧 Esperamos a que el perfil se cargue y isAuthenticated se marque
+    // antes de devolver el control a quien llamó (evita el rebote a /landing)
+    await get().refreshProfile(data.session);
+
+    return !!data.user;
+},
 
     consumeCredits: async (amount) => {
         const { profile } = get();
