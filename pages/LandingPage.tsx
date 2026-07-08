@@ -59,6 +59,15 @@ const LandingPage: React.FC = () => {
           </div>
         </section>
       </main>
+      <footer className="text-center py-6 text-sm text-gray-400">
+     <a href="/#/privacy" className="underline hover:text-primary-400">
+       Política de Privacidad
+     </a>
+     {' · '}
+     <a href="/#/terms" className="underline hover:text-primary-400">
+       Términos de Servicio
+     </a>
+   </footer>
     </div>
   );
 };
