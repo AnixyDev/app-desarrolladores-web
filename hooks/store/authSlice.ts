@@ -1,9 +1,9 @@
 import { StateCreator } from 'zustand';
 import { AppState } from '../useAppStore';
-import { Profile, UserRole } from '@/types';
-import { supabase } from '@/lib/supabaseClient';
-import { RealtimeChannel } from '@supabase/supabase-js';
+import { Profile, GoogleJwtPayload } from '../../types';
+import { supabase } from '../../lib/supabaseClient';
 
+// Estado inicial del perfil (valores por defecto antes de cargar datos reales)
 const initialProfile: Profile = {
     id: '',
     full_name: '',
@@ -11,8 +11,8 @@ const initialProfile: Profile = {
     business_name: '',
     tax_id: '',
     avatar_url: '',
-    plan: 'Free' as any,
-    role: 'Developer' as Profile['role'],
+    plan: 'Free',
+    role: 'Developer',
     ai_credits: 10,
     hourly_rate_cents: 0,
     pdf_color: '#d9009f',
@@ -29,239 +29,211 @@ const initialProfile: Profile = {
 
 export interface AuthSlice {
   isAuthenticated: boolean;
-  isProfileLoading: boolean;
+  isProfileLoading: boolean; 
   profile: Profile;
   login: (email: string, password?: string) => Promise<boolean>;
+  loginWithGoogle: (payload: GoogleJwtPayload) => Promise<void>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password?: string) => Promise<boolean>;
-  loginWithGoogle: (token: string) => Promise<boolean>;
-  consumeCredits: (amount: number) => Promise<boolean>;
   updateProfile: (profileData: Partial<Profile>) => Promise<void>;
-  refreshProfile: (sessionOverride?: any) => Promise<void>;
-  initializeAuth: () => () => void;
-  resetStore: () => void;
+  refreshProfile: () => Promise<void>;
+  upgradePlan: (plan: 'Pro' | 'Teams') => void;
+  purchaseCredits: (amount: number) => void;
+  consumeCredits: (amount: number) => Promise<boolean>;
+  initializeAuth: () => Promise<void>;
 }
-
-let isInitializing = false;
-let refreshLock = false;
-let profileChannel: RealtimeChannel | null = null;
 
 export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, get) => ({
     isAuthenticated: false,
-    isProfileLoading: true,
+    isProfileLoading: true, 
     profile: initialProfile,
-
-    resetStore: () => {
-        if (profileChannel) {
-            supabase.removeChannel(profileChannel);
-            profileChannel = null;
-        }
-        set({
-            isAuthenticated: false,
-            profile: initialProfile,
-            isProfileLoading: false,
-            clients: [],
-            projects: [],
-            invoices: [],
-            expenses: [],
-            budgets: [],
-            proposals: [],
-            contracts: [],
-            notifications: [],
-        });
-    },
-
-    refreshProfile: async (sessionOverride?: any) => {
-        if (refreshLock) return;
-        refreshLock = true;
-
+    
+    // FIX CRÍTICO: Refrescar perfil REAL desde la base de datos
+    refreshProfile: async () => {
         try {
-            const session = sessionOverride ?? (await supabase.auth.getSession()).data.session;
-
+            console.log("🔄 RefreshProfile iniciado...");
+            
+            // 1. Verificar si hay sesión activa en Supabase
+            const { data: { session } } = await supabase.auth.getSession();
+            
             if (!session?.user) {
-                get().resetStore();
+                console.log("❌ No hay sesión activa");
+                set({ isAuthenticated: false, profile: initialProfile, isProfileLoading: false });
                 return;
             }
 
-            let { data: profileData, error: fetchError } = await supabase
+            console.log("✅ Sesión encontrada para:", session.user.email);
+
+            // 2. CRÍTICO: Forzar lectura FRESCA desde la base de datos
+            const { data: profileData, error: fetchError } = await supabase
                 .from('profiles')
                 .select('*')
                 .eq('id', session.user.id)
-                .maybeSingle();
-
-            if (fetchError) throw fetchError;
-
-            if (!profileData) {
-                for (let i = 0; i < 3; i++) {
-                    await new Promise(r => setTimeout(r, 1000));
-                    const retry = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
-                    if (retry.data) { profileData = retry.data; break; }
-                }
+                .single();
+            
+            if (fetchError || !profileData) {
+                console.warn("⚠️ Perfil no encontrado en DB, creando desde metadatos");
+                
+                // Crear perfil fallback desde los metadatos de Google
+                const fallbackProfile = {
+                    ...initialProfile,
+                    id: session.user.id,
+                    email: session.user.email || '',
+                    full_name: session.user.user_metadata?.full_name || 'Usuario',
+                    plan: 'Free' as const
+                };
+                
+                set({ profile: fallbackProfile, isAuthenticated: true });
+            } else {
+                console.log("✅ Perfil cargado correctamente:", profileData.email);
+                // AQUÍ ESTÁ LA CLAVE: Sincronizar el plan pagado desde la DB
+                set({ profile: profileData as Profile, isAuthenticated: true });
             }
-
-            const activeProfile: Profile = {
-                ...initialProfile,
-                ...(profileData || {}),
-                id: session.user.id,
-                email: session.user.email || profileData?.email || '',
-                full_name: profileData?.full_name || session.user.user_metadata?.full_name || 'Usuario',
-            };
-
-            set({
-                profile: activeProfile,
-                isAuthenticated: true,
-                isProfileLoading: false
-            });
-
-            if (get().fetchClients) await get().fetchClients();
-            if (get().fetchProjects) await get().fetchProjects();
-            if (get().fetchTasks) await get().fetchTasks();
-            if (get().fetchTimeEntries) await get().fetchTimeEntries();
-            if (get().fetchFinanceData) await get().fetchFinanceData();
-            if (get().fetchNotifications) await get().fetchNotifications();
-
         } catch (error) {
-            console.error('Auth Sync Error:', error);
-            set({ isProfileLoading: false, isAuthenticated: false });
+            console.error("💥 RefreshProfile Error:", error);
         } finally {
-            refreshLock = false;
+            set({ isProfileLoading: false });
         }
     },
 
-    // 🔧 Único punto de arranque: getSession() directo, SIN pasar por onAuthStateChange.
-    initializeAuth: () => {
-        if (isInitializing) return () => {};
-        isInitializing = true;
+    // FIX CRÍTICO: Inicializar autenticación y manejar callbacks de OAuth
+    initializeAuth: async () => {
+        console.log("🚀 InitializeAuth iniciado...");
+        set({ isProfileLoading: true });
 
-        const bootstrapAuth = async () => {
-            try {
-                const params = new URLSearchParams(window.location.search);
-                const authCode = params.get('code');
-
-                if (authCode) {
-                    await supabase.auth.exchangeCodeForSession(authCode);
-                    const cleanUrl = window.location.origin + window.location.pathname;
-                    window.history.replaceState({}, document.title, cleanUrl);
-                }
-
-                const { data: { session } } = await supabase.auth.getSession();
-                if (session?.user) {
-                    await get().refreshProfile(session);
-                } else {
-                    set({ isProfileLoading: false });
-                }
-            } catch (error) {
-                console.error('Error during auth bootstrap:', error);
-                set({ isProfileLoading: false });
+        // 1. Configurar listener para cambios de autenticación (login/logout)
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("🔔 AuthStateChange event:", event);
+            
+            if (session?.user) {
+                console.log("✅ Usuario autenticado detectado");
+                await get().refreshProfile();
+            } else {
+                console.log("❌ Usuario desconectado");
+                set({ isAuthenticated: false, profile: initialProfile, isProfileLoading: false });
             }
-        };
+        });
 
-        void bootstrapAuth();
-
-        // 🔧 CLAVE: el callback ya NO es async, y la llamada a refreshProfile()
-        // se difiere con setTimeout(0) para salir del contexto de lock interno
-        // de Supabase — así evitamos el interbloqueo documentado.
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            (event, session) => {
-                if (event === 'SIGNED_IN' && session) {
-                    setTimeout(() => {
-                        get().refreshProfile(session);
-
-                        if (profileChannel) supabase.removeChannel(profileChannel);
-                        profileChannel = supabase
-                            .channel(`profile-updates-${session.user.id}`)
-                            .on('postgres_changes', {
-                                event: 'UPDATE',
-                                schema: 'public',
-                                table: 'profiles',
-                                filter: `id=eq.${session.user.id}`,
-                            }, (payload) => {
-                                set(state => ({ profile: { ...state.profile, ...payload.new } }));
-                            })
-                            .subscribe();
-                    }, 0);
-                } else if (event === 'SIGNED_OUT') {
-                    setTimeout(() => get().resetStore(), 0);
-                }
-            }
-        );
-
-        return () => {
-            subscription.unsubscribe();
-            if (profileChannel) supabase.removeChannel(profileChannel);
-            isInitializing = false;
-        };
+        // 2. Verificar si ya hay sesión activa (usuario volviendo)
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+            console.log("✅ Sesión existente encontrada");
+            await get().refreshProfile();
+            
+            // Cargar datos en segundo plano (no bloqueante)
+            get().fetchClients().catch(() => {});
+            get().fetchProjects().catch(() => {});
+        } else {
+            console.log("ℹ️ No hay sesión previa");
+            set({ isProfileLoading: false, isAuthenticated: false });
+        }
     },
 
+    // Login con email/password tradicional
     login: async (email, password) => {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password: password || '',
-        });
-        return !error && !!data.user;
-    },
-
-    logout: async () => {
-        await supabase.auth.signOut();
-        get().resetStore();
-    },
-
-    register: async (name, email, password) => {
-        const { data, error } = await supabase.auth.signUp({
-            email,
-            password: password || '',
-            options: { data: { full_name: name } },
-        });
-        return !error && !!data.user;
-    },
-
-    loginWithGoogle: async (token: string) => {
-    const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token,
-    });
-    if (error) {
-        console.error('Error login Google:', error.message);
+        set({ isProfileLoading: true });
+        try {
+            const { data, error } = await supabase.auth.signInWithPassword({ 
+                email, 
+                password: password || '' 
+            });
+            
+            if (error) throw error;
+            
+            if (data.user) {
+                await get().refreshProfile();
+                return true;
+            }
+        } catch (error: any) {
+            console.error("Login Error:", error.message);
+        } finally {
+            set({ isProfileLoading: false });
+        }
         return false;
-    }
-    if (!data.session) return false;
+    },
 
-    // 🔧 Esperamos a que el perfil se cargue y isAuthenticated se marque
-    // antes de devolver el control a quien llamó (evita el rebote a /landing)
-    await get().refreshProfile(data.session);
+    // FIX: Este método ya no es necesario para Google OAuth
+    // Supabase maneja el callback automáticamente
+    loginWithGoogle: async () => {
+        await get().refreshProfile();
+    },
 
-    return !!data.user;
-},
+    // Cerrar sesión y limpiar estado local
+    logout: async () => {
+        try {
+            await supabase.auth.signOut();
+        } finally {
+            set({ isAuthenticated: false, profile: initialProfile, isProfileLoading: false });
+            localStorage.clear();
+            window.location.hash = '/auth/login';
+        }
+    },
 
-    consumeCredits: async (amount) => {
-        const { profile } = get();
-        if (profile.ai_credits < amount) return false;
-
-        const { data, error } = await supabase
-            .from('profiles')
-            .update({ ai_credits: profile.ai_credits - amount })
-            .eq('id', profile.id)
-            .select()
-            .single();
-
-        if (error) {
-            console.error('Error al consumir créditos:', error);
+    // Registro con email/password
+    register: async (name, email, password) => {
+        try {
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password: password || '',
+                options: { data: { full_name: name } }
+            });
+            return !error && !!data.user;
+        } catch (error) {
             return false;
         }
-
-        set(state => ({ profile: { ...state.profile, ai_credits: data.ai_credits } }));
-        return true;
     },
 
+    // Actualizar perfil en base de datos
     updateProfile: async (profileData) => {
         const { profile } = get();
         if (!profile.id) return;
+        
+        try {
+            const cleanData = { ...profileData };
+            
+            // Convertir tarifa por hora a entero (si viene)
+            if (cleanData.hourly_rate_cents !== undefined) {
+                cleanData.hourly_rate_cents = Math.round(Number(cleanData.hourly_rate_cents));
+            }
 
-        const { id, email, plan, ai_credits, role, ...safeData } = profileData as any;
+            const { error } = await supabase
+                .from('profiles')
+                .update(cleanData)
+                .eq('id', profile.id);
 
-        const { error } = await supabase.from('profiles').update(safeData).eq('id', profile.id);
-        if (error) throw error;
+            if (error) throw error;
+            
+            // Actualizar estado local
+            set(state => ({ 
+                profile: { ...state.profile, ...cleanData } as Profile 
+            }));
+        } catch (err) {
+            console.error("Error updating profile:", err);
+            throw err;
+        }
+    },
 
-        set(state => ({ profile: { ...state.profile, ...safeData } }));
+    // Métodos auxiliares
+    upgradePlan: (plan) => get().updateProfile({ plan }),
+    purchaseCredits: (amount) => get().updateProfile({ ai_credits: (get().profile.ai_credits || 0) + amount }),
+    
+    // Consumir créditos de IA de forma atómica
+    consumeCredits: async (amount) => {
+        const { profile } = get();
+        if (!profile.id || (profile.ai_credits || 0) < amount) return false;
+
+        const { data: success, error } = await supabase.rpc('consume_credits_atomic', { 
+            user_id: profile.id, 
+            amount_to_consume: amount 
+        });
+
+        if (!error && success) {
+            set(state => ({ 
+                profile: { ...state.profile, ai_credits: (state.profile.ai_credits || 0) - amount } as Profile 
+            }));
+            return true;
+        }
+        return false;
     },
 });
