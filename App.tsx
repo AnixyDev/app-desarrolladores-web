@@ -1,6 +1,5 @@
 import React, { useEffect, lazy, Suspense } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import { useAppStore } from './hooks/useAppStore';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
@@ -111,7 +110,6 @@ function App() {
     console.log("✅ App.tsx: Renderizando rutas. isAuthenticated =", isAuthenticated);
 
     return (
-        <GoogleOAuthProvider clientId="457438236235-n2s8q6nvcjm32u0o3ut2lksd8po8gfqf.apps.googleusercontent.com">
             <Router>
                 <ToastContainer />
                 <CookieBanner />
@@ -179,7 +177,6 @@ function App() {
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
             </Router>
-        </GoogleOAuthProvider>
     );
 }
 
