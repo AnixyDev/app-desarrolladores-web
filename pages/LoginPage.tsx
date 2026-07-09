@@ -3,33 +3,35 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import { Logo } from '@/components/icons/Logo';
 import Button from '@/components/ui/Button';
-import { useRef } from 'react';
-import LoginPage from "./pages/LoginPage";
+import { supabase } from '@/lib/supabaseClient';
 
-// 1. Añadimos el import necesario
-import { GoogleLogin } from '@react-oauth/google';
+// FIX: Se eliminó "import LoginPage from './pages/LoginPage'"
+// Ese import causaba "Identifier 'LoginPage' has already been declared":
+// el archivo se importaba a sí mismo, duplicando la variable.
+
+// FIX: Se eliminó "import { GoogleLogin } from '@react-oauth/google'"
+// Ya no usamos ese botón (con popup). Ahora usamos
+// supabase.auth.signInWithOAuth(), con redirección real gestionada
+// por Supabase, evitando errores de "Cross-Origin-Opener-Policy".
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const isGoogleLoginInProgress = useRef(false);
 
-  
-  // 2. Extraemos la función de login con Google del store (asumiendo que se llama loginWithGoogle)
-  const { login, loginWithGoogle } = useAppStore(); 
+  const { login } = useAppStore();
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    
+
     try {
       const success = await login(email, password);
       if (success) {
-        navigate('/'); // O a /dashboard, según tu ruta principal
+        navigate('/');
       } else {
         setError('Credenciales incorrectas. Inténtalo de nuevo.');
       }
@@ -37,6 +39,22 @@ const LoginPage: React.FC = () => {
       setError('Error al conectar con el servidor.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setError(null);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      setError('Error al iniciar sesión con Google');
+      console.error(err.message);
     }
   };
 
@@ -58,8 +76,8 @@ const LoginPage: React.FC = () => {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Email</label>
-            <input 
-              type="email" 
+            <input
+              type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all"
@@ -69,8 +87,8 @@ const LoginPage: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Contraseña</label>
-            <input 
-              type="password" 
+            <input
+              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all"
@@ -83,7 +101,6 @@ const LoginPage: React.FC = () => {
           </Button>
         </form>
 
-        {/* 3. SECCIÓN DE GOOGLE */}
         <div className="mt-6">
           <div className="relative mb-6">
             <div className="absolute inset-0 flex items-center">
@@ -95,27 +112,15 @@ const LoginPage: React.FC = () => {
           </div>
 
           <div className="flex justify-center w-full">
-            <GoogleLogin
-  onSuccess={async (credentialResponse) => {
-    if (isGoogleLoginInProgress.current) return; // 🆕 ignora la segunda llamada duplicada
-    isGoogleLoginInProgress.current = true;
-
-    const success = await loginWithGoogle(credentialResponse.credential || '');
-    if (success) {
-      navigate('/');
-    } else {
-      isGoogleLoginInProgress.current = false; // permite reintentar si falló
-    }
-  }}
-  onError={() => {
-    isGoogleLoginInProgress.current = false;
-    setError('Error al iniciar sesión con Google');
-  }}
-  theme="filled_black"
-  width="320"
-  text="continue_with"
-  shape="pill"
-/>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleGoogleLogin}
+              className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
+            >
+              <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
+              Continuar con Google
+            </Button>
           </div>
         </div>
 
