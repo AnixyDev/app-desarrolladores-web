@@ -1,5 +1,5 @@
 import React, { useEffect, lazy, Suspense } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAppStore } from './hooks/useAppStore';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
@@ -79,10 +79,11 @@ const MainLayout = () => {
     const [sidebarOpen, setSidebarOpen] = React.useState(false);
     return (
         <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden font-sans selection:bg-primary-500/30">
-            <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
-            <div className="flex-1 flex flex-col min-w-0">
-                <Header setSidebarOpen={setSidebarOpen} />
-                <main className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 animate-fade-in">
+    <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <div className="flex-1 flex flex-col min-w-0">
+    <Header onMenuClick={() => setSidebarOpen(true)} />
+
+    <main className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 animate-fade-in">
                     <Suspense fallback={<div className="flex justify-center py-10"><div className="w-8 h-8 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin"></div></div>}>
                         <Outlet />
                     </Suspense>
@@ -110,7 +111,7 @@ function App() {
     console.log("✅ App.tsx: Renderizando rutas. isAuthenticated =", isAuthenticated);
 
     return (
-            <Router>
+            <>
                 <ToastContainer />
                 <CookieBanner />
                 <Routes>
@@ -142,7 +143,7 @@ function App() {
                         <Route path="clients" element={<ClientsPage />} />
                         <Route path="clients/:clientId" element={<ClientDetailPage />} />
                         <Route path="project" element={<ProjectPage />} />
-                        <Route path="projects/:projectId" element={<ProjectsDetailPage />} />
+                        <Route path="projects/:projectId" element={<ProjectDetailPage />} />
                         <Route path="invoices" element={<InvoicesPage />} />
                         <Route path="invoices/create" element={<CreateInvoicePage />} />
                         <Route path="expenses" element={<ExpensesPage />} />
@@ -176,7 +177,7 @@ function App() {
                     {/* Capturador de rutas no encontradas */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
-            </Router>
+           </>
     );
 }
 
