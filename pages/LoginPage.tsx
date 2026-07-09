@@ -4,6 +4,7 @@ import { useAppStore } from '@/hooks/useAppStore';
 import { Logo } from '@/components/icons/Logo';
 import Button from '@/components/ui/Button';
 import { useRef } from 'react';
+import LoginPage from "./pages/LoginPage";
 
 // 1. Añadimos el import necesario
 import { GoogleLogin } from '@react-oauth/google';
