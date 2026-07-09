@@ -1,7 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { GoogleOAuthProvider } from '@react-oauth/google';
 import App from './App';
 import './index.css';
 
@@ -12,12 +11,15 @@ import './index.css';
 //   AbortError: Lock broken by another request with the 'steal' option.
 // Este comportamiento rompe el flujo de autenticación con Google OAuth.
 
-const GOOGLE_CLIENT_ID = '457438236235-n2s8q6nvcjm32u0o3ut2lksd8po8gfqf.apps.googleusercontent.com';
+// FIX: Se elimina GoogleOAuthProvider porque ya NO se usa la librería
+// @react-oauth/google. Todo el login con Google ahora pasa por
+// supabase.auth.signInWithOAuth(), que hace una redirección real
+// gestionada por Supabase, sin necesidad de este proveedor.
+// Mantenerlo activo cargaba un script de Google en segundo plano
+// que generaba errores de "Cross-Origin-Opener-Policy" en consola.
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </GoogleOAuthProvider>
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
 );
