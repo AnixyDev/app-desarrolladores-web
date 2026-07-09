@@ -8,7 +8,7 @@ import CookieBanner from './components/ui/CookieBanner';
 
 // Auth & Public
 import AuthLayout from './pages/auth/AuthLayout';
-import LoginPage from './pages/auth/LoginPage';
+import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfService from './pages/TermsOfService';
