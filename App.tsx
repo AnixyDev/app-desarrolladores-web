@@ -31,7 +31,7 @@ const safeLazy = (importFn: () => Promise<any>) => {
 const DashboardPage = safeLazy(() => import('./pages/DashboardPage'));
 const ClientsPage = safeLazy(() => import('./pages/ClientsPage'));
 const ClientDetailPage = safeLazy(() => import('./pages/ClientDetailPage'));
-const ProjectsPage = safeLazy(() => import('./pages/ProjectsPage'));
+const ProjectPage = safeLazy(() => import('./pages/ProjectPage'));
 const ProjectDetailPage = safeLazy(() => import('./pages/ProjectDetailPage'));
 const InvoicesPage = safeLazy(() => import('./pages/InvoicesPage'));
 const CreateInvoicePage = safeLazy(() => import('./pages/CreateInvoicePage'));
@@ -141,8 +141,8 @@ function App() {
                         <Route index element={<DashboardPage />} />
                         <Route path="clients" element={<ClientsPage />} />
                         <Route path="clients/:clientId" element={<ClientDetailPage />} />
-                        <Route path="projects" element={<ProjectsPage />} />
-                        <Route path="projects/:projectId" element={<ProjectDetailPage />} />
+                        <Route path="project" element={<ProjectPage />} />
+                        <Route path="projects/:projectId" element={<ProjectsDetailPage />} />
                         <Route path="invoices" element={<InvoicesPage />} />
                         <Route path="invoices/create" element={<CreateInvoicePage />} />
                         <Route path="expenses" element={<ExpensesPage />} />
