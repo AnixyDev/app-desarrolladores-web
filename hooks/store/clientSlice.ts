@@ -17,9 +17,11 @@ export const createClientSlice: StateCreator<AppState, [], [], ClientSlice> = (s
     clients: [],
     
     fetchClients: async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return; // Silent guard para RLS
-
+        // FIX: se elimina la llamada a supabase.auth.getSession() que había aquí.
+        // Era redundante (la RLS de Postgres ya protege esta consulta con auth.uid())
+        // y competía por el Web Lock interno de supabase-js contra refreshProfile(),
+        // causando "AbortError: Lock broken by another request" y sesiones
+        // que parecían cerrarse solas al refrescar la página.
         try {
             const { data, error } = await supabase
                 .from('clients')
