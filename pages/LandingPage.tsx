@@ -47,7 +47,7 @@ const LandingPage: React.FC = () => {
               onClick={() => navigate('/login')} 
               className="px-10 py-4 text-lg bg-primary-600 hover:bg-primary-700"
             >
-              Empezar ahora gratis
+              Empezar prueba
             </Button>
             <Button 
               variant="secondary" 
@@ -60,11 +60,11 @@ const LandingPage: React.FC = () => {
         </section>
       </main>
       <footer className="text-center py-6 text-sm text-gray-400">
-     <a href="/#/privacy" className="underline hover:text-primary-400">
+     <a href="https://devfreelancer.app/#/privacy" className="underline hover:text-primary-400">
        Política de Privacidad
      </a>
      {' · '}
-     <a href="/#/terms" className="underline hover:text-primary-400">
+     <a href="https://devfreelancer.app/#/terms" className="underline hover:text-primary-400">
        Términos de Servicio
      </a>
    </footer>
