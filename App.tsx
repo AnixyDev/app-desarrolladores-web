@@ -142,7 +142,7 @@ function App() {
                         <Route index element={<DashboardPage />} />
                         <Route path="clients" element={<ClientsPage />} />
                         <Route path="clients/:clientId" element={<ClientDetailPage />} />
-                        <Route path="project" element={<ProjectPage />} />
+                        <Route path="projects" element={<ProjectPage />} />
                         <Route path="projects/:projectId" element={<ProjectDetailPage />} />
                         <Route path="invoices" element={<InvoicesPage />} />
                         <Route path="invoices/create" element={<CreateInvoicePage />} />
