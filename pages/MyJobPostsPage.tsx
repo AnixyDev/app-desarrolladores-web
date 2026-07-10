@@ -60,7 +60,7 @@ const MyJobPostsPage: React.FC = () => {
                                         <th className="p-4">Título de la Oferta</th>
                                         <th className="p-4">Fecha de Publicación</th>
                                         <th className="p-4">Postulaciones</th>
-                                        <th className="p-4 text-right">Acciones</th>
+                                        <th className="p-4 text-right sticky right-0 bg-gray-900">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -76,7 +76,7 @@ const MyJobPostsPage: React.FC = () => {
                                                     <span>{getApplicantCount(job.id)}</span>
                                                 </Link>
                                             </td>
-                                            <td className="p-4 text-right">
+                                            <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                                                 <div className="flex gap-2 justify-end">
                                                     <Button size="sm" variant="secondary"><EditIcon className="w-4 h-4"/></Button>
                                                     <Button size="sm" variant="danger"><TrashIcon className="w-4 h-4"/></Button>
