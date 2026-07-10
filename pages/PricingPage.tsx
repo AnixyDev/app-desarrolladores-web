@@ -16,7 +16,7 @@ const PricingPage: React.FC = () => {
         </div>
         <div className="flex items-center gap-6 relative z-[110]">
           <button 
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/auth/login')}
             className="text-sm font-medium text-gray-400 hover:text-white transition-colors py-2 px-4"
           >
             Entrar
@@ -24,7 +24,7 @@ const PricingPage: React.FC = () => {
           <Button 
             variant="primary" 
             size="sm"
-            onClick={() => navigate('/register')}
+            onClick={() => navigate('/auth/register')}
             className="hidden sm:block"
           >
             Empezar ahora
@@ -54,7 +54,7 @@ const PricingPage: React.FC = () => {
                 <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Facturación básica</span></li>
                 <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>10 créditos IA</span></li>
               </ul>
-              <Button variant="secondary" className="w-full" onClick={() => navigate('/register')}>
+              <Button variant="secondary" className="w-full" onClick={() => navigate('/auth/register')}>
                 Empezar Gratis
               </Button>
             </div>
@@ -73,7 +73,7 @@ const PricingPage: React.FC = () => {
                 <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Dashboard de métricas</span></li>
                 <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>Soporte prioritario</span></li>
               </ul>
-              <Button variant="primary" className="w-full" onClick={() => navigate('/register?plan=pro')}>
+              <Button variant="primary" className="w-full" onClick={() => navigate('/auth/register?plan=pro')}>
                 Probar Pro
               </Button>
             </div>
@@ -89,7 +89,7 @@ const PricingPage: React.FC = () => {
                 <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>API Access</span></li>
                 <li className="flex items-center gap-3"><CheckCircleIcon className="w-5 h-5 text-primary-500" /> <span>White-labeling</span></li>
               </ul>
-              <Button variant="secondary" className="w-full" onClick={() => navigate('/register?plan=agency')}>
+              <Button variant="secondary" className="w-full" onClick={() => navigate('/auth/register?plan=agency')}>
                 Contactar Ventas
               </Button>
             </div>
