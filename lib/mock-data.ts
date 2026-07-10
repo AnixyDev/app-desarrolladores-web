@@ -10,7 +10,7 @@ const clients: Client[] = [
 
 // --- Proyectos ---
 const projects: Project[] = [
-    { id: 'p-1', user_id: USER_ID, name: 'Website Redesign', client_id: 'c-1', // description: 'Complete redesign of the corporate website.', status: 'completed', start_date: '2024-10-05', due_date: '2024-10-20', budget_cents: 200000, created_at: '2024-10-05', category: 'Web Development', priority: 'High' }
+    { id: 'p-1', user_id: USER_ID, name: 'Website Redesign', client_id: 'c-1', description: 'Complete redesign of the corporate website.', status: 'completed', start_date: '2024-10-05', due_date: '2024-10-20', budget_cents: 200000, created_at: '2024-10-05', category: 'Web Development', priority: 'High' }
 ];
 
 // --- Tareas ---
@@ -27,10 +27,10 @@ const invoices: Invoice[] = [
         issue_date: '2024-10-22',
         due_date: '2024-11-21',
         items: [
-            { // description: 'Diseño y Maquetación de Landing Page (HTML/CSS)', quantity: 1, price_cents: 50000 },
-            { // description: 'Desarrollo de Componentes Interactivos (JavaScript)', quantity: 1, price_cents: 40000 },
-            { // description: 'Configuración de Formulario de Contacto y Lógica de Envío', quantity: 1, price_cents: 15000 },
-            { // description: 'Optimización para Dispositivos Móviles (Responsive Design)', quantity: 1, price_cents: 15000 }
+            { description: 'Diseño y Maquetación de Landing Page (HTML/CSS)', quantity: 1, price_cents: 50000 },
+            { description: 'Desarrollo de Componentes Interactivos (JavaScript)', quantity: 1, price_cents: 40000 },
+            { description: 'Configuración de Formulario de Contacto y Lógica de Envío', quantity: 1, price_cents: 15000 },
+            { description: 'Optimización para Dispositivos Móviles (Responsive Design)', quantity: 1, price_cents: 15000 }
         ],
         subtotal_cents: 120000,
         tax_percent: 21,
