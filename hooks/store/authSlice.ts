@@ -134,7 +134,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
                 // 2. Lectura fresca desde la base de datos
                 const { data: profileData, error: fetchError } = await withTimeout(
-                    supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+                    Promise.resolve(supabase.from('profiles').select('*').eq('id', session.user.id).single()),
                     8000,
                     'supabase.from(profiles).select()'
                 );
