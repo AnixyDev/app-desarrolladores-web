@@ -110,7 +110,7 @@ const JobApplicantsPage = () => {
                 </div>
 
                 <div className="flex lg:flex-col justify-end gap-2 shrink-0">
-                  <Button variant="outline" size="sm" className="flex-1 lg:flex-none">
+                  <Button variant="secondary" size="sm" className="flex-1 lg:flex-none">
                     <Download className="w-4 h-4 mr-2" /> CV
                   </Button>
                   {applicant.status === 'pending' && (
@@ -124,7 +124,7 @@ const JobApplicantsPage = () => {
                       </Button>
                       <Button 
                         size="sm" 
-                        variant="outline"
+                        variant="secondary"
                         className="flex-1 lg:flex-none text-red-400 border-red-500/30 hover:bg-red-500/10"
                         onClick={() => updateStatus(applicant.id, 'rejected')}
                       >
