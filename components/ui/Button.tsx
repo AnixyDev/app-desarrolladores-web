@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 type ButtonOwnProps<E extends React.ElementType = React.ElementType> = {
@@ -7,6 +6,7 @@ type ButtonOwnProps<E extends React.ElementType = React.ElementType> = {
   size?: 'sm' | 'md' | 'lg';
   children?: React.ReactNode;
   className?: string;
+  isLoading?: boolean;
 }
 
 type ButtonProps<E extends React.ElementType> = ButtonOwnProps<E> & Omit<React.ComponentProps<E>, keyof ButtonOwnProps>;
@@ -19,6 +19,8 @@ const Button = <E extends React.ElementType = typeof defaultElement>({
   variant = 'primary',
   size = 'md',
   className = '',
+  isLoading = false,
+  disabled,
   ...props
 }: ButtonProps<E>) => {
   const Tag: React.ElementType = as || defaultElement;
@@ -40,7 +42,13 @@ const Button = <E extends React.ElementType = typeof defaultElement>({
   const combinedClassName = `${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`;
 
   return (
-    <Tag className={combinedClassName} {...props}>
+    <Tag className={combinedClassName} disabled={disabled || isLoading} {...props}>
+        {isLoading && (
+          <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        )}
         {children}
     </Tag>
   );
