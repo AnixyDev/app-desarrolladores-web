@@ -57,7 +57,7 @@ export interface AuthSlice {
   login: (email: string, password?: string) => Promise<boolean>;
   loginWithGoogle: (payload: GoogleJwtPayload) => Promise<void>;
   logout: () => Promise<void>;
-  register: (name: string, email: string, password?: string) => Promise<boolean>;
+  register: (name: string, email: string, password?: string) => Promise<{ success: boolean; message?: string }>;
   updateProfile: (profileData: Partial<Profile>) => Promise<void>;
   refreshProfile: (knownSession?: Session | null) => Promise<void>;
   upgradePlan: (plan: 'Pro' | 'Teams') => void;
@@ -270,6 +270,12 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     },
 
     // Registro con email/password
+    // FIX: antes se devolvía solo `true`/`false`. Cuando el email ya tenía
+    // cuenta (aunque fuera creada por Google), Supabase responde 200 sin
+    // error (por seguridad, para no revelar qué emails existen) pero con
+    // `data.user.identities` vacío. Sin comprobar eso, el código interpretaba
+    // la respuesta como "cuenta creada" y navegaba a "/" sin avisar de nada,
+    // pareciendo que el registro no había hecho nada en absoluto.
     register: async (name, email, password) => {
         try {
             const { data, error } = await supabase.auth.signUp({
@@ -277,9 +283,23 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                 password: password || '',
                 options: { data: { full_name: name } }
             });
-            return !error && !!data.user;
+
+            if (error) {
+                return { success: false, message: error.message };
+            }
+
+            // Email ya registrado (con cualquier proveedor): Supabase devuelve
+            // un usuario con identities: [] en vez de un error, por diseño.
+            if (data.user && data.user.identities && data.user.identities.length === 0) {
+                return {
+                    success: false,
+                    message: 'Ya existe una cuenta con este email. Prueba a iniciar sesión en su lugar.',
+                };
+            }
+
+            return { success: true };
         } catch (error) {
-            return false;
+            return { success: false, message: 'Ocurrió un error inesperado al crear la cuenta.' };
         }
     },
 
