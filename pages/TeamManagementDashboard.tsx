@@ -144,7 +144,7 @@ const TeamManagementDashboard: React.FC = () => {
                   <th className="p-4">Rol</th>
                   <th className="p-4">Estado</th>
                   <th className="p-4">Invitado el</th>
-                  <th className="p-4 text-right">Acciones</th>
+                  <th className="p-4 text-right sticky right-0 bg-gray-900">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -170,7 +170,7 @@ const TeamManagementDashboard: React.FC = () => {
                       </span>
                     </td>
                     <td className="p-4 text-gray-300">{member.invitedOn || 'N/A'}</td>
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                       <button onClick={() => handleDelete(member)} className="text-gray-400 hover:text-red-500 p-2 rounded-full transition duration-200">
                         <Trash2 className="w-5 h-5" />
                       </button>
