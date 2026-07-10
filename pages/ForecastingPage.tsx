@@ -274,7 +274,7 @@ const handleSelectBudget = (budgetId: string) => {
           <p className="text-gray-400">Gestiona tus facturas, cobros parciales y facturación recurrente</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={() => setIsRecurringModalOpen(true)}>
+          <Button variant="secondary" onClick={() => setIsRecurringModalOpen(true)}>
             <Repeat className="w-4 h-4 mr-2" />
             Factura Recurrente
           </Button>
@@ -574,7 +574,7 @@ const handleSelectBudget = (budgetId: string) => {
           </div>
 
           <div className="flex justify-end gap-3 mt-6">
-            <Button type="button" variant="outline" onClick={handleCloseInvoiceModal}>Cancelar</Button>
+            <Button type="button" variant="secondary" onClick={handleCloseInvoiceModal}>Cancelar</Button>
             <Button type="submit">Generar Factura</Button>
           </div>
         </form>
