@@ -175,7 +175,8 @@ const TimeTrackingPage: React.FC = () => {
             <Card>
                 <CardHeader><h2 className="text-lg font-semibold">Registros de Tiempo</h2></CardHeader>
                 <CardContent className="p-0">
-                    <table className="w-full text-left">
+                    <div className="overflow-x-auto">
+                    <table className="w-full text-left hidden md:table">
                         <thead className="border-b border-gray-800">
                             <tr>
                                 <th className="p-4">Proyecto</th>
@@ -195,6 +196,21 @@ const TimeTrackingPage: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
+
+                    {/* Vista de tarjetas para móvil */}
+                    <div className="md:hidden divide-y divide-gray-800">
+                        {timeEntries.map(entry => (
+                            <div key={entry.id} className="p-4 space-y-1">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-primary-400 font-semibold">{getProjectById(entry.project_id)?.name}</span>
+                                    <span className="text-white font-bold">{(entry.duration_seconds / 3600).toFixed(2)}h</span>
+                                </div>
+                                <p className="text-white text-sm">{entry.description}</p>
+                                <p className="text-xs text-gray-500">{new Date(entry.start_time).toLocaleDateString()}</p>
+                            </div>
+                        ))}
+                    </div>
+                    </div>
                 </CardContent>
             </Card>
 
