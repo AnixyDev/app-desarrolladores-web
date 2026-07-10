@@ -2,15 +2,26 @@
 import type { Invoice, Client, Profile } from '@/types';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import * as autoTableNamespace from 'jspdf-autotable';
+
+// FIX: la interoperabilidad CJS/ESM de jspdf-autotable con Vite/Rolldown ha ido
+// cambiando de forma entre intentos (a veces el export real está en `.default`,
+// a veces envuelto un nivel más en `.default.default`). En vez de asumir un
+// nivel concreto de envoltorio, se prueban todos los candidatos posibles en
+// tiempo de ejecución y se usa el primero que sea realmente una función.
+// Esto es robusto frente a cambios de bundler/versión sin tener que adivinar.
+function resolveAutoTable(): (doc: jsPDF, options: any) => void {
+    const ns = autoTableNamespace as any;
+    const candidates = [ns, ns?.default, ns?.default?.default, ns?.autoTable];
+    const fn = candidates.find((c) => typeof c === 'function');
+    if (!fn) {
+        throw new Error('No se pudo cargar la librería jspdf-autotable (export no encontrado).');
+    }
+    return fn;
+}
 
 export const generateInvoicePdf = async (invoice: Invoice, client: Client, profile: Profile) => {
-    // FIX: antes se hacía `await import('jspdf-autotable')` y se desestructuraba
-    // `.default` dinámicamente. Con el bundle UMD/CJS de esta librería, Vite
-    // envolvía el export por duplicado (default.default) y `autoTable` dejaba
-    // de ser una función invocable ("TypeError: o is not a function"). El import
-    // estático de arriba es la forma documentada por la propia librería y evita
-    // ese problema de interoperabilidad por completo.
+    const autoTable = resolveAutoTable();
     const doc = new jsPDF();
     
     // Cálculos dinámicos basados en los items reales
