@@ -244,7 +244,7 @@ const ProposalsPage: React.FC = () => {
 
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-left text-sm hidden md:table">
                 <thead>
                   <tr className="text-gray-500 border-b border-gray-800">
                     <th className="px-6 py-4 font-semibold">Título / Concepto</th>
@@ -252,7 +252,7 @@ const ProposalsPage: React.FC = () => {
                     <th className="px-6 py-4 font-semibold">Fecha creación</th>
                     <th className="px-6 py-4 font-semibold">Presupuesto</th>
                     <th className="px-6 py-4 font-semibold">Estado</th>
-                    <th className="px-6 py-4 font-semibold text-right">Acciones</th>
+                    <th className="px-6 py-4 font-semibold text-right sticky right-0 bg-gray-900">Acciones</th>
                   </tr>
                 </thead>
 
@@ -275,7 +275,7 @@ const ProposalsPage: React.FC = () => {
                       <td className="px-6 py-4">
                         <StatusChip type="proposal" status={proposal.status} />
                       </td>
-                      <td className="px-6 py-4 text-right">
+                      <td className="px-6 py-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                         <div className="flex justify-end gap-2">
                            {proposal.status === 'accepted' && (
                              <button
@@ -300,6 +300,39 @@ const ProposalsPage: React.FC = () => {
                   ))}
                 </tbody>
               </table>
+
+              {/* Vista de tarjetas para móvil */}
+              <div className="md:hidden divide-y divide-gray-800">
+                {filtered.map(proposal => (
+                  <div key={proposal.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-white">{proposal.title}</p>
+                        <p className="text-xs text-gray-500 truncate max-w-[220px]">{proposal.content?.substring(0, 40)}...</p>
+                      </div>
+                      <StatusChip type="proposal" status={proposal.status} />
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-300 bg-gray-800/50 px-2 py-1 rounded-lg text-xs">{getClientName(proposal.client_id)}</span>
+                      <span className="font-mono font-bold text-white">{formatCurrency(proposal.amount_cents)}</span>
+                    </div>
+                    <p className="text-xs text-gray-500">{formatDate(proposal.created_at)}</p>
+                    <div className="flex justify-end gap-2 pt-1 border-t border-gray-800/50">
+                      {proposal.status === 'accepted' && (
+                        <button onClick={() => handleConvertToInvoice(proposal)} title="Convertir en Factura" className="p-2 text-gray-500 hover:text-green-400 hover:bg-green-400/10 rounded-lg transition-all">
+                          <FileTextIcon className="w-4 h-4" />
+                        </button>
+                      )}
+                      <button onClick={() => handleOpenEdit(proposal)} title="Editar" className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-all">
+                        <FileSignatureIcon className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(proposal.id)} className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all">
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
