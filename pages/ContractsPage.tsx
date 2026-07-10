@@ -155,7 +155,7 @@ const ContractsPage: React.FC = () => {
                   <th className="p-4 font-semibold whitespace-nowrap">Cliente</th>
                   <th className="p-4 font-semibold whitespace-nowrap">Fecha</th>
                   <th className="p-4 font-semibold whitespace-nowrap">Estado</th>
-                  <th className="p-4 font-semibold whitespace-nowrap text-right">Acciones</th>
+                  <th className="p-4 font-semibold whitespace-nowrap text-right sticky right-0 bg-gray-900">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -177,7 +177,7 @@ const ContractsPage: React.FC = () => {
                       <td className="p-4">
                         <StatusChip type="contract" status={contract.status} />
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                         <ContractActionsMenu
                           contract={contract}
                           onSign={handleOpenSign}
