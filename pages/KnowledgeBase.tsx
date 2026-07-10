@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { BookIcon, PlusIcon, SearchIcon, EditIcon, TrashIcon, SparklesIcon, FileSignatureIcon, BrainCircuitIcon } from '../components/icons/Icon';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
@@ -170,7 +169,7 @@ const KnowledgeBase: React.FC = () => {
                         <CardContent className="flex-grow">
                             <p className="text-sm text-gray-400 line-clamp-3">{article.content}</p>
                             <div className="mt-3 flex flex-wrap gap-2">
-                                {article.tags.map(tag => <span key={tag} className="px-2 py-0.5 text-xs rounded-full bg-gray-700 text-gray-300">{tag}</span>)}
+                                {(article.tags ?? []).map(tag => <span key={tag} className="px-2 py-0.5 text-xs rounded-full bg-gray-700 text-gray-300">{tag}</span>)}
                             </div>
                         </CardContent>
                         <div className="p-4 border-t border-gray-800 flex justify-between items-center text-xs text-gray-500">
