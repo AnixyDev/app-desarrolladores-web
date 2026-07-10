@@ -187,7 +187,7 @@ const ExpensesPage: React.FC = () => {
                     <Input name="category" label="Categoría" value={newExpense.category} onChange={handleExpenseChange} />
                     <div>
                          <label className="block text-sm font-medium text-gray-300 mb-1">Proyecto (Opcional)</label>
-                         <select name="project_id" value={newExpense.project_id} onChange={handleExpenseChange} className="block w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white">
+                         <select name="project_id" value={newExpense.project_id ?? ''} onChange={handleExpenseChange} className="block w-full px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white">
                             <option value="">Ninguno</option>
                             {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
