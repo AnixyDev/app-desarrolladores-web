@@ -115,13 +115,14 @@ const ExpensesPage: React.FC = () => {
                         <h2 className="text-lg font-semibold text-white">Gastos Únicos</h2>
                     </CardHeader>
                     <CardContent className="p-0">
+                        <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="border-b border-gray-800">
                                 <tr>
                                     <th className="p-4">Descripción</th>
                                     <th className="p-4">Fecha</th>
                                     <th className="p-4">Importe</th>
-                                    <th className="p-4"></th>
+                                    <th className="p-4 sticky right-0 bg-gray-900"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -130,7 +131,7 @@ const ExpensesPage: React.FC = () => {
                                         <td className="p-4 text-white">{(expense as any).description}</td>
                                         <td className="p-4 text-gray-300">{expense.date}</td>
                                         <td className="p-4 text-white font-semibold">{formatCurrency(expense.amount_cents)}</td>
-                                        <td className="p-4 text-right">
+                                        <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                                             <Button size="sm" variant="danger" onClick={() => handleDeleteClick(expense.id, 'single')}>
                                                 <TrashIcon className="w-4 h-4" />
                                             </Button>
@@ -139,6 +140,7 @@ const ExpensesPage: React.FC = () => {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -147,13 +149,14 @@ const ExpensesPage: React.FC = () => {
                         <h2 className="text-lg font-semibold text-white">Gastos Recurrentes</h2>
                     </CardHeader>
                     <CardContent className="p-0">
+                        <div className="overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="border-b border-gray-800">
                                 <tr>
                                     <th className="p-4">Descripción</th>
                                     <th className="p-4">Próximo Vencimiento</th>
                                     <th className="p-4">Importe</th>
-                                    <th className="p-4"></th>
+                                    <th className="p-4 sticky right-0 bg-gray-900"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -162,7 +165,7 @@ const ExpensesPage: React.FC = () => {
                                         <td className="p-4 text-white">{(expense as any).description}</td>
                                         <td className="p-4 text-gray-300">{(expense as any).next_date}</td>
                                         <td className="p-4 text-white font-semibold">{formatCurrency(expense.amount_cents)}</td>
-                                        <td className="p-4 text-right">
+                                        <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                                             <Button size="sm" variant="danger" onClick={() => handleDeleteClick(expense.id, 'recurring')}>
                                                 <TrashIcon className="w-4 h-4" />
                                             </Button>
@@ -171,6 +174,7 @@ const ExpensesPage: React.FC = () => {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
