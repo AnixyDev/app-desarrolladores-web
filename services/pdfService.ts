@@ -1,11 +1,16 @@
 // services/pdfService.ts
 import type { Invoice, Client, Profile } from '@/types';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export const generateInvoicePdf = async (invoice: Invoice, client: Client, profile: Profile) => {
-    const { default: jsPDF } = await import('jspdf');
-    const { default: autoTable } = await import('jspdf-autotable');
-
+    // FIX: antes se hacía `await import('jspdf-autotable')` y se desestructuraba
+    // `.default` dinámicamente. Con el bundle UMD/CJS de esta librería, Vite
+    // envolvía el export por duplicado (default.default) y `autoTable` dejaba
+    // de ser una función invocable ("TypeError: o is not a function"). El import
+    // estático de arriba es la forma documentada por la propia librería y evita
+    // ese problema de interoperabilidad por completo.
     const doc = new jsPDF();
     
     // Cálculos dinámicos basados en los items reales
