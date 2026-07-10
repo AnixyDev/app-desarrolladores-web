@@ -8,7 +8,7 @@ import {
   Proposal,
   Contract,
   RecurringInvoice,
-} from '../../types.ts';
+} from '../../types';
 import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
 
