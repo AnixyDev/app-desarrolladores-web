@@ -22,7 +22,7 @@ const JobDetailPage: React.FC = () => {
     useEffect(() => {
         if (job) {
             import('marked').then(markedModule => {
-                const html = markedModule.marked.parse(job.descripcionLarga || job.descripcionCorta) as string;
+                const html = markedModule.marked.parse(job.descripcionLarga || job.descripcionCorta || '') as string;
                 setDescriptionHtml(html);
             });
         }
@@ -95,7 +95,7 @@ const JobDetailPage: React.FC = () => {
                      <Card>
                         <CardHeader><h2 className="text-lg font-semibold">Habilidades Requeridas</h2></CardHeader>
                         <CardContent className="flex flex-wrap gap-2">
-                            {job.habilidades.map((skill) => (
+                            {(job.habilidades ?? []).map((skill) => (
                                 <span key={skill} className="px-3 py-1 text-sm font-medium rounded-full bg-gray-800 text-fuchsia-500 border border-fuchsia-900/50">
                                     {skill}
                                 </span>
