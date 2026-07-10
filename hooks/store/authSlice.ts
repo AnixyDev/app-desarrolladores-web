@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { AppState } from '../useAppStore';
 import { Profile, GoogleJwtPayload } from '../../types';
 import { supabase } from '../../lib/supabaseClient';
+import type { Session } from '@supabase/supabase-js';
 
 // Estado inicial del perfil (valores por defecto antes de cargar datos reales)
 const initialProfile: Profile = {
@@ -58,7 +59,7 @@ export interface AuthSlice {
   logout: () => Promise<void>;
   register: (name: string, email: string, password?: string) => Promise<boolean>;
   updateProfile: (profileData: Partial<Profile>) => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: (knownSession?: Session | null) => Promise<void>;
   upgradePlan: (plan: 'Pro' | 'Teams') => void;
   purchaseCredits: (amount: number) => void;
   consumeCredits: (amount: number) => Promise<boolean>;
@@ -82,7 +83,25 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     isProfileLoading: true,
     profile: initialProfile,
 
-    refreshProfile: async () => {
+    // FIX CRÍTICO: refreshProfile ahora acepta opcionalmente una sesión ya
+    // conocida (knownSession). Cuando se llama desde dentro del callback de
+    // onAuthStateChange, la sesión YA viene como argumento de ese callback,
+    // así que se le pasa aquí directamente y NUNCA se vuelve a llamar a
+    // supabase.auth.getSession() en ese caso.
+    //
+    // Por qué importa: llamar a getSession() DESDE DENTRO de onAuthStateChange
+    // es un anti-patrón documentado de supabase-js — ese callback se dispara
+    // durante la inicialización interna del cliente (_recoverAndRefresh /
+    // _initialize), que ya tiene cogido el lock interno de auth. Una llamada
+    // a getSession() en ese momento intenta coger el mismo lock y se queda
+    // esperando a que termine la propia inicialización que la está esperando
+    // a ella — un deadlock real, no un problema de red ni de timeout.
+    // (Esto es lo que veíamos como "Timeout 8000ms esperando getSession()".)
+    //
+    // Solo cuando se llama a refreshProfile() de forma "suelta" (ej. tras un
+    // login con email/password) se hace la llamada a getSession(), porque ahí
+    // sí estamos fuera del callback y es seguro.
+    refreshProfile: async (knownSession?: Session | null) => {
         if (refreshInFlight) {
             console.log("⏭️ RefreshProfile ya en curso, reutilizando promesa existente...");
             return refreshInFlight;
@@ -92,12 +111,18 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             try {
                 console.log("🔄 RefreshProfile iniciado...");
 
-                // 1. Verificar si hay sesión activa en Supabase (con timeout de seguridad)
-                const { data: { session } } = await withTimeout(
-                    supabase.auth.getSession(),
-                    8000,
-                    'supabase.auth.getSession()'
-                );
+                let session = knownSession;
+
+                if (session === undefined) {
+                    // Solo se llama a getSession() cuando NO nos han pasado ya
+                    // la sesión (es decir, cuando no venimos de onAuthStateChange).
+                    const result = await withTimeout(
+                        supabase.auth.getSession(),
+                        8000,
+                        'supabase.auth.getSession()'
+                    );
+                    session = result.data.session;
+                }
 
                 if (!session?.user) {
                     console.log("❌ No hay sesión activa");
@@ -157,7 +182,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
             if (session?.user) {
                 console.log("✅ Usuario autenticado detectado");
-                await get().refreshProfile();
+                await get().refreshProfile(session);
 
                 // Cargar datos en segundo plano, pero solo UNA vez por usuario/sesión.
                 // Evita que INITIAL_SESSION + SIGNED_IN disparen los fetch dos veces
