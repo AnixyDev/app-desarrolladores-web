@@ -1,0 +1,41 @@
+name: Build Check
+
+# Se ejecuta en cada push a main (tu flujo actual de edición directa) y también
+# en pull requests, por si en el futuro empiezas a trabajar con ramas.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Verificar build (typecheck + vite build)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Instalar dependencias (idéntico a lo que hace Vercel)
+        run: pnpm install --frozen-lockfile
+
+      - name: Comprobar tipos de TypeScript
+        run: pnpm exec tsc --noEmit
+
+      - name: Build de producción (vite build)
+        run: pnpm run build
+
+      - name: ✅ Build correcto
+        if: success()
+        run: echo "El build pasó sin errores. Seguro para desplegar."
