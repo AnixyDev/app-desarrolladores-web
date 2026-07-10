@@ -57,7 +57,7 @@ const articles: KnowledgeArticle[] = [];
 const jobs: Job[] = [
     {
         id: 'job-1',
-        title: 'Desarrollador Full-Stack para E-commerce con Next.js',
+        titulo: 'Desarrollador Full-Stack para E-commerce con Next.js',
         // description: 'Buscamos un desarrollador experimentado para construir una tienda online moderna utilizando Next.js, Stripe y Vercel.',
         descripcionLarga: '## Sobre el Proyecto\n\nNecesitamos desarrollar desde cero una plataforma de e-commerce para una marca de moda sostenible. El objetivo es crear una experiencia de usuario fluida, rápida y visualmente atractiva.\n\n### Responsabilidades:\n- Desarrollar el frontend con Next.js y Tailwind CSS.\n- Implementar la lógica de backend (gestión de productos, usuarios, pedidos) usando serverless functions.\n- Integrar la pasarela de pago de Stripe.\n- Desplegar y mantener la aplicación en Vercel.\n\n### Requisitos:\n- 3+ años de experiencia con React y Node.js.\n- Experiencia demostrable con Next.js en producción.\n- Sólidos conocimientos de TypeScript.',
         presupuesto: 8000,
@@ -71,7 +71,7 @@ const jobs: Job[] = [
     },
     {
         id: 'job-2',
-        title: 'Backend Developer (Python/Django) para API de Análisis de Datos',
+        titulo: 'Backend Developer (Python/Django) para API de Análisis de Datos',
         // description: 'Se requiere un desarrollador de backend para crear una API RESTful que procese y sirva grandes volúmenes de datos.',
         descripcionLarga: 'Estamos construyendo una plataforma de análisis de datos para el sector financiero. Tu rol será diseñar, desarrollar y mantener la API principal que alimentará nuestro dashboard. Buscamos a alguien con experiencia en optimización de consultas y manejo de bases de datos PostgreSQL.',
         presupuesto: 6500,
@@ -85,7 +85,7 @@ const jobs: Job[] = [
     },
     {
         id: 'job-3',
-        title: 'Maquetador Web con Experiencia en Animaciones (Tailwind CSS)',
+        titulo: 'Maquetador Web con Experiencia en Animaciones (Tailwind CSS)',
         // description: 'Necesitamos un especialista en maquetación para convertir diseños de Figma en componentes de React animados e interactivos.',
         descripcionLarga: 'Nuestra agencia de diseño necesita un freelancer con un ojo increíble para el detalle. Trabajarás directamente con nuestros diseñadores para dar vida a interfaces complejas. El proyecto principal es un landing page interactivo para un evento tecnológico.',
         presupuesto: 3000,
