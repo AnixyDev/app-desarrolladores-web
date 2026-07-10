@@ -1,247 +1,201 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Clock, CheckCircle, ListTodo, Calendar, Pause, Play, Plus, GitBranch } from 'lucide-react';
-import { useAppStore } from '@/hooks/useAppStore';
-import { useToast } from '@/hooks/useToast';
-import { TimeEntry, Task } from '@/types';
+// Definiciones de TypeScript definitivas alineadas con el repositorio AnixyDev/app-desarrolladores-web
 
+export type BudgetStatus = 'pending' | 'accepted' | 'rejected';
+export type ContractStatus = 'draft' | 'sent' | 'signed';
+export type JobApplicationStatus = 'sent' | 'viewed' | 'accepted' | 'rejected';
+export type ProjectStatus = 'planning' | 'in-progress' | 'completed' | 'on-hold';
+export type ProposalStatus = 'draft' | 'sent' | 'accepted' | 'rejected';
+export type ProjectPriority = 'Low' | 'Medium' | 'High';
 
-interface ManualEntry {
-    project_id: string;
-    description: string;
-    hours: string;
-    date: string;
-    billable: boolean;
+export interface Profile {
+  id: string;
+  full_name: string;
+  email: string;
+  business_name: string;
+  tax_id: string;
+  address?: string;
+  avatar_url: string;
+  plan: 'Free' | 'Pro' | 'Teams';
+  role: 'Admin' | 'Developer' | 'Manager' | string;
+  ai_credits: number;
+  hourly_rate_cents: number;
+  pdf_color: string;
+  bio?: string;
+  skills?: string[];
+  portfolio_url?: string;
+  payment_reminders_enabled: boolean;
+  reminder_template_upcoming: string;
+  reminder_template_overdue: string;
+  affiliate_code: string;
+  stripe_account_id: string;
+  stripe_onboarding_complete: boolean;
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
+  current_period_end?: string;
+  subscription_status?: string;
 }
 
-const MyTeamTimesheet: React.FC = () => {
-  const { tasks, projects, timeEntries, addTimeEntry, toggleTask } = useAppStore();
-  const { addToast } = useToast();
+export interface Client {
+  id: string;
+  user_id: string;
+  name: string;
+  company: string;
+  tax_id?: string;
+  address?: string;
+  email: string;
+  phone: string;
+  created_at: string;
+}
 
-  const [currentTimer, setCurrentTimer] = useState<Task | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
-  
-  const initialManualEntry: ManualEntry = {
-      project_id: projects[0]?.id || '',
-      description: '',
-      hours: '',
-      date: new Date().toISOString().slice(0, 10),
-      billable: true
-  };
-  const [manualEntry, setManualEntry] = useState<ManualEntry>(initialManualEntry);
-  
-  const relevantTasks = useMemo(() => {
-    // En una app real, aquí se filtrarían las tareas asignadas al usuario actual
-    return tasks;
-  }, [tasks]);
+export interface Project {
+  id: string;
+  user_id: string;
+  name: string;
+  client_id: string;
+  description?: string;
+  status: ProjectStatus;
+  start_date: string;
+  due_date: string;
+  budget_cents: number;
+  created_at: string;
+  category: string;
+  priority: ProjectPriority;
+}
 
-  useEffect(() => {
-    let interval: number | null = null;
-    if (isRunning) {
-      interval = window.setInterval(() => {
-        setElapsedTime(prevTime => prevTime + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRunning]);
+export type TaskStatus = 'todo' | 'in_progress' | 'completed' | 'done' | 'blocked';
 
-  const formatTime = (totalSeconds: number) => {
-    const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-    const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-    const seconds = String(totalSeconds % 60).padStart(2, '0');
-    return `${hours}:${minutes}:${seconds}`;
-  };
+export interface Task {
+  id: string;
+  user_id: string;
+  project_id: string;
+  description: string;
+  status: TaskStatus; // Corregido: antes usaba 'completed: boolean'
+  created_at: string;
+  invoice_id: string | null;
+}
 
-  const toggleTimer = (task: Task | null = null) => {
-    if (isRunning) {
-      const duration_seconds = elapsedTime;
-      if (currentTimer) {
-        const start_time = new Date(Date.now() - duration_seconds * 1000).toISOString();
-        const end_time = new Date().toISOString();
-        addTimeEntry({
-          project_id: currentTimer.project_id,
-          description: currentTimer.description,
-          start_time,
-          end_time,
-          duration_seconds,
-          invoice_id: null
-        });
-        addToast(`Tiempo registrado para "${currentTimer.description}"`, 'success');
-      }
-      setIsRunning(false);
-      setElapsedTime(0);
-      setCurrentTimer(null);
-    } else if (task) {
-      setCurrentTimer(task);
-      setIsRunning(true);
-    }
-  };
+export interface InvoiceItem {
+  description: string;
+  quantity: number;
+  price_cents: number;
+}
 
-  const handleManualEntry = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!manualEntry.project_id || !manualEntry.hours) {
-        addToast('Por favor, selecciona un proyecto e introduce las horas.', 'error');
-        return;
-    };
+export interface Invoice {
+  id: string;
+  user_id: string;
+  invoice_number: string;
+  client_id: string;
+  project_id: string | null;
+  issue_date: string;
+  due_date: string;
+  items: InvoiceItem[];
+  subtotal_cents: number;
+  tax_percent: number;
+  total_cents: number;
+  paid: boolean;
+  payment_date?: string | null;
+  created_at: string;
+  irpf_percent?: number;
+}
 
-    const duration_seconds = parseFloat(manualEntry.hours) * 3600;
-    const entryDate = new Date(manualEntry.date);
-    const start_time = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate(), 9, 0, 0).toISOString();
-    const end_time = new Date(new Date(start_time).getTime() + duration_seconds * 1000).toISOString();
+export interface NewInvoice {
+  client_id: string;
+  project_id?: string | null;
+  items: InvoiceItem[];
+  tax_percent: number;
+  irpf_percent?: number;
+  due_date: string;
+  notes?: string;
+}
 
-    addTimeEntry({
-        project_id: manualEntry.project_id,
-        description: manualEntry.description,
-        start_time,
-        end_time,
-        duration_seconds,
-        invoice_id: null,
-    });
-    addToast('Entrada manual añadida con éxito.', 'success');
-    setManualEntry(initialManualEntry);
-  };
-  
-  const handleManualInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setManualEntry(prev => ({ ...prev, [name]: value }));
-  };
+export interface Budget {
+  id: string;
+  user_id: string;
+  client_id: string;
+  description: string;
+  items: InvoiceItem[];
+  amount_cents: number;
+  status: BudgetStatus;
+  created_at: string;
+}
+export type NewBudget = Omit<Budget, 'id' | 'user_id' | 'amount_cents' | 'created_at'>;
 
-  const buttonStyle = 'px-4 py-2 font-semibold rounded-lg transition duration-200 shadow-md shadow-fuchsia-500/30 flex items-center justify-center';
+export interface Proposal {
+  id: string;
+  user_id: string;
+  client_id: string;
+  title: string;
+  content: string;
+  amount_cents: number;
+  status: ProposalStatus;
+  items: InvoiceItem[];
+  valid_until: string | null;
+  created_at: string;
+}
 
-  const TaskCard: React.FC<{ task: Task }> = ({ task }) => (
-    <div className={`bg-gray-800 p-4 rounded-xl shadow-lg border-l-4 ${(task.status === 'done' || task.status === 'completed') ? 'border-gray-500' : 'border-fuchsia-500'}`}>
-      <div className="flex justify-between items-start">
-        <h3 className={`font-semibold text-lg ${(task.status === 'done' || task.status === 'completed') ? 'text-gray-500 line-through' : 'text-white'}`}>{task.description}</h3>
-        <button 
-          onClick={() => toggleTask(task.id)}
-          className={`p-1 rounded-full transition-colors ${(task.status === 'done' || task.status === 'completed') ? 'bg-gray-700 text-gray-400 hover:text-white' : 'bg-green-700 text-white hover:bg-green-600'}`}
-          aria-label={(task.status === 'done' || task.status === 'completed') ? 'Marcar como Pendiente' : 'Marcar como Completada'}
-        >
-          {(task.status === 'done' || task.status === 'completed') ? <ListTodo className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
-        </button>
-      </div>
-      <p className="text-sm text-gray-400 mt-1 flex items-center"><GitBranch className="w-4 h-4 mr-2" /> {projects.find(p => p.id === task.project_id)?.name}</p>
-      
-      {!(task.status === 'done' || task.status === 'completed') && (
-        <div className="mt-4 pt-3 border-t border-gray-700 flex justify-end">
-          <button 
-            onClick={() => toggleTimer(task)}
-            disabled={isRunning && (!currentTimer || currentTimer.id !== task.id)}
-            className={`w-full ${buttonStyle} ${isRunning && currentTimer?.id === task.id ? 'bg-red-600 text-white hover:bg-red-700' : isRunning ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-fuchsia-600 text-black hover:bg-fuchsia-700'}`}
-          >
-            {isRunning && currentTimer?.id === task.id ? <><Pause className="w-5 h-5 mr-2" /> Detener</> : <><Play className="w-5 h-5 mr-2" /> Iniciar Tiempo</>}
-          </button>
-        </div>
-      )}
-    </div>
-  );
+export interface Contract {
+  id: string;
+  user_id: string;
+  client_id: string;
+  project_id: string;
+  content: string;
+  status: ContractStatus;
+  created_at: string;
+  signed_by?: string;
+  signed_at?: string;
+}
 
-  return (
-    <div className="min-h-screen bg-gray-950 p-4 sm:p-8">
-      <div className="max-w-7xl mx-auto">
-        <header className="mb-8 border-b border-gray-800 pb-4">
-          <h1 className="text-3xl font-bold text-white flex items-center">
-            <Clock className="w-7 h-7 text-fuchsia-500 mr-3" />
-            Mi Tiempo y Tareas
-          </h1>
-          <p className="text-gray-400">Tu centro de productividad como miembro del equipo.</p>
-        </header>
+export interface JobApplication {
+  id: string;
+  jobId: string;
+  userId: string;
+  applicantName: string;
+  jobTitle: string;
+  proposalText: string;
+  status: JobApplicationStatus;
+  appliedAt: string;
+}
 
-        <div className="bg-gray-900 p-6 rounded-xl shadow-2xl mb-8 border border-gray-800">
-          <div className="flex flex-col sm:flex-row justify-between items-center">
-            <div className="mb-4 sm:mb-0">
-              <p className="text-sm uppercase tracking-wider text-fuchsia-500 font-bold">Temporizador Global</p>
-              <h2 className="text-4xl font-extrabold text-white mt-1">{formatTime(elapsedTime)}</h2>
-              <p className="text-gray-400 text-sm mt-1">
-                {currentTimer ? `Trabajando en: ${currentTimer.description}` : 'Selecciona una tarea para iniciar el tiempo.'}
-              </p>
-            </div>
-            
-            <div className="flex space-x-3">
-              <button 
-                onClick={() => toggleTimer(null)}
-                disabled={!isRunning}
-                className={`${buttonStyle} ${!isRunning ? 'bg-gray-700 text-gray-500' : 'bg-red-600 text-white hover:bg-red-700 shadow-red-500/30'}`}
-              >
-                <Pause className="w-5 h-5 mr-2" />
-                Detener y Registrar
-              </button>
-            </div>
-          </div>
-        </div>
+export interface Referral {
+  id: string;
+  name: string;
+  join_date: string;
+  created_at?: string;
+  status: 'Registered' | 'Subscribed';
+  commission_cents: number;
+}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
-            <h2 className="text-xl font-semibold text-white mb-4 flex items-center"><ListTodo className="w-5 h-5 mr-2 text-fuchsia-500" /> Mis Tareas Asignadas</h2>
-            <div className="space-y-4">
-              {relevantTasks.filter(t => !(t.status === 'done' || t.status === 'completed')).map(task => (
-                <TaskCard key={task.id} task={task} />
-              ))}
-              {relevantTasks.filter(t => !(t.status === 'done' || t.status === 'completed')).length === 0 && <p className="text-gray-500 text-center py-4">¡No tienes tareas pendientes!</p>}
-              <div className="mt-6 pt-4 border-t border-gray-800">
-                <h3 className="text-lg font-semibold text-gray-500 mb-3">Completadas</h3>
-                <div className="space-y-3">
-                  {relevantTasks.filter(t => t.status === 'done' || t.status === 'completed').map(task => (
-                    <TaskCard key={task.id} task={task} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div>
-            <div className="bg-gray-900 p-6 rounded-xl shadow-xl mb-8 border border-gray-800">
-              <h2 className="text-xl font-semibold text-white mb-4 border-b border-gray-800 pb-2 flex items-center"><Plus className="w-5 h-5 mr-2 text-fuchsia-500" /> Registro Manual de Tiempo</h2>
-              <form onSubmit={handleManualEntry} className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Proyecto</label>
-                    <select name="project_id" value={manualEntry.project_id} onChange={handleManualInputChange} className="w-full p-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-fuchsia-500 outline-none" required>
-                        <option value="" disabled>Selecciona un proyecto</option>
-                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Descripción</label>
-                  <input name="description" type="text" value={manualEntry.description} onChange={handleManualInputChange} className="w-full p-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-fuchsia-500 outline-none" placeholder="Ej. Revisión de código" required/>
-                </div>
-                <div className="flex space-x-3">
-                    <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Horas</label>
-                        <input name="hours" type="number" step="0.1" min="0.1" value={manualEntry.hours} onChange={handleManualInputChange} className="w-full p-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-fuchsia-500 outline-none" required/>
-                    </div>
-                    <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Fecha</label>
-                        <input name="date" type="date" value={manualEntry.date} onChange={handleManualInputChange} className="w-full p-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-fuchsia-500 outline-none" required/>
-                    </div>
-                </div>
-                <button type="submit" className={`${buttonStyle} w-full bg-fuchsia-600 text-black hover:bg-fuchsia-700`}>
-                  <Plus className="w-5 h-5 mr-2" />
-                  Añadir Registro
-                </button>
-              </form>
-            </div>
+// Added missing types
+export interface UserData { id: string; name: string; email: string; role: 'Admin' | 'Manager' | 'Developer'; status: 'Activo' | 'Inactivo' | 'Pendiente'; hourly_rate_cents: number; invitedOn?: string; }
+export interface Job {
+  id: string;
+  postedByUserId: string;
+  titulo: string;
+  descripcionCorta?: string;
+  descripcionLarga?: string;
+  presupuesto: number;
+  duracionSemanas?: number;
+  habilidades?: string[];
+  cliente?: string;
+  fechaPublicacion?: string;
+  isFeatured?: boolean;
+  compatibilidadIA?: number;
+  created_at: string;
+  email_contacto?: string;
+}
+export interface KnowledgeArticle { id: string; user_id?: string; title: string; content: string; tags?: string[]; created_at?: string; updated_at?: string; }
 
-            <div className="bg-gray-900 p-6 rounded-xl shadow-xl border border-gray-800">
-              <h2 className="text-xl font-semibold text-white mb-4 border-b border-gray-800 pb-2 flex items-center"><Calendar className="w-5 h-5 mr-2 text-fuchsia-500" /> Registros Recientes</h2>
-              <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                {timeEntries.map(entry => (
-                  <div key={entry.id} className="p-3 bg-gray-800 rounded-lg flex justify-between items-center hover:bg-gray-700 transition duration-150">
-                    <div>
-                      <p className="text-sm font-medium text-white">{entry.description || 'Sin descripción'}</p>
-                      <p className="text-xs text-gray-400 flex items-center"><GitBranch className="w-3 h-3 mr-1" /> {projects.find(p=>p.id === entry.project_id)?.name} | {new Date(entry.start_time).toLocaleDateString()}</p>
-                    </div>
-                    <span className="text-lg font-bold text-fuchsia-500">{(entry.duration_seconds/3600).toFixed(2)}h</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default MyTeamTimesheet;
+// Additional missing types
+export type IconName = string;
+export type PlanType = 'free' | 'pro' | 'teams';
+export type UserRole = 'admin' | 'user' | 'manager';
+export interface Expense { id: string; user_id: string; amount_cents: number; category: string; date: string; description: string; tax_percent: number; project_id?: string | null; }
+export interface RecurringExpense { id: string; user_id: string; amount_cents: number; category: string; frequency: string; start_date: string; next_date: string; description: string; project_id?: string | null; }
+export interface RecurringInvoice { id: string; user_id: string; client_id: string; project_id?: string | null; items: InvoiceItem[]; tax_percent: number; frequency: string; start_date: string; next_date: string; }
+export interface NewProject { name: string; client_id: string; status: string; description?: string; start_date?: string; due_date?: string; budget_cents?: number; category?: string; priority?: ProjectPriority; }
+export interface TimeEntry { id: string; user_id: string; project_id: string; task_id?: string; description?: string; duration_seconds: number; start_time: string; end_time?: string; invoice_id?: string | null; }
+export interface NewTimeEntry { project_id: string; task_id?: string; description?: string; duration_seconds: number; start_time: string; end_time?: string; invoice_id?: string | null; }
+export interface ProjectMessage { id: string; project_id: string; user_id: string; user_name: string; text: string; timestamp: string; }
+export interface Notification { id: string; message: string; link?: string; isRead: boolean; createdAt: string; }
+export interface NewClient { name: string; email: string; company?: string; phone?: string; tax_id?: string; address?: string; }
+export interface GoogleJwtPayload { email: string; name?: string; picture?: string; sub: string; }
