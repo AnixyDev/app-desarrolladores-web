@@ -25,7 +25,7 @@ const LandingPage: React.FC = () => {
           <Button 
             variant="primary" 
             size="sm" 
-            onClick={() => navigate('/auth/login')}
+            onClick={() => navigate('/auth/register')}
             className="hidden sm:block"
           >
             Empezar ahora
@@ -44,7 +44,7 @@ const LandingPage: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Button 
-              onClick={() => navigate('/auth/login')} 
+              onClick={() => navigate('/auth/register')} 
               className="px-10 py-4 text-lg bg-primary-600 hover:bg-primary-700"
             >
               Empezar prueba
