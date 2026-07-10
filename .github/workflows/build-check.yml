@@ -16,16 +16,13 @@ jobs:
       - name: Checkout del código
         uses: actions/checkout@v4
 
-      - name: Instalar pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
+
+      - name: Activar pnpm vía corepack (integrado en Node, sin acciones externas)
+        run: corepack enable && corepack prepare pnpm@9 --activate
 
       - name: Instalar dependencias (idéntico a lo que hace Vercel)
         run: pnpm install --frozen-lockfile
