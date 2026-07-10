@@ -178,4 +178,4 @@ export interface NewProject { name: string; client_id: string; status: string; }
 export interface TimeEntry { id: string; user_id: string; project_id: string; task_id?: string; duration_seconds: number; start_time: string; end_time?: string; }
 export interface NewTimeEntry { project_id: string; task_id?: string; duration_seconds: number; start_time: string; }
 export interface Notification { id: string; user_id: string; title: string; message: string; read: boolean; created_at: string; }
-export interface NewClient { name: string; email: string; company?: string; phone?: string; }
+export interface NewClient { name: string; email: string; company?: string; phone?: string; tax_id?: string; address?: string; }
