@@ -26,6 +26,7 @@ const ProposalsPage: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
 
   const initialFormState = {
     client_id: '',
@@ -112,22 +113,34 @@ const ProposalsPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await addProposal({
-        user_id: profile.id,
-        client_id: form.client_id,
-        title: form.title,
-        content: form.content,
-        status: form.status,
-        amount_cents: Math.round(Number(form.amount_cents) * 100),
-        items: [],
-        valid_until: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-      });
+      if (editingProposalId) {
+        await updateProposal(editingProposalId, {
+          client_id: form.client_id,
+          title: form.title,
+          content: form.content,
+          status: form.status,
+          amount_cents: Math.round(Number(form.amount_cents) * 100),
+        });
+        addToast('Propuesta actualizada correctamente.', 'success');
+      } else {
+        await addProposal({
+          user_id: profile.id,
+          client_id: form.client_id,
+          title: form.title,
+          content: form.content,
+          status: form.status,
+          amount_cents: Math.round(Number(form.amount_cents) * 100),
+          items: [],
+          valid_until: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        });
+        addToast('Propuesta creada correctamente.', 'success');
+      }
 
-      addToast('Propuesta creada correctamente.', 'success');
       setIsModalOpen(false);
+      setEditingProposalId(null);
       setForm(initialFormState);
     } catch (error: any) {
-      addToast(`Error: ${error.message || 'No se pudo crear'}`, 'error');
+      addToast(`Error: ${error.message || 'No se pudo guardar'}`, 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -142,6 +155,27 @@ const ProposalsPage: React.FC = () => {
         addToast('Error al eliminar.', 'error');
       }
     }
+  };
+
+  // Abre el modal en modo edición, precargando el formulario con los datos
+  // de la propuesta seleccionada. Reutiliza el mismo modal/form que "Nueva propuesta".
+  const handleOpenEdit = (proposal: Proposal) => {
+    setEditingProposalId(proposal.id);
+    setForm({
+      client_id: proposal.client_id,
+      title: proposal.title,
+      content: proposal.content || '',
+      amount_cents: proposal.amount_cents / 100,
+      status: proposal.status,
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    if (isSubmitting) return;
+    setIsModalOpen(false);
+    setEditingProposalId(null);
+    setForm(initialFormState);
   };
 
   return (
@@ -253,7 +287,13 @@ const ProposalsPage: React.FC = () => {
                                <FileTextIcon className="w-4 h-4" />
                              </button>
                            )}
-                           <button className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-all"><FileSignatureIcon className="w-4 h-4" /></button>
+                           <button
+                             onClick={() => handleOpenEdit(proposal)}
+                             title="Editar"
+                             className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-all"
+                           >
+                             <FileSignatureIcon className="w-4 h-4" />
+                           </button>
                            <button onClick={() => handleDelete(proposal.id)} className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"><TrashIcon className="w-4 h-4" /></button>
                         </div>
                       </td>
@@ -266,7 +306,7 @@ const ProposalsPage: React.FC = () => {
         </Card>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={() => { if(!isSubmitting) { setIsModalOpen(false); setForm(initialFormState); } }} title="Crear Nueva Propuesta">
+      <Modal isOpen={isModalOpen} onClose={handleCloseModal} title={editingProposalId ? 'Editar Propuesta' : 'Crear Nueva Propuesta'}>
         <form onSubmit={handleSubmit} className="space-y-5 p-1">
           <div>
             <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Cliente</label>
@@ -297,8 +337,10 @@ const ProposalsPage: React.FC = () => {
             <textarea name="content" value={form.content} onChange={handleChange} rows={4} placeholder="Describe el alcance del trabajo..." className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white focus:border-primary-500 outline-none resize-none" />
           </div>
           <div className="flex justify-end gap-3 pt-4">
-            <Button type="button" variant="secondary" disabled={isSubmitting} onClick={() => { setIsModalOpen(false); setForm(initialFormState); }}>Cancelar</Button>
-            <Button type="submit" disabled={isSubmitting} className="px-8 bg-primary-500 hover:bg-primary-600">{isSubmitting ? 'Guardando...' : 'Crear Propuesta'}</Button>
+            <Button type="button" variant="secondary" disabled={isSubmitting} onClick={handleCloseModal}>Cancelar</Button>
+            <Button type="submit" disabled={isSubmitting} className="px-8 bg-primary-500 hover:bg-primary-600">
+              {isSubmitting ? 'Guardando...' : editingProposalId ? 'Guardar Cambios' : 'Crear Propuesta'}
+            </Button>
           </div>
         </form>
       </Modal>
