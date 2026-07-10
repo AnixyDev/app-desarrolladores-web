@@ -77,9 +77,10 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
   monthlyGoalCents: 0,
 
   fetchFinanceData: async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
+    // FIX: se elimina la llamada a supabase.auth.getUser() que había aquí.
+    // Era redundante (la RLS ya protege estas consultas con auth.uid()) y
+    // competía por el Web Lock de supabase-js contra refreshProfile(),
+    // pudiendo hacer que esta función se saliera en silencio sin cargar nada.
     const results = await Promise.allSettled([
       supabase.from('invoices').select('*').order('created_at', { ascending: false }),
       supabase.from('expenses').select('*').order('created_at', { ascending: false }),
