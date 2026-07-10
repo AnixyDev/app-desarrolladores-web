@@ -1,4 +1,3 @@
-
 import React, { ReactNode } from 'react';
 
 interface ModalProps {
@@ -20,10 +19,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
       aria-labelledby="modal-title"
     >
       <div
-        className="bg-gray-900 rounded-lg shadow-xl w-full max-w-md m-4 border border-gray-700"
+        className="bg-gray-900 rounded-lg shadow-xl w-full max-w-md m-4 border border-gray-700 max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center p-4 border-b border-gray-700">
+        <div className="flex justify-between items-center p-4 border-b border-gray-700 shrink-0">
           <h3 id="modal-title" className="text-lg font-semibold text-white">{title}</h3>
           <button
             onClick={onClose}
@@ -33,7 +32,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
           </button>
         </div>
-        <div className="p-4">
+        <div className="p-4 overflow-y-auto custom-scrollbar">
           {children}
         </div>
       </div>
