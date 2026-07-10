@@ -170,7 +170,8 @@ const BudgetsPage: React.FC = () => {
           </CardHeader>
 
           <CardContent className="p-0">
-            <table className="w-full text-left">
+            <div className="overflow-x-auto">
+            <table className="w-full text-left hidden md:table">
               <thead className="border-b border-gray-800">
                 <tr>
                   <th className="p-4">Descripción</th>
@@ -178,7 +179,7 @@ const BudgetsPage: React.FC = () => {
                   <th className="p-4">Fecha</th>
                   <th className="p-4">Importe</th>
                   <th className="p-4">Estado</th>
-                  <th className="p-4 text-right">Acciones</th>
+                  <th className="p-4 text-right sticky right-0 bg-gray-900">Acciones</th>
                 </tr>
               </thead>
 
@@ -211,7 +212,7 @@ const BudgetsPage: React.FC = () => {
                       />
                     </td>
 
-                    <td className="p-4 text-right">
+                    <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                       {budget.status === 'pending' && (
                         <div className="flex justify-end gap-2">
                           <Button
@@ -240,6 +241,34 @@ const BudgetsPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+
+            {/* Vista de tarjetas para móvil */}
+            <div className="md:hidden divide-y divide-gray-800">
+              {budgets.map(budget => (
+                <div key={budget.id} className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-semibold text-white">{budget.description}</p>
+                    <StatusChip type="budget" status={budget.status} />
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-primary-400">{getClientById(budget.client_id)?.name}</span>
+                    <span className="text-white font-bold">{formatCurrency(budget.amount_cents)}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">{budget.created_at}</p>
+                  {budget.status === 'pending' && (
+                    <div className="flex justify-end gap-2 pt-1 border-t border-gray-800/50">
+                      <Button size="sm" variant="secondary" onClick={() => updateBudgetStatus(budget.id, 'accepted')}>
+                        <CheckCircleIcon className="w-4 h-4 text-green-400" />
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => updateBudgetStatus(budget.id, 'rejected')}>
+                        <XCircleIcon className="w-4 h-4 text-red-400" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            </div>
           </CardContent>
         </Card>
       )}
