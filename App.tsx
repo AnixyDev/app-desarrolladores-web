@@ -9,6 +9,7 @@ import CookieBanner from './components/ui/CookieBanner';
 // Auth & Public
 import AuthLayout from './pages/auth/AuthLayout';
 import LoginPage from './pages/LoginPage';
+import LandingPage from './pages/LandingPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfService from './pages/TermsOfService';
@@ -137,7 +138,7 @@ function App() {
                     {/* FIX: Rutas protegidas - solo accesibles si estás autenticado */}
                     <Route 
                         path="/" 
-                        element={isAuthenticated ? <MainLayout /> : <Navigate to="/auth/login" replace />}
+                        element={isAuthenticated ? <MainLayout /> : <LandingPage />}
                     >
                         <Route index element={<DashboardPage />} />
                         <Route path="clients" element={<ClientsPage />} />
