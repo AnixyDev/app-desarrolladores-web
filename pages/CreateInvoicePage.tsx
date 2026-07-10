@@ -227,7 +227,7 @@ const CreateInvoicePage: React.FC = () => {
             <label className="block text-sm text-gray-400 mb-1">Proyecto (opcional)</label>
             <select
               name="project_id"
-              value={newInvoice.project_id}
+              value={newInvoice.project_id ?? ''}
               onChange={handleInputChange}
               className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
             >
