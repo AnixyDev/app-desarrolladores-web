@@ -134,7 +134,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                       const content = (
                         <div className="flex gap-4 p-4 hover:bg-gray-800/60 transition">
                           <div className="p-2 bg-gray-800 rounded-full border border-gray-700">
-                            <NotificationIcon link={n.link} />
+                            <NotificationIcon link={n.link || ''} />
                           </div>
                           <div className="flex-1">
                             <p className={`text-sm ${!n.isRead ? 'text-white font-medium' : 'text-gray-400'}`}>
@@ -147,11 +147,11 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                         </div>
                       );
 
-                      if (isExternalLink(n.link)) {
+                      if (isExternalLink(n.link || '')) {
                         return (
                           <a
                             key={n.id}
-                            href={n.link}
+                            href={n.link || '#'}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={() => {
@@ -167,7 +167,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                       return (
                         <Link
                           key={n.id}
-                          to={n.link}
+                          to={n.link || '#'}
                           onClick={() => {
                             markAsRead(n.id);
                             setIsNotificationsOpen(false);
