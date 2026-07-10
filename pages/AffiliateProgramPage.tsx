@@ -124,7 +124,7 @@ const AffiliateProgramPage = () => {
             <div className="p-12">
               <EmptyState
                 title="Aún no tienes referidos"
-                description="Empieza a compartir tu enlace para ver aquí a tus invitados y tus ganancias."
+                message="Empieza a compartir tu enlace para ver aquí a tus invitados y tus ganancias."
                 icon={Users}
               />
             </div>
@@ -141,7 +141,7 @@ const AffiliateProgramPage = () => {
                 <tbody className="divide-y divide-gray-800">
                   {referrals.map((r) => (
                     <tr key={r.id} className="text-sm text-gray-300 hover:bg-gray-800/50 transition-colors">
-                      <td className="px-6 py-4">{new Date(r.created_at).toLocaleDateString()}</td>
+                      <td className="px-6 py-4">{new Date(r.created_at || r.join_date).toLocaleDateString()}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold border ${statusClasses[r.status]}`}>
                           {statusLabels[r.status]}
