@@ -10,6 +10,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal';
+import { generateInvoicePdf } from '@/services/pdfService';
+import { sendEmail } from '@/services/emailService';
 
 interface PaymentSummary {
   paidCents: number;
@@ -27,6 +29,8 @@ const InvoicesPage: React.FC = () => {
     invoices,
     recurringInvoices,
     clients,
+    profile,
+    getClientById,
     addInvoice,
     deleteInvoice,
     addRecurringInvoice,
@@ -203,6 +207,39 @@ const handleSelectBudget = (budgetId: string) => {
     return clients.find(c => c.id === clientId)?.name || 'Cliente desconocido';
   };
 
+  // Genera y descarga el PDF de la factura usando el servicio ya existente en el proyecto
+  const handleDownloadPdf = async (invoice: typeof invoices[number]) => {
+    const client = getClientById(invoice.client_id);
+    if (!client) {
+      addToast('No se encontró el cliente de esta factura.', 'error');
+      return;
+    }
+    if (!profile) {
+      addToast('No se pudo cargar tu perfil para generar el PDF.', 'error');
+      return;
+    }
+    try {
+      await generateInvoicePdf(invoice, client, profile);
+    } catch (error) {
+      console.error('Error generando el PDF:', error);
+      addToast('No se pudo generar el PDF de la factura.', 'error');
+    }
+  };
+
+  // Abre el cliente de correo del usuario con un borrador prellenado (mailto:).
+  // No envía el email en segundo plano por sí solo.
+  const handleSendEmailInvoice = (invoice: typeof invoices[number]) => {
+    const client = getClientById(invoice.client_id);
+    if (!client?.email) {
+      addToast('Este cliente no tiene email registrado.', 'error');
+      return;
+    }
+    const subject = `Factura ${invoice.invoice_number}`;
+    const body = `Hola ${client.name},\n\nAdjunto la factura ${invoice.invoice_number} por un importe de ${formatCurrency(invoice.total_cents)}.\n\nUn saludo.`;
+    sendEmail(client.email, subject, body);
+    addToast('Se abrió tu cliente de correo con el borrador de la factura.', 'success');
+  };
+
   // Devuelve el estado real de cobro combinando `paid` (booleano, sincronizado por trigger)
   // con el importe parcial acumulado, para mostrar 4 estados: pagada / parcial / pendiente / sin importe
   const getPaymentStatus = (invoiceId: string, totalCents: number, isPaidFlag: boolean) => {
@@ -315,10 +352,18 @@ const handleSelectBudget = (budgetId: string) => {
                                   <DollarSignIcon className="w-4 h-4" />
                                 </button>
                               )}
-                              <button className="p-2 text-gray-400 hover:text-white transition-colors" title="Descargar PDF">
+                              <button
+                                onClick={() => handleDownloadPdf(inv)}
+                                className="p-2 text-gray-400 hover:text-white transition-colors"
+                                title="Descargar PDF"
+                              >
                                 <Download className="w-4 h-4" />
                               </button>
-                              <button className="p-2 text-gray-400 hover:text-primary-400 transition-colors" title="Enviar por Email">
+                              <button
+                                onClick={() => handleSendEmailInvoice(inv)}
+                                className="p-2 text-gray-400 hover:text-primary-400 transition-colors"
+                                title="Enviar por Email"
+                              >
                                 <Send className="w-4 h-4" />
                               </button>
                               <button
