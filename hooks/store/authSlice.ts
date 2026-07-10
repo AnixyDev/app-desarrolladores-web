@@ -160,12 +160,23 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                 await get().refreshProfile();
 
                 // Cargar datos en segundo plano, pero solo UNA vez por usuario/sesión.
-                // Evita que INITIAL_SESSION + SIGNED_IN disparen fetchClients/fetchProjects
-                // dos veces en paralelo, que era la causa de la contención del Web Lock.
+                // Evita que INITIAL_SESSION + SIGNED_IN disparen los fetch dos veces
+                // en paralelo, que era la causa de la contención del Web Lock.
+                //
+                // FIX: se añaden fetchFinanceData (invoices, budgets, proposals,
+                // contracts, expenses, recurring_*) y fetchTimeEntries/fetchTasks.
+                // Antes NADA los llamaba al arrancar la app — solo existían en
+                // memoria mientras durase la sesión del navegador en la que se
+                // creaban. Al recargar o volver a loguear, el store arrancaba
+                // vacío y parecía que los datos se habían borrado, cuando en
+                // realidad seguían intactos en la base de datos.
                 if (backgroundDataFetchedForUser !== session.user.id) {
                     backgroundDataFetchedForUser = session.user.id;
                     get().fetchClients().catch(() => {});
                     get().fetchProjects().catch(() => {});
+                    get().fetchFinanceData().catch(() => {});
+                    get().fetchTimeEntries().catch(() => {});
+                    get().fetchTasks().catch(() => {});
                 }
             } else {
                 console.log("❌ Usuario desconectado");
