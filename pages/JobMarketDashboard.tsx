@@ -1,4 +1,3 @@
-
 import React, { useState, lazy, Suspense, useEffect, useMemo } from 'react';
 import { DollarSign, Clock, Zap, Target, Filter, ChevronDown, ChevronUp, TrendingUp, Search, Star, X } from 'lucide-react';
 import { Job } from '@/types';
@@ -27,9 +26,9 @@ const useDebounce = (value: string, delay: number) => {
 
 const JobCard: React.FC<{ job: Job, onApply: (job: Job) => void, onSave: (jobId: string) => void, isSaved: boolean }> = ({ job, onApply, onSave, isSaved }) => {
   let compatibilityColor = 'text-red-400 bg-red-900/30';
-  if (job.compatibilidadIA >= 80) {
+  if ((job.compatibilidadIA ?? 0) >= 80) {
     compatibilityColor = 'text-fuchsia-500 bg-fuchsia-900/30'; 
-  } else if (job.compatibilidadIA >= 60) {
+  } else if ((job.compatibilidadIA ?? 0) >= 60) {
     compatibilityColor = 'text-yellow-400 bg-yellow-900/30';
   }
 
@@ -72,7 +71,7 @@ const JobCard: React.FC<{ job: Job, onApply: (job: Job) => void, onSave: (jobId:
         </div>
         
         <div className="flex flex-wrap gap-2">
-          {job.habilidades.map((skill, index) => (
+          {(job.habilidades ?? []).map((skill, index) => (
             <span key={index} className="px-3 py-1 text-xs font-medium rounded-full bg-gray-800 text-fuchsia-500 border border-fuchsia-900/50">
               {skill}
             </span>
@@ -119,7 +118,7 @@ const JobMarketDashboard = () => {
 
   const allSkills = useMemo(() => {
     const skillSet = new Set<string>();
-    jobs.forEach(job => job.habilidades.forEach(skill => skillSet.add(skill)));
+    jobs.forEach(job => (job.habilidades ?? []).forEach(skill => skillSet.add(skill)));
     return Array.from(skillSet).sort();
   }, [jobs]);
 
@@ -148,11 +147,11 @@ const JobMarketDashboard = () => {
     return jobs.filter(job => {
         const searchTermMatch = debouncedSearchTerm.length > 0 ?
             job.titulo.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-            job.descripcionLarga.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+            (job.descripcionLarga ?? '').toLowerCase().includes(debouncedSearchTerm.toLowerCase())
             : true;
 
         const skillsMatch = filters.skills.length > 0 ?
-            filters.skills.every(skill => job.habilidades.includes(skill))
+            filters.skills.every(skill => (job.habilidades ?? []).includes(skill))
             : true;
 
         const minBudget = parseFloat(filters.minBudget);
@@ -164,8 +163,8 @@ const JobMarketDashboard = () => {
         const minDuration = parseInt(filters.minDuration);
         const maxDuration = parseInt(filters.maxDuration);
         const durationMatch =
-            (isNaN(minDuration) || job.duracionSemanas >= minDuration) &&
-            (isNaN(maxDuration) || job.duracionSemanas <= maxDuration);
+            (isNaN(minDuration) || (job.duracionSemanas ?? 0) >= minDuration) &&
+            (isNaN(maxDuration) || (job.duracionSemanas ?? 0) <= maxDuration);
 
         return searchTermMatch && skillsMatch && budgetMatch && durationMatch;
     });
@@ -178,7 +177,7 @@ const JobMarketDashboard = () => {
 
         switch (sort) {
         case 'match':
-            return b.compatibilidadIA - a.compatibilidadIA;
+            return (b.compatibilidadIA ?? 0) - (a.compatibilidadIA ?? 0);
         case 'budget':
             return b.presupuesto - a.presupuesto;
         default:
