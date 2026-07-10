@@ -3,6 +3,32 @@ import { Job, JobApplication } from '@/types';
 import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
 
+// FIX: la tabla `jobs` en Supabase tiene columnas en minúsculas pegadas
+// (descripcionlarga, duracionsemanas, isfeatured, compatibilidadia...) porque
+// se crearon sin comillas y Postgres las pliega a minúsculas automáticamente.
+// El resto del código (formularios, páginas del marketplace) siempre ha usado
+// camelCase (descripcionLarga, duracionSemanas...). Sin este alias, un
+// `select('*')` devolvía las claves en minúsculas y todos esos campos
+// aparecían como `undefined` en pantalla para cualquier job real (no de
+// mock-data). Este alias hace que PostgREST devuelva las claves ya en el
+// nombre que espera el frontend, sin tener que tocar el esquema de la BD.
+const JOB_SELECT = `
+  id,
+  titulo,
+  descripcionCorta:descripcioncorta,
+  descripcionLarga:descripcionlarga,
+  presupuesto,
+  duracionSemanas:duracionsemanas,
+  habilidades,
+  cliente,
+  fechaPublicacion:fechapublicacion,
+  isFeatured:isfeatured,
+  compatibilidadIA:compatibilidadia,
+  created_at,
+  email_contacto,
+  postedByUserId:user_id
+`;
+
 export interface JobSlice {
   jobs: Job[];
   applications: JobApplication[];
@@ -17,7 +43,7 @@ export interface JobSlice {
   getApplicationsByJobId: (jobId: string) => JobApplication[];
   getSavedJobs: () => Job[];
   
-  addJob: (job: Omit<Job, 'id'>) => Promise<void>;
+  addJob: (job: Omit<Job, 'id' | 'created_at' | 'postedByUserId'>) => Promise<void>;
   applyForJob: (jobId: string, userId: string, proposalText: string) => Promise<void>;
   viewApplication: (applicationId: string) => Promise<void>;
   
@@ -32,8 +58,8 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
     notifiedJobIds: [],
 
     fetchJobs: async () => {
-        const { data, error } = await supabase.from('jobs').select('*').order('created_at', { ascending: false });
-        if (!error && data) set({ jobs: data as Job[] });
+        const { data, error } = await supabase.from('jobs').select(JOB_SELECT).order('created_at', { ascending: false });
+        if (!error && data) set({ jobs: data as unknown as Job[] });
     },
 
     fetchApplications: async () => {
@@ -53,9 +79,31 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data, error } = await supabase.from('jobs').insert({ ...job, user_id: user.id }).select().single();
+        // FIX: se mapea explícitamente cada campo camelCase a su columna real
+        // en minúsculas. Antes se hacía `{ ...job, user_id: user.id }` tal
+        // cual, y Postgres rechazaba el insert porque columnas como
+        // "descripcionCorta" no existen (la real es "descripcioncorta").
+        const { data, error } = await supabase
+            .from('jobs')
+            .insert({
+                titulo: job.titulo,
+                descripcioncorta: job.descripcionCorta,
+                descripcionlarga: job.descripcionLarga,
+                presupuesto: job.presupuesto,
+                duracionsemanas: job.duracionSemanas,
+                habilidades: job.habilidades,
+                cliente: job.cliente,
+                fechapublicacion: job.fechaPublicacion,
+                isfeatured: job.isFeatured ?? false,
+                compatibilidadia: job.compatibilidadIA,
+                email_contacto: job.email_contacto,
+                user_id: user.id,
+            })
+            .select(JOB_SELECT)
+            .single();
+
         if (!error && data) {
-            set(state => ({ jobs: [data as Job, ...state.jobs] }));
+            set(state => ({ jobs: [data as unknown as Job, ...state.jobs] }));
         }
     },
 
@@ -78,7 +126,7 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
                 jobId: data.job_id,
                 userId: data.applicant_id,
                 applicantName: String(profile.full_name || 'Freelancer'),
-                jobTitle: String(job.title || 'Oferta'), // Fix prop name
+                jobTitle: String(job.titulo || 'Oferta'), // Fix prop name
                 proposalText: String(data.proposal_text),
                 status: data.status,
                 appliedAt: data.created_at
