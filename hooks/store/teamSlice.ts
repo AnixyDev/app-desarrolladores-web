@@ -8,7 +8,7 @@ export interface TeamSlice {
   articles: KnowledgeArticle[];
   inviteUser: (name: string, email: string, role: UserData['role']) => void;
   updateUserRole: (id: string, role: UserData['role']) => void;
-  updateUserStatus: (id: string, status: string) => void;
+  updateUserStatus: (id: string, status: UserData['status']) => void;
   updateUserHourlyRate: (id: string, rateCents: number) => void;
   deleteUser: (id: string) => void;
 }
@@ -23,8 +23,8 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set) 
             name,
             email,
             role,
-            // status: 'Pendiente',
-            // invitedOn: new Date().toISOString().slice(0, 10),
+            status: 'Pendiente',
+            invitedOn: new Date().toISOString().slice(0, 10),
             hourly_rate_cents: 5000,
         };
         set(state => ({ users: [...state.users, newUser] }));
