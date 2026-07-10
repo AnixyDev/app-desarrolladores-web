@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Logo } from '@/components/icons/Logo';
 import Button from '@/components/ui/Button';
 
@@ -7,7 +7,7 @@ const LandingPage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <div clasName="min-h-screen bg-gray-950 text-white flex flex-col font-sans">
+    <div className="min-h-screen bg-gray-950 text-white flex flex-col font-sans">
       <nav className="h-20 border-b border-gray-800 flex items-center justify-between px-6 sm:px-12 bg-gray-950/80 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
           <Logo className="h-8 w-8 text-primary-500" />
@@ -16,7 +16,7 @@ const LandingPage: React.FC = () => {
 
         <div className="flex items-center gap-6 relative z-[110]">
           <button 
-            onClick={() => navigate('/login')} 
+            onClick={() => navigate('/auth/login')} 
             className="text-sm font-medium text-gray-400 hover:text-white transition-colors py-2 px-4"
           >
             Entrar
@@ -25,7 +25,7 @@ const LandingPage: React.FC = () => {
           <Button 
             variant="primary" 
             size="sm" 
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/auth/login')}
             className="hidden sm:block"
           >
             Empezar ahora
@@ -44,14 +44,14 @@ const LandingPage: React.FC = () => {
 
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Button 
-              onClick={() => navigate('/login')} 
+              onClick={() => navigate('/auth/login')} 
               className="px-10 py-4 text-lg bg-primary-600 hover:bg-primary-700"
             >
               Empezar prueba
             </Button>
             <Button 
               variant="secondary" 
-              onClick={() => navigate('/login')} 
+              onClick={() => navigate('/auth/login')} 
               className="px-10 py-4 text-lg border-gray-700 hover:bg-gray-900"
             >
               Ver demo
@@ -60,13 +60,13 @@ const LandingPage: React.FC = () => {
         </section>
       </main>
       <footer className="text-center py-6 text-sm text-gray-400">
-     <a href="https://devfreelancer.app/#/privacy" className="underline hover:text-primary-400">
+     <Link to="/privacy" className="underline hover:text-primary-400">
        Política de Privacidad
-     </a>
+     </Link>
      {' · '}
-     <a href="https://devfreelancer.app/#/terms" className="underline hover:text-primary-400">
+     <Link to="/terms" className="underline hover:text-primary-400">
        Términos de Servicio
-     </a>
+     </Link>
    </footer>
     </div>
   );
