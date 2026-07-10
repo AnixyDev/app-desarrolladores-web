@@ -96,7 +96,7 @@ const ProfitabilityReportPage: React.FC = () => {
         setIsBuyCreditsOpen(true);
         return;
       }
-      const data = await analyzeProfitability(profitabilityData) as any;
+      const data = await analyzeProfitability(profitabilityData as unknown as Record<string, unknown>[]) as any;
       // Normalización de la respuesta para evitar fallos en la UI
       setAnalysis({
         summary: data.summary || 'No se pudo generar el resumen.',
