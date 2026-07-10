@@ -23,8 +23,8 @@ export const AI_CREDIT_COSTS = {
 ========================= */
 
 export interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
+  role: 'user' | 'model';
+  parts: { text: string }[];
 }
 
 export interface ForecastDataPoint {
@@ -112,7 +112,7 @@ export const generateFinancialForecast = async (
 ========================= */
 
 export const analyzeProfitability = async (
-  data: ProfitabilityData[] | Record<string, unknown>
+  data: Record<string, unknown>[] | Record<string, unknown>
 ): Promise<{ summary: string; insights: string[]; topPerformers?: any[]; areasForImprovement?: any[] }> => {
   const res = await callAI('analyzeProfitability', { data: data as unknown as Record<string, unknown>[] });
   return res as unknown as { summary: string; insights: string[]; topPerformers?: any[]; areasForImprovement?: any[] };
