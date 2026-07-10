@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import AuthCard from '../../components/auth/AuthCard';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
@@ -7,24 +7,30 @@ import { useAppStore } from '../../hooks/useAppStore';
 import { supabase } from '../../lib/supabaseClient';
 
 const RegisterPage: React.FC = () => {
-    const navigate = useNavigate();
     const register = useAppStore(state => state.register);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [infoMessage, setInfoMessage] = useState('');
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+        setInfoMessage('');
         setLoading(true);
         try {
-            const success = await register(name, email, password);
-            if (success) {
-                navigate('/');
+            const result = await register(name, email, password);
+            if (result.success) {
+                // FIX: no navegamos directo a "/" en silencio. Si el proyecto tiene
+                // confirmación de email activada (lo habitual), signUp() no crea
+                // sesión todavía — hay que avisar de que revise su correo, si no
+                // parece que "no ha pasado nada" tras crear la cuenta.
+                setError('');
+                setInfoMessage('Cuenta creada. Revisa tu email para confirmar la cuenta antes de iniciar sesión.');
             } else {
-                setError('No se pudo crear la cuenta. Inténtalo de nuevo.');
+                setError(result.message || 'No se pudo crear la cuenta. Inténtalo de nuevo.');
             }
         } catch (err) {
             setError('Ocurrió un error durante el registro.');
@@ -79,6 +85,7 @@ const RegisterPage: React.FC = () => {
                     required
                 />
                 {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                {infoMessage && <p className="text-green-400 text-sm text-center">{infoMessage}</p>}
                 <Button type="submit" className="w-full" disabled={loading}>
                     {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
                 </Button>
