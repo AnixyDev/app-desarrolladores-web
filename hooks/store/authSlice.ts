@@ -177,37 +177,51 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         console.log("🚀 InitializeAuth iniciado...");
         set({ isProfileLoading: true });
 
-        supabase.auth.onAuthStateChange(async (event, session) => {
+        supabase.auth.onAuthStateChange((event, session) => {
             console.log("🔔 AuthStateChange event:", event);
 
-            if (session?.user) {
-                console.log("✅ Usuario autenticado detectado");
-                await get().refreshProfile(session);
+            // FIX CRÍTICO: todo el trabajo async se difiere con setTimeout(0).
+            // No basta con evitar getSession() dentro de este callback (ya lo
+            // arreglamos pasando `session` directamente a refreshProfile) —
+            // CUALQUIER llamada a Supabase hecha de forma síncrona aquí dentro
+            // (incluida una simple `.from('profiles').select()`) puede quedar
+            // bloqueada, porque este callback se dispara DURANTE la propia
+            // inicialización interna del cliente (_recoverAndRefresh/_initialize),
+            // que tiene cogido el lock de auth. setTimeout(fn, 0) saca la
+            // ejecución de ese callback síncrono y la mueve al siguiente tick,
+            // momento en el que _initialize() ya ha soltado el lock. Este es
+            // el patrón recomendado oficialmente por la documentación de
+            // supabase-js para onAuthStateChange.
+            setTimeout(async () => {
+                if (session?.user) {
+                    console.log("✅ Usuario autenticado detectado");
+                    await get().refreshProfile(session);
 
-                // Cargar datos en segundo plano, pero solo UNA vez por usuario/sesión.
-                // Evita que INITIAL_SESSION + SIGNED_IN disparen los fetch dos veces
-                // en paralelo, que era la causa de la contención del Web Lock.
-                //
-                // FIX: se añaden fetchFinanceData (invoices, budgets, proposals,
-                // contracts, expenses, recurring_*) y fetchTimeEntries/fetchTasks.
-                // Antes NADA los llamaba al arrancar la app — solo existían en
-                // memoria mientras durase la sesión del navegador en la que se
-                // creaban. Al recargar o volver a loguear, el store arrancaba
-                // vacío y parecía que los datos se habían borrado, cuando en
-                // realidad seguían intactos en la base de datos.
-                if (backgroundDataFetchedForUser !== session.user.id) {
-                    backgroundDataFetchedForUser = session.user.id;
-                    get().fetchClients().catch(() => {});
-                    get().fetchProjects().catch(() => {});
-                    get().fetchFinanceData().catch(() => {});
-                    get().fetchTimeEntries().catch(() => {});
-                    get().fetchTasks().catch(() => {});
+                    // Cargar datos en segundo plano, pero solo UNA vez por usuario/sesión.
+                    // Evita que INITIAL_SESSION + SIGNED_IN disparen los fetch dos veces
+                    // en paralelo, que era la causa de la contención del Web Lock.
+                    //
+                    // FIX: se añaden fetchFinanceData (invoices, budgets, proposals,
+                    // contracts, expenses, recurring_*) y fetchTimeEntries/fetchTasks.
+                    // Antes NADA los llamaba al arrancar la app — solo existían en
+                    // memoria mientras durase la sesión del navegador en la que se
+                    // creaban. Al recargar o volver a loguear, el store arrancaba
+                    // vacío y parecía que los datos se habían borrado, cuando en
+                    // realidad seguían intactos en la base de datos.
+                    if (backgroundDataFetchedForUser !== session.user.id) {
+                        backgroundDataFetchedForUser = session.user.id;
+                        get().fetchClients().catch(() => {});
+                        get().fetchProjects().catch(() => {});
+                        get().fetchFinanceData().catch(() => {});
+                        get().fetchTimeEntries().catch(() => {});
+                        get().fetchTasks().catch(() => {});
+                    }
+                } else {
+                    console.log("❌ Usuario desconectado");
+                    backgroundDataFetchedForUser = null;
+                    set({ isAuthenticated: false, profile: initialProfile, isProfileLoading: false });
                 }
-            } else {
-                console.log("❌ Usuario desconectado");
-                backgroundDataFetchedForUser = null;
-                set({ isAuthenticated: false, profile: initialProfile, isProfileLoading: false });
-            }
+            }, 0);
         });
 
         // No se hace una segunda llamada a getSession()/refreshProfile() aquí:
