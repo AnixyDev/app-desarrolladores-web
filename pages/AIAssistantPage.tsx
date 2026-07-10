@@ -61,7 +61,7 @@ const AIAssistantPage = () => {
     try {
       // 2. Obtener respuesta de la IA
       // Importante: chatHistory debe seguir el formato que espera tu geminiService
-      const chatHistory = messages.map(m => ({
+      const chatHistory: { role: 'user' | 'model'; parts: { text: string }[] }[] = messages.map(m => ({
         role: m.sender === 'user' ? 'user' : 'model',
         parts: [{ text: m.text }]
       }));
