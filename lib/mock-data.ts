@@ -67,7 +67,8 @@ const jobs: Job[] = [
         fechaPublicacion: 'Hace 2 días',
         isFeatured: true,
         compatibilidadIA: 92,
-        postedByUserId: OTHER_USER_ID
+        postedByUserId: OTHER_USER_ID,
+        created_at: new Date().toISOString()
     },
     {
         id: 'job-2',
@@ -81,7 +82,8 @@ const jobs: Job[] = [
         fechaPublicacion: 'Hace 5 días',
         isFeatured: false,
         compatibilidadIA: 75,
-        postedByUserId: OTHER_USER_ID
+        postedByUserId: OTHER_USER_ID,
+        created_at: new Date().toISOString()
     },
     {
         id: 'job-3',
@@ -95,7 +97,8 @@ const jobs: Job[] = [
         fechaPublicacion: 'Hace 1 semana',
         isFeatured: false,
         compatibilidadIA: 55,
-        postedByUserId: OTHER_USER_ID
+        postedByUserId: OTHER_USER_ID,
+        created_at: new Date().toISOString()
     },
 ];
 
