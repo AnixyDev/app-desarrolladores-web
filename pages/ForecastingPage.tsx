@@ -310,7 +310,7 @@ const handleSelectBudget = (budgetId: string) => {
                       <th className="px-6 py-4 font-medium text-right">Total</th>
                       <th className="px-6 py-4 font-medium">Cobrado</th>
                       <th className="px-6 py-4 font-medium text-center">Estado</th>
-                      <th className="px-6 py-4 font-medium text-center">Acciones</th>
+                      <th className="px-6 py-4 font-medium text-center sticky right-0 bg-gray-900">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
@@ -346,7 +346,7 @@ const handleSelectBudget = (budgetId: string) => {
                               {status.label}
                             </span>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                             <div className="flex items-center justify-center gap-2">
                               {status.label !== 'PAGADA' && (
                                 <button
