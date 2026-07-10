@@ -21,6 +21,8 @@ const initialClientState: NewClient = {
     company: '',
     email: '',
     phone: '',
+    tax_id: '',
+    address: '',
 };
 
 const ClientsPage: React.FC = () => {
@@ -138,8 +140,10 @@ const ClientsPage: React.FC = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <Input name="name" label="Nombre Completo" value={formData.name} onChange={handleInputChange} required />
                     <Input name="company" label="Empresa (Opcional)" value={formData.company} onChange={handleInputChange} />
+                    <Input name="tax_id" label="NIF/CIF (Opcional)" value={formData.tax_id || ''} onChange={handleInputChange} placeholder="Ej: B12345678" />
                     <Input name="email" label="Email" type="email" value={formData.email} onChange={handleInputChange} required />
                     <Input name="phone" label="Teléfono (Opcional)" value={formData.phone} onChange={handleInputChange} />
+                    <Input name="address" label="Dirección (Opcional)" value={formData.address || ''} onChange={handleInputChange} />
                     <div className="flex justify-end pt-4">
                         <Button type="submit">Guardar Cliente</Button>
                     </div>
