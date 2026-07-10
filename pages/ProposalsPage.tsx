@@ -124,7 +124,6 @@ const ProposalsPage: React.FC = () => {
         addToast('Propuesta actualizada correctamente.', 'success');
       } else {
         await addProposal({
-          user_id: profile.id,
           client_id: form.client_id,
           title: form.title,
           content: form.content,
