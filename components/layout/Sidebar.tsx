@@ -28,7 +28,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     try {
       // logout() en el store ya llama a supabase.auth.signOut() y resetStore()
       await logout();
-      navigate('/login', { replace: true });
+      navigate('/auth/login', { replace: true });
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
       window.location.href = '/login';
