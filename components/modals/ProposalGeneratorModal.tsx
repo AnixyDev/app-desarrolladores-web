@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
@@ -35,7 +34,7 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
 
         setIsLoading(true);
         try {
-            const text = await generateProposalText(job.title, (job as any).description, userProfileSummary);
+            const text = await generateProposalText(job.titulo, job.descripcionLarga || job.descripcionCorta || '', userProfileSummary);
             setProposalText(text);
             consumeCredits(AI_CREDIT_COSTS.generateProposal);
             addToast('Propuesta generada con IA', 'success');
@@ -79,13 +78,13 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
     const handleSendApplication = () => {
         if (!profile) return;
         applyForJob(job.id, profile.id, proposalText);
-        addToast(`Postulación para "${job.title}" enviada con éxito.`, 'success');
+        addToast(`Postulación para "${job.titulo}" enviada con éxito.`, 'success');
         onClose();
     };
 
     return (
         <>
-            <Modal isOpen={isOpen} onClose={onClose} title={`Aplicar a: ${job.title}`}>
+            <Modal isOpen={isOpen} onClose={onClose} title={`Aplicar a: ${job.titulo}`}>
                 <div className="space-y-4">
                     {isLoading && (
                         <div className="text-center p-8">
