@@ -215,6 +215,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                         get().fetchJobs().catch(() => {});
                         get().fetchApplications().catch(() => {});
                         get().fetchSavedJobs().catch(() => {});
+                        get().fetchUsers().catch(() => {});
 
                         // FIX: checkInvoiceStatuses() (avisos de vencimiento) y la
                         // nueva checkProjectProfitability() (avisos de presupuesto)
