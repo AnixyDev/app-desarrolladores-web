@@ -16,11 +16,14 @@ export interface ProjectSlice {
   // AÑADIMOS ESTA LÍNEA PARA EL KANBAN Y EDICIONES GENERALES
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
   updateProjectStatus: (id: string, status: Project['status']) => Promise<void>;
+  deleteProject: (id: string) => Promise<void>;
   getTasksByProjectId: (projectId: string) => Task[];
   addTask: (task: Omit<Task, 'id'|'user_id'|'created_at'|'status'|'invoice_id'>) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   addTimeEntry: (entry: Omit<NewTimeEntry, 'user_id'>) => Promise<void>;
+  updateTimeEntry: (id: string, updates: Partial<NewTimeEntry>) => Promise<void>;
+  deleteTimeEntry: (id: string) => Promise<void>;
 }
 
 export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = (set, get) => ({
@@ -89,6 +92,22 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         await get().updateProject(id, { status });
     },
 
+    // FIX: no existía ninguna forma de borrar un proyecto desde la UI.
+    // A nivel de BD, tasks/time_entries/contracts/comments/files del proyecto
+    // se borran en cascada; invoices/expenses/recurring_invoices solo se
+    // desvinculan (project_id pasa a null), no se borran — así no se pierde
+    // ningún dato de facturación real solo por borrar un proyecto.
+    deleteProject: async (id) => {
+        const { error } = await supabase.from('projects').delete().eq('id', id);
+        if (!error) {
+            set(state => ({
+                projects: state.projects.filter(p => p.id !== id),
+                tasks: state.tasks.filter(t => t.project_id !== id),
+                timeEntries: state.timeEntries.filter(t => t.project_id !== id),
+            }));
+        }
+    },
+
     getTasksByProjectId: (projectId) => get().tasks.filter(t => t.project_id === projectId),
 
     addTask: async (task) => {
@@ -133,6 +152,29 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         const { data, error } = await supabase.from('time_entries').insert({ ...entry, user_id: user.id }).select().single();
         if (!error && data) {
             set(state => ({ timeEntries: [data as TimeEntry, ...state.timeEntries].sort((a,b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()) }));
+        }
+    },
+
+    // FIX: no existía forma de editar ni borrar un registro de tiempo ya creado.
+    updateTimeEntry: async (id, updates) => {
+        const previous = get().timeEntries;
+        set(state => ({
+            timeEntries: state.timeEntries.map(t => t.id === id ? { ...t, ...updates } : t)
+        }));
+
+        const { error } = await supabase.from('time_entries').update(updates).eq('id', id);
+        if (error) {
+            set({ timeEntries: previous }); // revertir si falla
+        }
+    },
+
+    deleteTimeEntry: async (id) => {
+        const previous = get().timeEntries;
+        set(state => ({ timeEntries: state.timeEntries.filter(t => t.id !== id) }));
+
+        const { error } = await supabase.from('time_entries').delete().eq('id', id);
+        if (error) {
+            set({ timeEntries: previous }); // revertir si falla
         }
     },
 });

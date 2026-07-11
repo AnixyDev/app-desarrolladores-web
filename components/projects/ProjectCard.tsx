@@ -4,8 +4,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { Project } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { useAppStore } from '@/hooks/useAppStore';
-import { BriefcaseIcon, ClockIcon } from '@/components/icons/Icon';
+import { BriefcaseIcon, ClockIcon, TrashIcon } from '@/components/icons/Icon';
 import StatusChip from '@/components/ui/StatusChip';
+import { useToast } from '@/hooks/useToast';
 
 interface ProjectCardProps {
     project: Project;
@@ -15,7 +16,24 @@ interface ProjectCardProps {
 }
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({ project, progress, clientName, compact }) => {
-    const { timeEntries, profile } = useAppStore();
+    const { timeEntries, profile, deleteProject } = useAppStore();
+    const { addToast } = useToast();
+
+    // FIX: no había ninguna forma de borrar un proyecto. El botón usa
+    // stopPropagation en pointerdown/click porque toda la tarjeta tiene
+    // los listeners de arrastre de dnd-kit — sin esto, pulsar "borrar"
+    // se interpretaría como el inicio de un arrastre.
+    const handleDelete = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (window.confirm(`¿Eliminar el proyecto "${project.name}"? Se borrarán también sus tareas, registros de tiempo y contratos. Las facturas y gastos ya emitidos NO se borran, solo quedan sin proyecto asociado.`)) {
+            try {
+                await deleteProject(project.id);
+                addToast('Proyecto eliminado.', 'success');
+            } catch (error) {
+                addToast('No se pudo eliminar el proyecto.', 'error');
+            }
+        }
+    };
 
     // Lógica de Rentabilidad
     const projectHours = timeEntries
@@ -49,11 +67,21 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, progress, cli
         >
             <div className="flex justify-between items-start mb-3">
                 <StatusChip type="project" status={project.status} />
-                {budgetCents > 0 && (
-                    <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${isProfitable ? 'text-primary-300 bg-primary-500/10 border-primary-500/20' : 'text-red-400 bg-red-500/10 border-red-500/20'}`}>
-                        {formatCurrency(budgetCents)}
-                    </span>
-                )}
+                <div className="flex items-center gap-1.5">
+                    {budgetCents > 0 && (
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${isProfitable ? 'text-primary-300 bg-primary-500/10 border-primary-500/20' : 'text-red-400 bg-red-500/10 border-red-500/20'}`}>
+                            {formatCurrency(budgetCents)}
+                        </span>
+                    )}
+                    <button
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={handleDelete}
+                        title="Eliminar proyecto"
+                        className="p-1 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                        <TrashIcon className="w-3.5 h-3.5" />
+                    </button>
+                </div>
             </div>
 
             <div className="text-white font-semibold text-sm line-clamp-1 mb-1">

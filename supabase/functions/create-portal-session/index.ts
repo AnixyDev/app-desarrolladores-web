@@ -1,60 +1,86 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import Stripe from 'https://esm.sh/stripe@12.0.0?target=deno'
+// Archivo: supabase/functions/create-portal-session/index.ts
+//
+// SINCRONIZADO desde la versión realmente desplegada en Supabase, que estaba
+// desactualizada en el repo (alguien la desplegó directo desde el dashboard
+// sin subir el cambio a GitHub). Esta es la que de verdad corre en producción.
 
-declare const Deno: any;
-
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
-  apiVersion: '2022-11-15',
-  httpClient: Stripe.createFetchHttpClient(),
-})
+import Stripe from 'https://esm.sh/stripe@13.10.0?target=deno';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
+    apiVersion: '2023-10-16',
+});
 
-  try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    )
+const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!
+);
 
-    const { data: { user } } = await supabaseClient.auth.getUser()
-    if (!user) throw new Error('Usuario no autenticado')
-
-    const { return_url } = await req.json()
-
-    const { data: profile } = await supabaseClient
-      .from('profiles')
-      .select('stripe_customer_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!profile?.stripe_customer_id) {
-      throw new Error('No se encontró un cliente de Stripe asociado a este usuario.')
+Deno.serve(async (req) => {
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders });
     }
 
-    // Usamos el return_url dinámico enviado por el cliente
-    const session = await stripe.billingPortal.sessions.create({
-      customer: profile.stripe_customer_id,
-      return_url: return_url || `${req.headers.get('origin')}/#/billing`, 
-    })
+    const authHeader = req.headers.get('Authorization') || '';
 
-    return new Response(JSON.stringify({ url: session.url }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    if (!authHeader) {
+        return new Response(JSON.stringify({ error: 'Acceso no autorizado' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+    }
 
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  }
-})
+    const { data: userAuth, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+
+    if (authError || !userAuth.user) {
+        return new Response(JSON.stringify({ error: 'Fallo al autenticar al usuario' }), {
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+    }
+
+    const userId = userAuth.user.id;
+
+    const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('stripe_customer_id')
+        .eq('id', userId)
+        .single();
+
+    if (profileError || !profile?.stripe_customer_id) {
+        console.error('Error al buscar perfil o Stripe ID:', profileError);
+        return new Response(JSON.stringify({ error: 'No se encontro el ID de cliente de Stripe' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+    }
+
+    const stripeCustomerId = profile.stripe_customer_id;
+
+    try {
+        const returnUrl = req.headers.get('Referer') || 'https://devfreelancer.app/settings';
+
+        const session = await stripe.billingPortal.sessions.create({
+            customer: stripeCustomerId,
+            return_url: returnUrl,
+        });
+
+        return new Response(
+            JSON.stringify({ url: session.url }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+
+    } catch (error) {
+        console.error('Error al crear la sesion del portal:', error);
+        return new Response(
+            JSON.stringify({ error: 'Error interno al crear el portal de facturacion.' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+    }
+});

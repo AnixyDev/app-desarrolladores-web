@@ -9,25 +9,49 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') as string, {
   typescript: true,
 })
 
-const endpointSecret = 'whsec_ff208a48af25c37d9e95ce60ca278f36a0725ae248638c632070ae855803c044';
+const endpointSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')
 
-// AÑADE ESTO PARA DEBUGUEAR (mira los logs después de hacer el despliegue)
-console.log("¿Existe el secreto?", !!endpointSecret);
-console.log("Longitud del secreto:", endpointSecret?.length);
+// Estados de Stripe que consideramos "suscripcion activa" a efectos de la app
+const ACTIVE_STRIPE_STATUSES = new Set(['active', 'trialing'])
+
+// Creditos de bienvenida que recibe cualquier suscripcion al activarse
+const PRO_PLAN_WELCOME_CREDITS = 50
+const TEAMS_PLAN_WELCOME_CREDITS = 200
+
+// FIX: antes se asumia SIEMPRE plan: 'Pro' para cualquier suscripcion activa,
+// sin mirar que price_id tenia contratado el cliente. Un cliente de "Plan de
+// equipos" (35,95E/mes o 295E/ano) se guardaba como 'Pro' y recibia 50
+// creditos en vez de los 200 prometidos en /billing. Estos sets mapean los
+// price_id reales de Stripe (ver STRIPE_ITEMS en services/stripeService.ts)
+// al plan correcto.
+const PRO_PRICE_IDS = new Set([
+  'price_1SOgUF8oC5awQy15dOEM5jGS', // Pro Plan (mensual)
+])
+const TEAMS_PRICE_IDS = new Set([
+  'price_1SOggV8oC5awQy15YW1wAgcg', // Plan de equipos (mensual)
+  'price_1TqEIe8oC5awQy15hnNqSypf', // Plan de equipos (anual)
+])
+
+function resolvePlanFromPriceId(priceId: string | undefined | null): 'Pro' | 'Teams' | null {
+  if (!priceId) return null
+  if (TEAMS_PRICE_IDS.has(priceId)) return 'Teams'
+  if (PRO_PRICE_IDS.has(priceId)) return 'Pro'
+  return null
+}
 
 serve(async (req) => {
-  const signature = req.headers.get('stripe-signature') || req.headers.get('Stripe-Signature')
+  const signature = req.headers.get('Stripe-Signature')
+  if (!signature) return new Response('Missing signature', { status: 400 })
+
   const body = await req.text()
-  
-  // LOGUEAR PARA DEPURAR
-  console.log("Firma recibida:", signature);
-  console.log("Secreto usado:", endpointSecret?.substring(0, 8) + "...");
+  let event: Stripe.Event
 
   try {
-    event = await stripe.webhooks.constructEventAsync(body, signature!, endpointSecret!)
+    // En entornos Edge (como Deno/Supabase), se DEBE usar constructEventAsync
+    // porque la API de criptografia Web Crypto es asincrona.
+    event = await stripe.webhooks.constructEventAsync(body, signature, endpointSecret!)
   } catch (err: any) {
-    console.error(`❌ ERROR: Firma recibida: ${signature}`);
-    console.error(`❌ ERROR: Mensaje de Stripe: ${err.message}`);
+    console.error(`⚠️ Webhook signature verification failed: ${err.message}`)
     return new Response(`Webhook Error: ${err.message}`, { status: 400 })
   }
 
@@ -47,19 +71,49 @@ serve(async (req) => {
     return new Response(JSON.stringify({ duplicate: true }), { status: 200 })
   }
 
+  // Busca el perfil dueno de un customer de Stripe, ya sea por columna
+  // stripe_customer_id o (fallback) por email del customer en Stripe.
+  async function findUserIdByCustomer(customerId: string): Promise<string | null> {
+    const { data: byCustomerId } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('stripe_customer_id', customerId)
+      .maybeSingle()
+
+    if (byCustomerId) return byCustomerId.id
+
+    const customer = await stripe.customers.retrieve(customerId)
+    if (customer && !('deleted' in customer) && customer.email) {
+      const { data: byEmail } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', customer.email)
+        .maybeSingle()
+      if (byEmail) return byEmail.id
+    }
+    return null
+  }
+
   try {
-    // Lógica de negocio (simplificada para post-release)
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         const userId = session.metadata?.supabase_user_id
-        const clientReferenceId = session.client_reference_id // El ref_id del afiliado
-        
+        const clientReferenceId = session.client_reference_id
+
         if (userId) {
-          // 1. Actualizar créditos/plan del usuario según el itemKey en metadata
           const itemKey = session.metadata?.itemKey
+
+          // FIX: se anaden los casos 'teamsPlan' y 'teamsPlanYearly', que
+          // antes caian por defecto sin hacer nada aqui (solo se manejaba
+          // 'proPlan' y 'aiCredits*'). Esto da feedback inmediato al
+          // completar el checkout; el webhook de subscription.updated de
+          // abajo actua como red de seguridad por si este evento llega
+          // antes de que exista la suscripcion en Stripe.
           if (itemKey === 'proPlan') {
-            await supabase.from('profiles').update({ plan: 'Pro', ai_credits: 50 }).eq('id', userId)
+            await supabase.from('profiles').update({ plan: 'Pro', ai_credits: PRO_PLAN_WELCOME_CREDITS }).eq('id', userId)
+          } else if (itemKey === 'teamsPlan' || itemKey === 'teamsPlanYearly') {
+            await supabase.from('profiles').update({ plan: 'Teams', ai_credits: TEAMS_PLAN_WELCOME_CREDITS }).eq('id', userId)
           } else if (itemKey?.startsWith('aiCredits')) {
             const creditsToAdd = parseInt(session.metadata?.credits || '0')
             const { data: profile } = await supabase.from('profiles').select('ai_credits').eq('id', userId).single()
@@ -68,9 +122,11 @@ serve(async (req) => {
             }
           }
 
-          // 2. Procesar comisión si hay un clientReferenceId (afiliado)
+          if (typeof session.customer === 'string') {
+            await supabase.from('profiles').update({ stripe_customer_id: session.customer }).eq('id', userId)
+          }
+
           if (clientReferenceId && session.amount_total) {
-            // Buscamos al afiliado por su código
             const { data: affiliate } = await supabase
               .from('profiles')
               .select('id')
@@ -78,7 +134,7 @@ serve(async (req) => {
               .single()
 
             if (affiliate) {
-              const commissionCents = Math.round(session.amount_total * 0.20) // 20% de comisión
+              const commissionCents = Math.round(session.amount_total * 0.20)
               await supabase.from('referrals').insert({
                 affiliate_id: affiliate.id,
                 referred_id: userId,
@@ -91,18 +147,74 @@ serve(async (req) => {
         }
         break;
       }
+
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
+        const userId = await findUserIdByCustomer(customerId)
+
+        if (userId) {
+          const isActive = ACTIVE_STRIPE_STATUSES.has(subscription.status)
+
+          // FIX: resolver el plan real (Pro vs Teams) mirando el price_id
+          // de la suscripcion, en vez de asumir 'Pro' siempre.
+          const priceId = subscription.items.data[0]?.price?.id
+          const resolvedPlan = resolvePlanFromPriceId(priceId)
+
+          const { data: currentProfile } = await supabase
+            .from('profiles')
+            .select('subscription_status, ai_credits, plan')
+            .eq('id', userId)
+            .maybeSingle()
+
+          const wasActive = currentProfile ? ACTIVE_STRIPE_STATUSES.has(currentProfile.subscription_status || '') : false
+
+          const updates: Record<string, unknown> = {
+            subscription_status: subscription.status,
+            stripe_subscription_id: subscription.id,
+            plan: isActive ? (resolvedPlan || currentProfile?.plan || 'Pro') : 'Free',
+          }
+
+          // Solo regalamos los creditos de bienvenida la primera vez que la
+          // suscripcion pasa a estar activa (evita resetear creditos ya
+          // comprados en cada actualizacion menor, ej. cambio de tarjeta).
+          // El importe de bienvenida depende de si es Pro (50) o Teams (200).
+          if (isActive && !wasActive) {
+            const current = currentProfile?.ai_credits ?? 0
+            const welcomeCredits = resolvedPlan === 'Teams' ? TEAMS_PLAN_WELCOME_CREDITS : PRO_PLAN_WELCOME_CREDITS
+            updates.ai_credits = Math.max(current, welcomeCredits)
+          }
+
+          await supabase.from('profiles').update(updates).eq('id', userId)
+        } else {
+          console.error(`⚠️ No se encontro perfil para el customer ${customerId} (evento ${event.type})`)
+        }
+        break;
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
+        const userId = await findUserIdByCustomer(customerId)
+
+        if (userId) {
+          await supabase.from('profiles').update({
+            subscription_status: 'canceled',
+            plan: 'Free',
+          }).eq('id', userId)
+        }
+        break;
+      }
     }
 
-    // Registrar evento como procesado exitosamente
-    const { error: insertError } = await supabase.from('processed_stripe_events').insert({ 
-      event_id: event.id, 
-      type: event.type 
+    const { error: insertError } = await supabase.from('processed_stripe_events').insert({
+      event_id: event.id,
+      type: event.type
     })
 
     if (insertError) {
       console.error(`❌ Error saving processed event to DB:`, insertError)
-      // No fallamos el webhook si solo falló el registro de idempotencia,
-      // pero lo registramos en los logs.
     }
 
     console.log(`✅ Successfully processed webhook event: ${event.id} of type ${event.type}`)
@@ -110,7 +222,6 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error(`❌ Webhook processing error for event ${event?.id || 'unknown'}:`, error)
-    // Devolvemos 400 o 500 para que Stripe reintente el webhook más tarde
     return new Response(JSON.stringify({ error: 'Internal Error', details: error.message }), { status: 500 })
   }
 })
