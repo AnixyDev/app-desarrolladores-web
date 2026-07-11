@@ -215,6 +215,9 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                         get().fetchFinanceData().catch(() => {});
                         get().fetchTimeEntries().catch(() => {});
                         get().fetchTasks().catch(() => {});
+                        get().fetchJobs().catch(() => {});
+                        get().fetchApplications().catch(() => {});
+                        get().fetchSavedJobs().catch(() => {});
                     }
                 } else {
                     console.log("❌ Usuario desconectado");

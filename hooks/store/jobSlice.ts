@@ -37,6 +37,7 @@ export interface JobSlice {
   
   fetchJobs: () => Promise<void>;
   fetchApplications: () => Promise<void>;
+  fetchSavedJobs: () => Promise<void>;
   
   getJobById: (id: string) => Job | undefined;
   getApplicationsByUserId: (userId: string) => JobApplication[];
@@ -47,7 +48,7 @@ export interface JobSlice {
   applyForJob: (jobId: string, userId: string, proposalText: string) => Promise<void>;
   viewApplication: (applicationId: string) => Promise<void>;
   
-  saveJob: (jobId: string) => void;
+  saveJob: (jobId: string) => Promise<void>;
   markJobAsNotified: (jobId: string) => void;
 }
 
@@ -62,9 +63,67 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
         if (!error && data) set({ jobs: data as unknown as Job[] });
     },
 
+    // FIX: antes hacía `select('*')` sin ningún mapeo. La tabla real usa
+    // job_id/applicant_id/proposal_text (snake_case), pero getApplicationsByUserId
+    // y getApplicationsByJobId filtran por .userId/.jobId (camelCase) — sin
+    // este alias esas dos funciones SIEMPRE devolvían un array vacío, así que
+    // "Mis Postulaciones" aparecía vacía aunque hubieras aplicado a ofertas
+    // de verdad. También se resuelve jobTitle vía join (FK real a jobs) y
+    // applicantName vía una segunda consulta a profiles (applicant_id
+    // referencia auth.users, que PostgREST no expone para hacer join directo).
     fetchApplications: async () => {
-        const { data, error } = await supabase.from('job_applications').select('*');
-        if (!error && data) set({ applications: data as JobApplication[] });
+        const { data, error } = await supabase
+            .from('job_applications')
+            .select(`
+                id,
+                jobId:job_id,
+                userId:applicant_id,
+                proposalText:proposal_text,
+                status,
+                appliedAt:created_at,
+                jobs ( titulo )
+            `);
+
+        if (error || !data) return;
+
+        const rows = data as unknown as Array<{
+            id: string; jobId: string; userId: string; proposalText: string;
+            status: JobApplication['status']; appliedAt: string; jobs: { titulo: string } | null;
+        }>;
+
+        const applicantIds = [...new Set(rows.map(r => r.userId))];
+        let namesById: Record<string, string> = {};
+        if (applicantIds.length > 0) {
+            const { data: profilesData } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .in('id', applicantIds);
+            namesById = Object.fromEntries((profilesData || []).map((p: any) => [p.id, p.full_name]));
+        }
+
+        const applications: JobApplication[] = rows.map(row => ({
+            id: row.id,
+            jobId: row.jobId,
+            userId: row.userId,
+            applicantName: namesById[row.userId] || 'Freelancer',
+            jobTitle: row.jobs?.titulo || 'Oferta',
+            proposalText: row.proposalText,
+            status: row.status,
+            appliedAt: row.appliedAt,
+        }));
+
+        set({ applications });
+    },
+
+    // FIX: "Ofertas Guardadas" solo vivía en memoria (savedJobIds nunca se
+    // leía de ningún sitio al arrancar). Ahora se carga desde la tabla real.
+    fetchSavedJobs: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data, error } = await supabase.from('saved_jobs').select('job_id').eq('user_id', user.id);
+        if (!error && data) {
+            set({ savedJobIds: data.map((row: any) => row.job_id) });
+        }
     },
 
     getJobById: (id) => get().jobs.find(j => j.id === id),
@@ -152,12 +211,35 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
         }
     },
 
-    saveJob: (jobId) => {
+    // FIX: antes solo tocaba el estado local de Zustand, nunca Supabase.
+    // Guardar una oferta se perdía en cuanto se refrescaba la página o se
+    // volvía a iniciar sesión. Ahora persiste en la tabla saved_jobs, con
+    // actualización optimista del estado local para que la UI responda al instante.
+    saveJob: async (jobId) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
         const { savedJobIds } = get();
-        if (savedJobIds.includes(jobId)) {
-            set({ savedJobIds: savedJobIds.filter(id => id !== jobId) });
+        const alreadySaved = savedJobIds.includes(jobId);
+
+        // Actualización optimista
+        set({
+            savedJobIds: alreadySaved
+                ? savedJobIds.filter(id => id !== jobId)
+                : [...savedJobIds, jobId]
+        });
+
+        if (alreadySaved) {
+            const { error } = await supabase.from('saved_jobs').delete().eq('user_id', user.id).eq('job_id', jobId);
+            if (error) {
+                // Revertir si falla
+                set({ savedJobIds: [...get().savedJobIds, jobId] });
+            }
         } else {
-            set({ savedJobIds: [...savedJobIds, jobId] });
+            const { error } = await supabase.from('saved_jobs').insert({ user_id: user.id, job_id: jobId });
+            if (error) {
+                set({ savedJobIds: get().savedJobIds.filter(id => id !== jobId) });
+            }
         }
     },
 
