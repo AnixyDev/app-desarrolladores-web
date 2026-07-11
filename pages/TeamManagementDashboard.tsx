@@ -4,6 +4,7 @@ import { Users, UserPlus, Trash2, MailIcon as Mail, UserIcon as User } from '@/c
 import { useAppStore } from '@/hooks/useAppStore';
 import { UserData } from '@/types';
 import Modal from '@/components/ui/Modal';
+import { useToast } from '@/hooks/useToast';
 
 const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
@@ -23,19 +24,26 @@ const initialNewMember: NewMember = { name: '', email: '', role: roles[0] };
 
 const TeamManagementDashboard: React.FC = () => {
   const { users, inviteUser, deleteUser } = useAppStore();
+  const { addToast } = useToast();
   
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<UserData | null>(null);
   const [newMember, setNewMember] = useState<NewMember>(initialNewMember);
 
-  const handleInvite = (e: React.FormEvent) => {
+  const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMember.name || !newMember.email) return;
-    
-    inviteUser(newMember.name, newMember.email, newMember.role);
+
+    const result = await inviteUser(newMember.name, newMember.email, newMember.role);
     setNewMember(initialNewMember);
     setShowInviteModal(false);
+
+    if (result.success) {
+      addToast('Invitación enviada por email.', 'success');
+    } else {
+      addToast(result.message || 'No se pudo enviar la invitación.', 'error');
+    }
   };
 
   const handleCloseInviteModal = () => {

@@ -8,7 +8,7 @@ export interface TeamSlice {
   referrals: Referral[];
   articles: KnowledgeArticle[];
   fetchUsers: () => Promise<void>;
-  inviteUser: (name: string, email: string, role: UserData['role']) => Promise<void>;
+  inviteUser: (name: string, email: string, role: UserData['role']) => Promise<{ success: boolean; message?: string }>;
   updateUserRole: (id: string, role: UserData['role']) => Promise<void>;
   updateUserStatus: (id: string, status: UserData['status']) => Promise<void>;
   updateUserHourlyRate: (id: string, rateCents: number) => Promise<void>;
@@ -50,7 +50,7 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
     // de Resend que ya está probado y funcionando.
     inviteUser: async (name, email, role) => {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) return { success: false, message: 'No se encontró sesión de usuario.' };
 
         const { data, error } = await supabase
             .from('team_members')
@@ -74,19 +74,25 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
             `)
             .single();
 
-        if (!error && data) {
-            set(state => ({ users: [...state.users, data as unknown as UserData] }));
-
-            const { error: fnError } = await supabase.functions.invoke('invite-team-member', {
-                body: { email, name, role },
-            });
-
-            if (fnError) {
-                console.error('No se pudo enviar el email de invitación:', fnError);
-                // La fila en team_members ya se guardó igualmente; el freelancer
-                // puede reintentar o avisar manualmente si el email falla.
-            }
+        if (error || !data) {
+            return { success: false, message: 'No se pudo guardar la invitación.' };
         }
+
+        set(state => ({ users: [...state.users, data as unknown as UserData] }));
+
+        const { data: fnData, error: fnError } = await supabase.functions.invoke('invite-team-member', {
+            body: { email, name, role },
+        });
+
+        if (fnError || fnData?.success === false) {
+            const message = fnData?.message || 'No se pudo enviar el email de invitación.';
+            console.error('No se pudo enviar el email de invitación:', message);
+            // La fila en team_members ya se guardó igualmente — el freelancer puede
+            // ver el motivo (ej. "ya existe cuenta con ese email") y decidir qué hacer.
+            return { success: false, message };
+        }
+
+        return { success: true };
     },
 
     updateUserRole: async (id, role) => {

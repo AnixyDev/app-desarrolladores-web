@@ -82,20 +82,24 @@ Deno.serve(async (req) => {
     if (inviteError) {
       // Si el email ya tiene cuenta, Supabase devuelve error — no es un fallo
       // real del sistema de invitación, solo que esa persona ya existe.
-      return new Response(JSON.stringify({ error: inviteError.message }), {
-        status: 400,
+      // Se devuelve 200 (no 400) con success:false para que el frontend
+      // pueda leer el mensaje de forma fiable sin lidiar con las
+      // particularidades de supabase-js al extraer el cuerpo de errores
+      // no-2xx de una Edge Function.
+      return new Response(JSON.stringify({ success: false, message: inviteError.message }), {
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({ sent: true }), {
+    return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
     console.error('Error enviando invitación de equipo:', error);
-    return new Response(JSON.stringify({ error: error.message || 'Error interno' }), {
-      status: 500,
+    return new Response(JSON.stringify({ success: false, message: error.message || 'Error interno' }), {
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
