@@ -64,6 +64,7 @@ import {
   Link,
   RefreshCw,
   Repeat,
+  Upload,
   // Estado
   CheckCircle,
   XCircle,
@@ -214,6 +215,7 @@ export {
   PenTool as SignatureIcon,
   AlertTriangle as AlertTriangleIcon,
   Copy as CopyIcon,
+  Upload as UploadIcon,
   ArrowUpCircle as ArrowUpCircleIcon,
   ArrowDownCircle as ArrowDownCircleIcon,
   ChevronDown as ChevronDownIcon,

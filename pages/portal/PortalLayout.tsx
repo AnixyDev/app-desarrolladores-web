@@ -5,7 +5,16 @@ import { supabase } from '@/lib/supabaseClient';
 interface PortalClient {
   client_id: string;
   client_name: string;
+  // FIX / NUEVO: marca del freelancer dueño de este cliente, para el portal
+  // con marca blanca — antes el portal siempre mostraba el genérico
+  // "Portal de Cliente" sin ningún logo ni nombre de negocio.
+  ownerBusinessName: string | null;
+  ownerFullName: string | null;
+  ownerLogoUrl: string | null;
+  ownerBrandColor: string | null;
 }
+
+const DEFAULT_BRAND_COLOR = '#d9009f';
 
 const PortalLayout: React.FC = () => {
   const navigate = useNavigate();
@@ -25,14 +34,23 @@ const PortalLayout: React.FC = () => {
       }
       setHasSession(true);
 
-      // Vincula (o recupera el vínculo ya existente) del cliente para este email
+      // Vincula (o recupera el vínculo ya existente) del cliente para este email.
+      // link_portal_client() ahora también devuelve la marca (logo, nombre,
+      // color) del freelancer dueño de este cliente.
       const { data, error } = await supabase.rpc('link_portal_client');
 
       if (error || !data || data.length === 0) {
-        // El email no coincide con ningún cliente dado de alta por el freelancer
         setLinkError(true);
       } else {
-        setClient({ client_id: data[0].client_id, client_name: data[0].client_name });
+        const row = data[0];
+        setClient({
+          client_id: row.client_id,
+          client_name: row.client_name,
+          ownerBusinessName: row.owner_business_name,
+          ownerFullName: row.owner_full_name,
+          ownerLogoUrl: row.owner_logo_url,
+          ownerBrandColor: row.owner_brand_color,
+        });
       }
       setLoading(false);
     };
@@ -83,13 +101,38 @@ const PortalLayout: React.FC = () => {
     );
   }
 
+  const brandName = client?.ownerBusinessName || client?.ownerFullName || 'Portal de Cliente';
+  const brandColor = client?.ownerBrandColor || DEFAULT_BRAND_COLOR;
+
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100">
+    // La variable CSS --portal-brand-color permite que cualquier página hija
+    // del portal (facturas, presupuestos, contratos...) use la marca del
+    // freelancer en acentos/botones sin tener que volver a pedir el dato.
+    <div className="min-h-screen bg-gray-900 text-gray-100" style={{ '--portal-brand-color': brandColor } as React.CSSProperties}>
       <header className="bg-black border-b border-gray-800">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-white">Portal de Cliente</h1>
+          <div className="flex items-center gap-3">
+            {client?.ownerLogoUrl ? (
+              <img
+                src={client.ownerLogoUrl}
+                alt={brandName}
+                className="h-9 w-9 rounded-lg object-cover border border-gray-800"
+              />
+            ) : (
+              <div
+                className="h-9 w-9 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"
+                style={{ backgroundColor: brandColor }}
+              >
+                {brandName.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div>
+              <h1 className="text-lg font-bold text-white leading-tight">{brandName}</h1>
+              <p className="text-[11px] text-gray-500 leading-tight">Portal de Cliente</p>
+            </div>
+          </div>
           <div className="flex items-center gap-4">
-            {client && <span className="text-sm text-gray-400">{client.client_name}</span>}
+            {client && <span className="text-sm text-gray-400 hidden sm:inline">{client.client_name}</span>}
             <button onClick={handleLogout} className="text-sm text-gray-400 hover:text-white">
               Cerrar sesión
             </button>
@@ -97,8 +140,8 @@ const PortalLayout: React.FC = () => {
         </div>
       </header>
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {/* El contexto pasa el client_id a las páginas hijas (facturas, presupuestos, etc.) */}
-        <Outlet context={{ clientId: client?.client_id }} />
+        {/* El contexto pasa el client_id (y la marca) a las páginas hijas */}
+        <Outlet context={{ clientId: client?.client_id, brandColor }} />
       </main>
     </div>
   );

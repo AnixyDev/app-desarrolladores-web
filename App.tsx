@@ -60,6 +60,7 @@ const IntegrationsManager = safeLazy(() => import('./pages/IntegrationsManager')
 const ForecastingPage = safeLazy(() => import('./pages/ForecastingPage'));
 const AffiliateProgramPage = safeLazy(() => import('./pages/AffiliateProgramPage'));
 const BillingPage = safeLazy(() => import('./pages/BillingPage'));
+const PortalBrandingPage = safeLazy(() => import('./pages/PortalBrandingPage'));
 const SettingsPage = safeLazy(() => import('./pages/SettingsPage'));
 const AdminDashboard = safeLazy(() => import('./pages/AdminDashboard'));
 
@@ -171,6 +172,7 @@ function App() {
                         <Route path="forecasting" element={<ForecastingPage />} />
                         <Route path="affiliate" element={<AffiliateProgramPage />} />
                         <Route path="billing" element={<BillingPage />} />
+                        <Route path="portal-branding" element={<PortalBrandingPage />} />
                         <Route path="settings" element={<SettingsPage />} />
                         <Route path="admin" element={<AdminDashboard />} />
                     </Route>

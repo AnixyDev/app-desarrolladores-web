@@ -20,6 +20,7 @@ export interface Profile {
   ai_credits: number;
   hourly_rate_cents: number;
   pdf_color: string;
+  portal_logo_url?: string;
   bio?: string;
   skills?: string[];
   portfolio_url?: string;

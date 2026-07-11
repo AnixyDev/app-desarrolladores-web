@@ -92,6 +92,7 @@ export const SIDEBAR_STRUCTURE: SidebarItem[] = [
     icon: 'Settings',
     items: [
       { href: '/settings', label: 'Ajustes Generales', icon: 'Settings' },
+      { href: '/portal-branding', label: 'Portal de Cliente', icon: 'Building' },
       { href: '/public-profile', label: 'Perfil Público', icon: 'User' },
       { href: '/billing', label: 'Facturación y Plan', icon: 'CreditCard' },
       { href: '/integrations', label: 'Integraciones', icon: 'Zap' },
