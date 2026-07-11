@@ -15,7 +15,7 @@ export interface ClientSlice {
 
 export const createClientSlice: StateCreator<AppState, [], [], ClientSlice> = (set, get) => ({
     clients: [],
-    
+
     fetchClients: async () => {
         // FIX: se elimina la llamada a supabase.auth.getSession() que había aquí.
         // Era redundante (la RLS de Postgres ya protege esta consulta con auth.uid())
@@ -27,7 +27,7 @@ export const createClientSlice: StateCreator<AppState, [], [], ClientSlice> = (s
                 .from('clients')
                 .select('*')
                 .order('created_at', { ascending: false });
-            
+
             if (error) throw error;
             if (data) set({ clients: data as Client[] });
         } catch (error) {
@@ -36,16 +36,16 @@ export const createClientSlice: StateCreator<AppState, [], [], ClientSlice> = (s
     },
 
     getClientById: (id) => get().clients.find(c => c.id === id),
-    
+
     getClientByName: (name) => get().clients.find(c => c.name.toLowerCase() === name.toLowerCase()),
-    
+
     addClient: async (client) => {
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error('No user authenticated');
 
             const newClientData = { ...client, user_id: user.id };
-            
+
             const { data, error } = await supabase
                 .from('clients')
                 .insert(newClientData)
@@ -53,7 +53,7 @@ export const createClientSlice: StateCreator<AppState, [], [], ClientSlice> = (s
                 .single();
 
             if (error) throw error;
-            
+
             if (data) {
                 const createdClient = data as Client;
                 set(state => ({ clients: [createdClient, ...state.clients] }));
@@ -65,44 +65,50 @@ export const createClientSlice: StateCreator<AppState, [], [], ClientSlice> = (s
         return null;
     },
 
+    // FIX: updateClient ahora relanza el error (throw) en lugar de solo
+    // registrarlo en consola. Antes, si el UPDATE de Supabase fallaba
+    // (p. ej. por una columna inexistente o una violación de RLS), la
+    // función terminaba en silencio con estado "resuelto" y el store local
+    // nunca se enteraba, así que la UI (ClientsPage) no podía distinguir
+    // un guardado real de uno fallido.
     updateClient: async (client) => {
-        try {
-            const { error } = await supabase
-                .from('clients')
-                .update({ 
-                    name: client.name, 
-                    company: client.company, 
-                    email: client.email, 
-                    phone: client.phone,
-                    tax_id: client.tax_id,
-                    address: client.address
-                })
-                .eq('id', client.id);
+        const { error } = await supabase
+            .from('clients')
+            .update({
+                name: client.name,
+                company: client.company,
+                email: client.email,
+                phone: client.phone,
+                tax_id: client.tax_id,
+                address: client.address,
+            })
+            .eq('id', client.id)
+            .select()
+            .single();
 
-            if (error) throw error;
-
-            set(state => ({ clients: state.clients.map(c => c.id === client.id ? client : c) }));
-        } catch (error) {
+        if (error) {
             console.error('Error updating client:', error);
+            throw error;
         }
+
+        set(state => ({ clients: state.clients.map(c => c.id === client.id ? client : c) }));
     },
 
     deleteClient: async (id) => {
-        try {
-            const { error } = await supabase
-                .from('clients')
-                .delete()
-                .eq('id', id);
+        const { error } = await supabase
+            .from('clients')
+            .delete()
+            .eq('id', id);
 
-            if (error) throw error;
-
-            set(state => ({
-                clients: state.clients.filter(c => c.id !== id),
-                projects: state.projects.filter(p => p.client_id !== id),
-                invoices: state.invoices.filter(i => i.client_id !== id),
-            }));
-        } catch (error) {
+        if (error) {
             console.error('Error deleting client:', error);
+            throw error;
         }
+
+        set(state => ({
+            clients: state.clients.filter(c => c.id !== id),
+            projects: state.projects.filter(p => p.client_id !== id),
+            invoices: state.invoices.filter(i => i.client_id !== id),
+        }));
     },
 });

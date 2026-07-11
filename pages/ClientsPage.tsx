@@ -34,6 +34,9 @@ const ClientsPage: React.FC = () => {
     const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
     const [formData, setFormData] = useState<NewClient | Client>(initialClientState);
     const [editingClient, setEditingClient] = useState<Client | null>(null);
+    // FIX: estado de guardado para bloquear el botón y evitar doble submit
+    // mientras la llamada a Supabase está en curso.
+    const [isSaving, setIsSaving] = useState(false);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -49,30 +52,50 @@ const ClientsPage: React.FC = () => {
             setIsModalOpen(true);
         }
     };
-    
+
     const openEditModal = (client: Client) => {
         setEditingClient(client);
         setFormData(client);
         setIsModalOpen(true);
     }
-    
+
     const closeModal = () => {
         setIsModalOpen(false);
         setEditingClient(null);
         setFormData(initialClientState);
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
+    // FIX: handleSubmit ahora es async y espera (await) el resultado real
+    // de addClient/updateClient. Antes se mostraba el toast de éxito y se
+    // cerraba el modal de forma optimista sin comprobar si la escritura en
+    // Supabase había funcionado, por lo que un error de base de datos
+    // (p. ej. una columna inexistente) quedaba oculto en console.error y
+    // el usuario veía "éxito" aunque no se hubiera guardado nada.
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (formData.name && formData.email) {
+        if (!formData.name || !formData.email) return;
+
+        setIsSaving(true);
+        try {
             if (editingClient) {
-                updateClient(formData as Client);
+                await updateClient(formData as Client);
                 addToast('Cliente actualizado con éxito', 'success');
             } else {
-                addClient(formData as NewClient);
+                const created = await addClient(formData as NewClient);
+                if (!created) {
+                    // addClient devuelve null si algo falló en el store.
+                    throw new Error('No se pudo crear el cliente');
+                }
                 addToast('Cliente añadido con éxito', 'success');
             }
             closeModal();
+        } catch (error) {
+            console.error('Error guardando cliente:', error);
+            addToast('No se pudo guardar el cliente. Inténtalo de nuevo.', 'error');
+            // Importante: NO cerramos el modal ni reseteamos formData aquí,
+            // así el usuario no pierde lo que había escrito.
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -81,12 +104,18 @@ const ClientsPage: React.FC = () => {
         setIsConfirmModalOpen(true);
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (clientToDelete) {
-            deleteClient(clientToDelete.id);
-            addToast(`Cliente "${clientToDelete.name}" eliminado`, 'info');
-            setIsConfirmModalOpen(false);
-            setClientToDelete(null);
+            try {
+                await deleteClient(clientToDelete.id);
+                addToast(`Cliente "${clientToDelete.name}" eliminado`, 'info');
+            } catch (error) {
+                console.error('Error eliminando cliente:', error);
+                addToast('No se pudo eliminar el cliente.', 'error');
+            } finally {
+                setIsConfirmModalOpen(false);
+                setClientToDelete(null);
+            }
         }
     };
 
@@ -96,7 +125,7 @@ const ClientsPage: React.FC = () => {
                 <h1 className="text-2xl font-semibold text-white">Clientes</h1>
                 <Button onClick={handleOpenAddModal}>Añadir Cliente</Button>
             </div>
-            
+
             {clients.length > 0 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                     {clients.map(client => (
@@ -145,21 +174,23 @@ const ClientsPage: React.FC = () => {
                     <Input name="phone" label="Teléfono (Opcional)" value={formData.phone} onChange={handleInputChange} />
                     <Input name="address" label="Dirección (Opcional)" value={formData.address || ''} onChange={handleInputChange} />
                     <div className="flex justify-end pt-4">
-                        <Button type="submit">Guardar Cliente</Button>
+                        <Button type="submit" isLoading={isSaving} disabled={isSaving}>
+                            {isSaving ? 'Guardando...' : 'Guardar Cliente'}
+                        </Button>
                     </div>
                 </form>
             </Modal>
-            
+
             <Suspense fallback={null}>
                 {isUpgradeModalOpen && (
-                    <UpgradePromptModal 
-                        isOpen={isUpgradeModalOpen} 
+                    <UpgradePromptModal
+                        isOpen={isUpgradeModalOpen}
                         onClose={() => setIsUpgradeModalOpen(false)}
                         featureName="clientes"
                     />
                 )}
                 {isConfirmModalOpen && (
-                    <ConfirmationModal 
+                    <ConfirmationModal
                         isOpen={isConfirmModalOpen}
                         onClose={() => setIsConfirmModalOpen(false)}
                         onConfirm={confirmDelete}
