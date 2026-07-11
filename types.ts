@@ -200,3 +200,10 @@ export interface ProjectMessage { id: string; project_id: string; user_id: strin
 export interface Notification { id: string; message: string; link?: string; isRead: boolean; createdAt: string; }
 export interface NewClient { name: string; email: string; company?: string; phone?: string; tax_id?: string; address?: string; }
 export interface GoogleJwtPayload { email: string; name?: string; picture?: string; sub: string; }
+export interface TeamMembership {
+  membershipId: string;
+  role: string;
+  status: string;
+  ownerBusinessName: string | null;
+  ownerFullName: string | null;
+}

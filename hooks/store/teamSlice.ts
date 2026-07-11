@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { UserData, Referral, KnowledgeArticle } from '@/types';
+import { UserData, Referral, KnowledgeArticle, TeamMembership } from '@/types';
 import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
 
@@ -7,7 +7,11 @@ export interface TeamSlice {
   users: UserData[];
   referrals: Referral[];
   articles: KnowledgeArticle[];
+  // NUEVO: si el usuario logueado fue invitado al equipo de otro freelancer,
+  // aquí queda esa membresía (a qué equipo pertenece y con qué rol).
+  teamMembership: TeamMembership | null;
   fetchUsers: () => Promise<void>;
+  fetchTeamMembership: () => Promise<void>;
   inviteUser: (name: string, email: string, role: UserData['role']) => Promise<{ success: boolean; message?: string }>;
   updateUserRole: (id: string, role: UserData['role']) => Promise<void>;
   updateUserStatus: (id: string, status: UserData['status']) => Promise<void>;
@@ -19,6 +23,30 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
     users: [],
     referrals: [],
     articles: [],
+    teamMembership: null,
+
+    // NUEVO: vincula la cuenta del usuario logueado con cualquier invitación
+    // de equipo pendiente que tenga su mismo email (la primera vez), o
+    // recupera la membresía ya vinculada en logins siguientes. Sin esto,
+    // un invitado que aceptaba el email y entraba a la app no tenía forma
+    // de saber a qué equipo pertenecía — entraba a su propia cuenta vacía.
+    fetchTeamMembership: async () => {
+        const { data, error } = await supabase.rpc('link_team_membership');
+        if (!error && data && data.length > 0) {
+            const row = data[0];
+            set({
+                teamMembership: {
+                    membershipId: row.membership_id,
+                    role: row.role,
+                    status: row.status,
+                    ownerBusinessName: row.owner_business_name,
+                    ownerFullName: row.owner_full_name,
+                },
+            });
+        } else {
+            set({ teamMembership: null });
+        }
+    },
 
     // FIX: no existía. La tabla team_members existía en Supabase desde hace
     // tiempo, pero nada la leía nunca — "users" solo vivía en memoria.

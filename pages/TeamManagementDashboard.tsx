@@ -23,7 +23,7 @@ interface NewMember {
 const initialNewMember: NewMember = { name: '', email: '', role: roles[0] };
 
 const TeamManagementDashboard: React.FC = () => {
-  const { users, inviteUser, deleteUser } = useAppStore();
+  const { users, inviteUser, deleteUser, teamMembership } = useAppStore();
   const { addToast } = useToast();
   
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -147,6 +147,21 @@ const TeamManagementDashboard: React.FC = () => {
             Invitar Miembro
           </button>
         </header>
+
+        {/* NUEVO: si este usuario fue invitado al equipo de otro freelancer,
+            se le muestra aquí a qué equipo pertenece y con qué rol. */}
+        {teamMembership && (
+          <div className="mb-8 bg-fuchsia-950/30 border border-fuchsia-800/50 rounded-xl p-4 flex items-center gap-3">
+            <Users className="w-5 h-5 text-fuchsia-400 shrink-0" />
+            <p className="text-sm text-gray-200">
+              Perteneces al equipo de{' '}
+              <span className="font-semibold text-white">
+                {teamMembership.ownerBusinessName || teamMembership.ownerFullName || 'otro freelancer'}
+              </span>
+              {' '}con el rol de <span className="font-semibold text-white">{teamMembership.role}</span>.
+            </p>
+          </div>
+        )}
 
         <div className="bg-gray-900 rounded-xl p-6 shadow-xl">
           <h2 className="text-xl font-semibold text-white mb-4 border-b border-gray-800 pb-2">Miembros del Equipo ({users.length})</h2>
