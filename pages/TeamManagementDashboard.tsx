@@ -1,8 +1,9 @@
 import React, { useState, lazy, Suspense } from 'react';
 // FIX: Switched to the centralized Icon wrapper for consistency and added the missing User icon.
-import { Users, UserPlus, Trash2, MailIcon as Mail, X, UserIcon as User } from '@/components/icons/Icon';
+import { Users, UserPlus, Trash2, MailIcon as Mail, UserIcon as User } from '@/components/icons/Icon';
 import { useAppStore } from '@/hooks/useAppStore';
 import { UserData } from '@/types';
+import Modal from '@/components/ui/Modal';
 
 const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
@@ -18,21 +19,28 @@ interface NewMember {
     role: UserData['role'];
 }
 
+const initialNewMember: NewMember = { name: '', email: '', role: roles[0] };
+
 const TeamManagementDashboard: React.FC = () => {
   const { users, inviteUser, deleteUser } = useAppStore();
   
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<UserData | null>(null);
-  const [newMember, setNewMember] = useState<NewMember>({ name: '', email: '', role: roles[0] });
+  const [newMember, setNewMember] = useState<NewMember>(initialNewMember);
 
   const handleInvite = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMember.name || !newMember.email) return;
     
     inviteUser(newMember.name, newMember.email, newMember.role);
-    setNewMember({ name: '', email: '', role: roles[0] });
+    setNewMember(initialNewMember);
     setShowInviteModal(false);
+  };
+
+  const handleCloseInviteModal = () => {
+    setShowInviteModal(false);
+    setNewMember(initialNewMember);
   };
 
   const handleDelete = (member: UserData) => {
@@ -57,21 +65,26 @@ const TeamManagementDashboard: React.FC = () => {
     }
   };
 
-  const InviteMemberModal = () => (
-    <div className="fixed inset-0 bg-gray-950 bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 p-8 rounded-xl w-full max-w-lg border border-fuchsia-600/50 shadow-2xl">
-        <div className="flex justify-between items-center border-b border-gray-800 pb-4 mb-6">
-          <h2 className="text-2xl font-bold text-white flex items-center"><UserPlus className="w-6 h-6 mr-3 text-fuchsia-500" /> Invitar Nuevo Miembro</h2>
-          <button onClick={() => setShowInviteModal(false)} className="text-gray-400 hover:text-white"><X /></button>
-        </div>
-        
+  // FIX: antes "InviteMemberModal" era un componente definido DENTRO de
+  // TeamManagementDashboard (const InviteMemberModal = () => (...)). En React,
+  // cualquier componente definido dentro del cuerpo de otro componente se
+  // considera un "tipo" nuevo en cada render. Como escribir en el input
+  // dispara un setState → re-render del padre → React recreaba
+  // InviteMemberModal como un componente distinto → desmontaba y volvía a
+  // montar el <input> de verdad → perdías el foco después de cada letra.
+  // La solución es no definir componentes dentro de otros componentes: el
+  // JSX del modal va aquí directamente, y además ahora usa el Modal
+  // compartido (con el scroll interno ya arreglado) en vez de un div suelto.
+  return (
+    <div className="min-h-screen bg-gray-950 p-4 sm:p-8">
+      <Modal isOpen={showInviteModal} onClose={handleCloseInviteModal} title="Invitar Nuevo Miembro">
         <form onSubmit={handleInvite} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Nombre Completo</label>
             <input
               type="text"
               value={newMember.name}
-              onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+              onChange={(e) => setNewMember(prev => ({ ...prev, name: e.target.value }))}
               className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-fuchsia-500 focus:ring-1 focus:ring-fuchsia-500 outline-none"
               required
             />
@@ -81,7 +94,7 @@ const TeamManagementDashboard: React.FC = () => {
             <input
               type="email"
               value={newMember.email}
-              onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+              onChange={(e) => setNewMember(prev => ({ ...prev, email: e.target.value }))}
               className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-fuchsia-500 focus:ring-1 focus:ring-fuchsia-500 outline-none"
               required
             />
@@ -90,7 +103,7 @@ const TeamManagementDashboard: React.FC = () => {
             <label className="block text-sm font-medium text-gray-300 mb-1">Rol y Permisos</label>
             <select
               value={newMember.role}
-              onChange={(e) => setNewMember({ ...newMember, role: e.target.value as UserData['role'] })}
+              onChange={(e) => setNewMember(prev => ({ ...prev, role: e.target.value as UserData['role'] }))}
               className="w-full p-3 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-fuchsia-500 outline-none"
             >
               {roles.map(role => (
@@ -110,13 +123,7 @@ const TeamManagementDashboard: React.FC = () => {
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-gray-950 p-4 sm:p-8">
-      {showInviteModal && <InviteMemberModal />}
+      </Modal>
 
       <div className="max-w-7xl mx-auto">
         <header className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
