@@ -2,7 +2,6 @@ import { StateCreator } from 'zustand';
 import { UserData, Referral, KnowledgeArticle } from '@/types';
 import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
-import { sendEmail } from '@/services/emailService';
 
 export interface TeamSlice {
   users: UserData[];
@@ -42,17 +41,13 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
         }
     },
 
-    // FIX: antes solo tocaba el estado local (id: `u-${Date.now()}`), sin
-    // guardar nada en Supabase ni enviar ningún email — un refresh borraba
-    // la invitación entera. Ahora persiste de verdad y abre un borrador de
-    // email real con la invitación.
-    //
-    // Sobre el email: sendEmail() abre el cliente de correo del usuario con
-    // el mensaje ya redactado (mismo mecanismo que "Enviar por Email" en
-    // Facturas) — no manda el correo en segundo plano sin intervención.
-    // Enviar una invitación 100% automática requeriría dar de alta un
-    // proveedor de email transaccional (ej. Resend) con su propia API key,
-    // que hoy no está configurado en el proyecto.
+    // FIX (actualizado): se descubrió que el proyecto SÍ tiene Resend
+    // configurado como SMTP personalizado de Supabase Auth (usado hoy por
+    // el magic link del Portal de Cliente). Así que en vez de abrir un
+    // borrador de correo manual, ahora se llama a la edge function
+    // invite-team-member, que usa supabase.auth.admin.inviteUserByEmail()
+    // — esto SÍ envía un email real en segundo plano, por el mismo canal
+    // de Resend que ya está probado y funcionando.
     inviteUser: async (name, email, role) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
@@ -82,13 +77,15 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
         if (!error && data) {
             set(state => ({ users: [...state.users, data as unknown as UserData] }));
 
-            const profile = get().profile;
-            const inviterName = profile?.business_name || profile?.full_name || 'Tu equipo en DevFreelancer';
-            sendEmail(
-                email,
-                `${inviterName} te ha invitado a unirte en DevFreelancer`,
-                `Hola ${name},\n\n${inviterName} te ha invitado a unirte a su equipo en DevFreelancer con el rol de ${role}.\n\nPídele que te pase el enlace de acceso para completar tu alta.\n\nUn saludo.`
-            );
+            const { error: fnError } = await supabase.functions.invoke('invite-team-member', {
+                body: { email, name, role },
+            });
+
+            if (fnError) {
+                console.error('No se pudo enviar el email de invitación:', fnError);
+                // La fila en team_members ya se guardó igualmente; el freelancer
+                // puede reintentar o avisar manualmente si el email falla.
+            }
         }
     },
 
