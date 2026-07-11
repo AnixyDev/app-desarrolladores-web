@@ -112,3 +112,125 @@ export const generateInvoicePdf = async (invoice: Invoice, client: Client, profi
     
     doc.save(`Factura-${invoice.invoice_number}.pdf`);
 };
+
+// FIX / NUEVO: exportación en PDF del "Libro Fiscal" (TaxLedgerPage.tsx).
+// Antes solo existía exportación a CSV (útil para pegar en Excel, pero poco
+// presentable). Este PDF está pensado para que el freelancer se lo lleve
+// directamente a su gestoría, o lo guarde como justificante propio — con la
+// misma cabecera de marca que las facturas, y un aviso legal bien visible de
+// que es una estimación, no una declaración oficial ya presentada.
+interface TaxReportTotals {
+    totalIngresos: number;
+    totalGastos: number;
+    beneficio: number;
+    ivaRepercutido: number;
+    ivaSoportado: number;
+    ivaAPagar: number;
+    totalRetenciones: number;
+    irpfAPagar: number;
+}
+
+export const generateTaxReportPdf = (
+    profile: Profile,
+    year: number,
+    quarter: number,
+    irpfPercentage: number,
+    totals: TaxReportTotals
+) => {
+    const autoTable = resolveAutoTable();
+    const doc = new jsPDF();
+
+    // --- Header (mismo estilo que las facturas, para coherencia de marca) ---
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text(profile.business_name || profile.full_name, 14, 22);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(profile.full_name, 14, 30);
+    if (profile.tax_id) doc.text(`NIF/CIF: ${profile.tax_id}`, 14, 35);
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('BORRADOR FISCAL', 200, 22, { align: 'right' });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Periodo: ${quarter}º Trimestre ${year}`, 200, 30, { align: 'right' });
+    doc.text(`Generado: ${new Date().toLocaleDateString('es-ES')}`, 200, 35, { align: 'right' });
+
+    // --- Aviso legal (bien visible, arriba del todo) ---
+    doc.setFillColor(255, 247, 224);
+    doc.rect(14, 45, 182, 16, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(150, 100, 0);
+    doc.text(
+        'Este documento es una ESTIMACIÓN calculada a partir de tus facturas y gastos registrados.',
+        18, 51
+    );
+    doc.text(
+        'No sustituye la presentación oficial ante la AEAT. Revísalo con tu gestoría antes de presentar.',
+        18, 56
+    );
+    doc.setTextColor(0, 0, 0);
+
+    // --- Resumen general ---
+    autoTable(doc, {
+        startY: 68,
+        head: [['Resumen del trimestre', '']],
+        body: [
+            ['Ingresos (base imponible)', formatCurrency(totals.totalIngresos)],
+            ['Gastos (base imponible)', formatCurrency(totals.totalGastos)],
+            ['Beneficio neto', formatCurrency(totals.beneficio)],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: profile.pdf_color || '#d9009f' },
+        columnStyles: { 1: { halign: 'right' } },
+    });
+
+    // --- Modelo 303 (IVA) ---
+    const y1 = (doc as any).lastAutoTable.finalY + 10;
+    autoTable(doc, {
+        startY: y1,
+        head: [['Modelo 303 · Liquidación de IVA', '']],
+        body: [
+            ['IVA Repercutido (+)', formatCurrency(totals.ivaRepercutido)],
+            ['IVA Soportado (-)', formatCurrency(totals.ivaSoportado)],
+            [
+                { content: totals.ivaAPagar >= 0 ? 'A INGRESAR' : 'A DEVOLVER', styles: { fontStyle: 'bold' } },
+                { content: formatCurrency(Math.abs(totals.ivaAPagar)), styles: { fontStyle: 'bold' } },
+            ],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: profile.pdf_color || '#d9009f' },
+        columnStyles: { 1: { halign: 'right' } },
+    });
+
+    // --- Modelo 130 (IRPF) ---
+    const y2 = (doc as any).lastAutoTable.finalY + 10;
+    autoTable(doc, {
+        startY: y2,
+        head: [[`Modelo 130 · Pago Fraccionado IRPF (${irpfPercentage}%)`, '']],
+        body: [
+            ['Cuota íntegra', formatCurrency(totals.beneficio > 0 ? totals.beneficio * (irpfPercentage / 100) : 0)],
+            ['Retenciones ya soportadas (-)', formatCurrency(totals.totalRetenciones)],
+            [
+                { content: 'A INGRESAR', styles: { fontStyle: 'bold' } },
+                { content: formatCurrency(totals.irpfAPagar), styles: { fontStyle: 'bold' } },
+            ],
+        ],
+        theme: 'striped',
+        headStyles: { fillColor: profile.pdf_color || '#d9009f' },
+        columnStyles: { 1: { halign: 'right' } },
+    });
+
+    // --- Footer ---
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text(
+        'Documento generado automáticamente por DevFreelancer a partir de los datos introducidos por el usuario. No tiene validez como declaración oficial.',
+        14, 285
+    );
+
+    doc.save(`Borrador-Fiscal-${year}-T${quarter}.pdf`);
+};

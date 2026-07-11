@@ -211,13 +211,25 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                     if (backgroundDataFetchedForUser !== session.user.id) {
                         backgroundDataFetchedForUser = session.user.id;
                         get().fetchClients().catch(() => {});
-                        get().fetchProjects().catch(() => {});
-                        get().fetchFinanceData().catch(() => {});
-                        get().fetchTimeEntries().catch(() => {});
                         get().fetchTasks().catch(() => {});
                         get().fetchJobs().catch(() => {});
                         get().fetchApplications().catch(() => {});
                         get().fetchSavedJobs().catch(() => {});
+
+                        // FIX: checkInvoiceStatuses() (avisos de vencimiento) y la
+                        // nueva checkProjectProfitability() (avisos de presupuesto)
+                        // necesitan que projects/invoices/timeEntries ya estén
+                        // cargados para poder comprobar algo real — por eso se
+                        // esperan explícitamente aquí, en vez de dispararlas en
+                        // paralelo como el resto (que antes ni siquiera se llamaban).
+                        Promise.all([
+                            get().fetchProjects(),
+                            get().fetchFinanceData(),
+                            get().fetchTimeEntries(),
+                        ]).then(() => {
+                            get().checkInvoiceStatuses();
+                            get().checkProjectProfitability();
+                        }).catch(() => {});
                     }
                 } else {
                     console.log("❌ Usuario desconectado");

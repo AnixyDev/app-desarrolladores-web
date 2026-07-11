@@ -1,14 +1,15 @@
-
 import React, { useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import { useAppStore } from '@/hooks/useAppStore';
 import { formatCurrency } from '@/lib/utils';
-import { BookIcon, AlertTriangleIcon, DownloadIcon } from '@/components/icons/Icon';
+import { BookIcon, AlertTriangleIcon, DownloadIcon, ZapIcon, FileTextIcon } from '@/components/icons/Icon';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
+import { generateTaxReportPdf } from '@/services/pdfService';
 
 const TaxLedgerPage: React.FC = () => {
-    const { invoices, expenses, clients } = useAppStore();
+    const { invoices, expenses, clients, profile } = useAppStore();
     const [year, setYear] = useState(new Date().getFullYear());
     const [quarter, setQuarter] = useState(Math.floor(new Date().getMonth() / 3) + 1);
     const [irpfPercentage, setIrpfPercentage] = useState(20);
@@ -131,11 +132,69 @@ const TaxLedgerPage: React.FC = () => {
         document.body.removeChild(link);
     };
 
+    const handleExportPDF = () => {
+        if (!profile) return;
+        generateTaxReportPdf(profile, year, quarter, irpfPercentage, totals);
+    };
+
+    // FIX / NUEVO: el Libro Fiscal no tenía ninguna restricción de plan —
+    // cualquier usuario Free lo veía completo. Es justo el tipo de función
+    // ("me ahorra ir a la gestoría") por la que un freelancer paga una
+    // suscripción, así que se protege detrás de Pro/Teams con una vista de
+    // vista previa bloqueada en vez de esconderla del todo (deja claro qué
+    // se pierde, que es lo que mejor convierte en upgrades).
+    if (profile && profile.plan === 'Free') {
+        return (
+            <div className="space-y-6">
+                <h1 className="text-2xl font-semibold text-white">Libro Fiscal (Estimación Directa)</h1>
+                <div className="relative">
+                    <div className="pointer-events-none select-none blur-sm opacity-40">
+                        <Card>
+                            <CardContent>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center py-8">
+                                    <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+                                        <p className="text-sm text-gray-400 mb-1">Ingresos (Base)</p>
+                                        <p className="text-2xl font-bold text-green-400">2.450,00 €</p>
+                                    </div>
+                                    <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+                                        <p className="text-sm text-gray-400 mb-1">Modelo 303 (IVA)</p>
+                                        <p className="text-2xl font-bold text-white">514,50 €</p>
+                                    </div>
+                                    <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+                                        <p className="text-sm text-gray-400 mb-1">Modelo 130 (IRPF)</p>
+                                        <p className="text-2xl font-bold text-white">490,00 €</p>
+                                    </div>
+                                    <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+                                        <p className="text-sm text-gray-400 mb-1">Borrador PDF</p>
+                                        <p className="text-2xl font-bold text-white">Listo</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                        <div className="bg-gray-950/90 border border-gray-800 rounded-2xl p-8 max-w-md">
+                            <ZapIcon className="w-10 h-10 text-yellow-400 mx-auto mb-4" />
+                            <h3 className="text-lg font-bold text-white mb-2">Libro Fiscal — función Pro</h3>
+                            <p className="text-gray-400 text-sm mb-6">
+                                Calcula automáticamente tu Modelo 130 (IRPF) y 303 (IVA) trimestral a partir de tus facturas y gastos reales, y descárgalo en PDF listo para tu gestoría.
+                            </p>
+                            <Button as={Link} to="/billing" className="w-full">Actualizar a Pro</Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
   return (
     <div className='space-y-6'>
         <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <h1 className="text-2xl font-semibold text-white">Libro Fiscal (Estimación Directa)</h1>
             <div className='flex flex-wrap gap-2 items-center bg-gray-900 p-2 rounded-lg'>
+                <Button onClick={handleExportPDF} variant="secondary" size="sm" className="mr-2">
+                    <FileTextIcon className="w-4 h-4 mr-2" /> Borrador PDF
+                </Button>
                 <Button onClick={handleExportCSV} variant="secondary" size="sm" className="mr-2">
                     <DownloadIcon className="w-4 h-4 mr-2" /> Exportar CSV
                 </Button>
