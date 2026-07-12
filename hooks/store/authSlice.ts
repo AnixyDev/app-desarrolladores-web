@@ -4,7 +4,6 @@ import { Profile, GoogleJwtPayload } from '../../types';
 import { supabase } from '../../lib/supabaseClient';
 import type { Session } from '@supabase/supabase-js';
 
-// Estado inicial del perfil (valores por defecto antes de cargar datos reales)
 const initialProfile: Profile = {
     id: '',
     full_name: '',
@@ -28,10 +27,6 @@ const initialProfile: Profile = {
     stripe_onboarding_complete: false,
 };
 
-// Utilidad: evita que una llamada se quede colgada para siempre.
-// Si supabase-js se queda esperando un lock interno (p.ej. tras invalidar
-// sesiones/refresh tokens a mano), esto garantiza que la promesa se
-// resuelva igualmente pasado el timeout, en vez de dejar la UI en bucle.
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -66,16 +61,7 @@ export interface AuthSlice {
   initializeAuth: () => Promise<void>;
 }
 
-// Guard módulo-level: evita ejecuciones concurrentes de refreshProfile.
-// Si ya hay una llamada en curso, las siguientes reutilizan esa misma promesa
-// en vez de disparar otro getSession() en paralelo (causa raíz del bucle infinito).
 let refreshInFlight: Promise<void> | null = null;
-
-// Guard módulo-level: evita que fetchClients()/fetchProjects() se disparen más
-// de una vez por sesión de login. onAuthStateChange puede emitir INITIAL_SESSION
-// y SIGNED_IN casi simultáneamente en la carga inicial; sin este guard, cada
-// evento dispara su propia carga en segundo plano y se amontonan llamadas
-// concurrentes a Supabase (agravando la contención del Web Lock de auth).
 let backgroundDataFetchedForUser: string | null = null;
 
 export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, get) => ({

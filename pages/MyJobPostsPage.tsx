@@ -1,25 +1,40 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
-import { Building, Briefcase, EditIcon, TrashIcon, Users } from 'lucide-react';
+import { Building, Briefcase, TrashIcon, Users } from 'lucide-react';
 import { Job } from '@/types';
 import EmptyState from '@/components/ui/EmptyState';
 import Button from '@/components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/useToast';
 
 const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
+const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
 const MyJobPostsPage: React.FC = () => {
-    const { jobs, applications, profile } = useAppStore();
+    const { jobs, applications, profile, deleteJob } = useAppStore();
+    const { addToast } = useToast();
     const navigate = useNavigate();
-    
+
+    const [jobToDelete, setJobToDelete] = useState<Job | null>(null);
+
     const myJobs = jobs.filter(j => j.postedByUserId === profile?.id); 
     
-    // Solo mostramos el modal si el perfil está cargado Y es Free
     const showUpgrade = profile && profile.id && profile.plan === 'Free';
 
     const getApplicantCount = (jobId: string) => {
         return applications.filter(app => app.jobId === jobId).length;
+    };
+
+    const confirmDelete = async () => {
+        if (!jobToDelete) return;
+        const result = await deleteJob(jobToDelete.id);
+        setJobToDelete(null);
+        if (result.success) {
+            addToast('Oferta eliminada.', 'success');
+        } else {
+            addToast(result.message || 'No se pudo eliminar la oferta.', 'error');
+        }
     };
 
     if (showUpgrade) {
@@ -71,15 +86,14 @@ const MyJobPostsPage: React.FC = () => {
                                             </td>
                                             <td className="p-4 text-gray-300">{job.fechaPublicacion}</td>
                                             <td className="p-4 text-white font-semibold">
-                                                <Link to={`/my-job-posts/${job.id}/applicants`} className="flex items-center gap-2 text-primary-400 hover:underline">
+                                                <Link to={`/job-market/${job.id}/applicants`} className="flex items-center gap-2 text-primary-400 hover:underline">
                                                     <Users className="w-4 h-4"/>
                                                     <span>{getApplicantCount(job.id)}</span>
                                                 </Link>
                                             </td>
                                             <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                                                 <div className="flex gap-2 justify-end">
-                                                    <Button size="sm" variant="secondary"><EditIcon className="w-4 h-4"/></Button>
-                                                    <Button size="sm" variant="danger"><TrashIcon className="w-4 h-4"/></Button>
+                                                    <Button size="sm" variant="danger" onClick={() => setJobToDelete(job)}><TrashIcon className="w-4 h-4"/></Button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -90,6 +104,18 @@ const MyJobPostsPage: React.FC = () => {
                     </CardContent>
                 </Card>
             )}
+
+            <Suspense fallback={null}>
+                {jobToDelete && (
+                    <ConfirmationModal
+                        isOpen={!!jobToDelete}
+                        onClose={() => setJobToDelete(null)}
+                        onConfirm={confirmDelete}
+                        title="¿Eliminar oferta?"
+                        message={`¿Seguro que quieres eliminar "${jobToDelete.titulo}"? Esto no borrará las postulaciones ya recibidas.`}
+                    />
+                )}
+            </Suspense>
         </div>
     );
 };

@@ -21,8 +21,6 @@ const MyTeamTimesheet: React.FC = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
 
-  // Si hay una membresía de equipo activa, esta página se limita al
-  // workspace del dueño del equipo (no mezcla con proyectos propios).
   const scopedProjects = useMemo(() => {
     if (!teamMembership) return projects;
     return projects.filter(p => p.user_id === teamMembership.ownerId);

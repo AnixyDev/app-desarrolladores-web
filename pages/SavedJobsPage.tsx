@@ -3,7 +3,7 @@ import React, { useState, lazy, Suspense } from 'react';
 
 import { useAppStore } from '@/hooks/useAppStore';
 import { Star, Briefcase } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { Job } from '@/types';
 import EmptyState from '@/components/ui/EmptyState';
@@ -19,6 +19,7 @@ const UpgradePromptModal = lazy(
 const SavedJobsPage: React.FC = () => {
   const { getSavedJobs, saveJob, profile } = useAppStore();
   const savedJobs = getSavedJobs();
+  const navigate = useNavigate();
 
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
@@ -47,7 +48,7 @@ const SavedJobsPage: React.FC = () => {
           message="Usa el ícono de estrella en el mercado de proyectos para guardar las ofertas que te interesan."
           action={{
             text: 'Buscar Proyectos',
-            onClick: () => {},
+            onClick: () => navigate('/job-market'),
           }}
         />
       ) : (

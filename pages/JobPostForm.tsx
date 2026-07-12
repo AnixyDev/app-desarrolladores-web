@@ -46,7 +46,6 @@ const JobPostForm: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // CORRECCIÓN: Permitir acceso si es Pro o Teams
     if (profile && profile.plan === 'Free') {
       setIsUpgradeModalOpen(true);
     }
@@ -96,9 +95,16 @@ const JobPostForm: React.FC = () => {
             compatibilidadIA: 100, 
             postedByUserId: profile.id
         };
-        await addJob(newJob);
-        addToast('¡Oferta de trabajo publicada con éxito!', 'success');
-        navigate('/my-job-posts');
+        setIsLoading(true);
+        const result = await addJob(newJob);
+        setIsLoading(false);
+
+        if (result.success) {
+            addToast('¡Oferta de trabajo publicada con éxito!', 'success');
+            navigate('/my-job-posts');
+        } else {
+            addToast(result.message || 'No se pudo publicar la oferta.', 'error');
+        }
     }
   };
 

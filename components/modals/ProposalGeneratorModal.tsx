@@ -22,6 +22,7 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
     const [isLoading, setIsLoading] = useState(false);
     const [isRefining, setIsRefining] = useState<boolean>(false);
     const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
+    const [isSending, setIsSending] = useState(false);
 
     const userProfileSummary = profile?.bio || `Freelancer con experiencia en desarrollo full-stack. Tarifa por hora: ${profile.hourly_rate_cents / 100}€/h. Habilidades: ${profile.skills?.join(', ')}`;
 
@@ -68,18 +69,24 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
         if (isOpen) {
             handleGenerate();
         } else {
-            // Reset state when closing
             setProposalText('');
             setIsLoading(false);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, job]);
 
-    const handleSendApplication = () => {
+    const handleSendApplication = async () => {
         if (!profile) return;
-        applyForJob(job.id, profile.id, proposalText);
-        addToast(`Postulación para "${job.titulo}" enviada con éxito.`, 'success');
-        onClose();
+        setIsSending(true);
+        const result = await applyForJob(job.id, profile.id, proposalText);
+        setIsSending(false);
+
+        if (result.success) {
+            addToast(`Postulación para "${job.titulo}" enviada con éxito.`, 'success');
+            onClose();
+        } else {
+            addToast(result.message || 'No se pudo enviar la postulación.', 'error');
+        }
     };
 
     return (
@@ -115,9 +122,9 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
                                     <SparklesIcon className="w-4 h-4 mr-2" />
                                     Volver a Generar
                                 </Button>
-                                <Button onClick={handleSendApplication}>
+                                <Button onClick={handleSendApplication} disabled={isSending}>
                                     <SendIcon className="w-4 h-4 mr-2" />
-                                    Enviar Postulación
+                                    {isSending ? 'Enviando...' : 'Enviar Postulación'}
                                 </Button>
                             </div>
                         </div>

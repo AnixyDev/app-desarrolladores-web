@@ -138,11 +138,6 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Si el usuario es un miembro de equipo invitado, las horas se
-        // atribuyen al dueño del equipo (user_id = ownerId) y se deja
-        // constancia de quién las registró (logged_by). Así cumple con la
-        // política RLS "time_entries_insert_team_member" y aparece en la
-        // facturación/reportes del dueño, no en una cuenta "huérfana".
         const { teamMembership } = get();
         const ownerId = teamMembership?.ownerId ?? user.id;
 

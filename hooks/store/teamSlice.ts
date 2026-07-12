@@ -138,10 +138,6 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
         if (error) set({ users: previous });
     },
 
-    // Knowledge Base: antes vivía solo en useState local de la página y
-    // nunca tocaba Supabase. La RLS ya soporta dueño y miembro de equipo
-    // activo (is_active_team_member) — un select('*') sin filtrar ya
-    // devuelve la unión correcta según quién esté logueado.
     fetchArticles: async () => {
         const { data, error } = await supabase
             .from('knowledge_articles')

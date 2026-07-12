@@ -3,15 +3,6 @@ import { Job, JobApplication } from '@/types';
 import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
 
-// FIX: la tabla `jobs` en Supabase tiene columnas en minúsculas pegadas
-// (descripcionlarga, duracionsemanas, isfeatured, compatibilidadia...) porque
-// se crearon sin comillas y Postgres las pliega a minúsculas automáticamente.
-// El resto del código (formularios, páginas del marketplace) siempre ha usado
-// camelCase (descripcionLarga, duracionSemanas...). Sin este alias, un
-// `select('*')` devolvía las claves en minúsculas y todos esos campos
-// aparecían como `undefined` en pantalla para cualquier job real (no de
-// mock-data). Este alias hace que PostgREST devuelva las claves ya en el
-// nombre que espera el frontend, sin tener que tocar el esquema de la BD.
 const JOB_SELECT = `
   id,
   titulo,
@@ -44,9 +35,11 @@ export interface JobSlice {
   getApplicationsByJobId: (jobId: string) => JobApplication[];
   getSavedJobs: () => Job[];
   
-  addJob: (job: Omit<Job, 'id' | 'created_at' | 'postedByUserId'>) => Promise<void>;
-  applyForJob: (jobId: string, userId: string, proposalText: string) => Promise<void>;
+  addJob: (job: Omit<Job, 'id' | 'created_at' | 'postedByUserId'>) => Promise<{ success: boolean; message?: string }>;
+  deleteJob: (jobId: string) => Promise<{ success: boolean; message?: string }>;
+  applyForJob: (jobId: string, userId: string, proposalText: string) => Promise<{ success: boolean; message?: string }>;
   viewApplication: (applicationId: string) => Promise<void>;
+  updateApplicationStatus: (applicationId: string, status: 'accepted' | 'rejected') => Promise<{ success: boolean; message?: string }>;
   
   saveJob: (jobId: string) => Promise<void>;
   markJobAsNotified: (jobId: string) => void;
@@ -63,14 +56,6 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
         if (!error && data) set({ jobs: data as unknown as Job[] });
     },
 
-    // FIX: antes hacía `select('*')` sin ningún mapeo. La tabla real usa
-    // job_id/applicant_id/proposal_text (snake_case), pero getApplicationsByUserId
-    // y getApplicationsByJobId filtran por .userId/.jobId (camelCase) — sin
-    // este alias esas dos funciones SIEMPRE devolvían un array vacío, así que
-    // "Mis Postulaciones" aparecía vacía aunque hubieras aplicado a ofertas
-    // de verdad. También se resuelve jobTitle vía join (FK real a jobs) y
-    // applicantName vía una segunda consulta a profiles (applicant_id
-    // referencia auth.users, que PostgREST no expone para hacer join directo).
     fetchApplications: async () => {
         const { data, error } = await supabase
             .from('job_applications')
@@ -115,8 +100,6 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
         set({ applications });
     },
 
-    // FIX: "Ofertas Guardadas" solo vivía en memoria (savedJobIds nunca se
-    // leía de ningún sitio al arrancar). Ahora se carga desde la tabla real.
     fetchSavedJobs: async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
@@ -136,12 +119,8 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
 
     addJob: async (job) => {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) return { success: false, message: 'No se encontró sesión de usuario.' };
 
-        // FIX: se mapea explícitamente cada campo camelCase a su columna real
-        // en minúsculas. Antes se hacía `{ ...job, user_id: user.id }` tal
-        // cual, y Postgres rechazaba el insert porque columnas como
-        // "descripcionCorta" no existen (la real es "descripcioncorta").
         const { data, error } = await supabase
             .from('jobs')
             .insert({
@@ -163,35 +142,60 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
 
         if (!error && data) {
             set(state => ({ jobs: [data as unknown as Job, ...state.jobs] }));
+            return { success: true };
         }
+
+        console.error('Error al publicar la oferta:', error?.message);
+        return { success: false, message: error?.message || 'No se pudo publicar la oferta.' };
+    },
+
+    deleteJob: async (jobId) => {
+        const previous = get().jobs;
+        set(state => ({ jobs: state.jobs.filter(j => j.id !== jobId) }));
+
+        const { error } = await supabase.from('jobs').delete().eq('id', jobId);
+        if (error) {
+            set({ jobs: previous });
+            return { success: false, message: error.message };
+        }
+        return { success: true };
     },
 
     applyForJob: async (jobId, userId, proposalText) => {
         const job = get().getJobById(jobId);
         const profile = get().profile;
 
-        if (!job || !profile) return;
+        if (!job || !profile) return { success: false, message: 'No se pudo identificar la oferta o tu perfil.' };
 
         const { data, error } = await supabase.from('job_applications').insert({
             job_id: jobId,
             applicant_id: userId,
-            proposal_text: String(proposalText), // Sanitización forzada a string
+            proposal_text: String(proposalText),
             status: 'sent'
         }).select().single();
 
-        if (!error && data) {
-            const newApp: JobApplication = {
-                id: data.id,
-                jobId: data.job_id,
-                userId: data.applicant_id,
-                applicantName: String(profile.full_name || 'Freelancer'),
-                jobTitle: String(job.titulo || 'Oferta'), // Fix prop name
-                proposalText: String(data.proposal_text),
-                status: data.status,
-                appliedAt: data.created_at
+        if (error || !data) {
+            console.error('Error al enviar la postulación:', error?.message);
+            return {
+                success: false,
+                message: error?.code === '23505' || error?.message?.includes('duplicate')
+                    ? 'Ya te has postulado a esta oferta.'
+                    : (error?.message || 'No se pudo enviar la postulación.'),
             };
-            set(state => ({ applications: [newApp, ...state.applications] }));
         }
+
+        const newApp: JobApplication = {
+            id: data.id,
+            jobId: data.job_id,
+            userId: data.applicant_id,
+            applicantName: String(profile.full_name || 'Freelancer'),
+            jobTitle: String(job.titulo || 'Oferta'),
+            proposalText: String(data.proposal_text),
+            status: data.status,
+            appliedAt: data.created_at
+        };
+        set(state => ({ applications: [newApp, ...state.applications] }));
+        return { success: true };
     },
 
     viewApplication: async (applicationId) => {
@@ -208,13 +212,25 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
                     : app
                 )
             }));
+        } else {
+            console.error('Error al marcar la postulación como vista:', error.message);
         }
     },
 
-    // FIX: antes solo tocaba el estado local de Zustand, nunca Supabase.
-    // Guardar una oferta se perdía en cuanto se refrescaba la página o se
-    // volvía a iniciar sesión. Ahora persiste en la tabla saved_jobs, con
-    // actualización optimista del estado local para que la UI responda al instante.
+    updateApplicationStatus: async (applicationId, status) => {
+        const previous = get().applications;
+        set(state => ({
+            applications: state.applications.map(app => app.id === applicationId ? { ...app, status } : app),
+        }));
+
+        const { error } = await supabase.from('job_applications').update({ status }).eq('id', applicationId);
+        if (error) {
+            set({ applications: previous });
+            return { success: false, message: error.message };
+        }
+        return { success: true };
+    },
+
     saveJob: async (jobId) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
@@ -222,7 +238,6 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
         const { savedJobIds } = get();
         const alreadySaved = savedJobIds.includes(jobId);
 
-        // Actualización optimista
         set({
             savedJobIds: alreadySaved
                 ? savedJobIds.filter(id => id !== jobId)
@@ -232,7 +247,6 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
         if (alreadySaved) {
             const { error } = await supabase.from('saved_jobs').delete().eq('user_id', user.id).eq('job_id', jobId);
             if (error) {
-                // Revertir si falla
                 set({ savedJobIds: [...get().savedJobIds, jobId] });
             }
         } else {
