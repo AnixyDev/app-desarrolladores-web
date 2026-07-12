@@ -59,11 +59,11 @@ const JobCard: React.FC<{ job: Job, onApply: (job: Job) => void, onSave: (jobId:
         <div className="flex flex-wrap items-center text-sm text-gray-400 space-x-4 mb-4">
           <span className="flex items-center">
             <DollarSign className="w-4 h-4 mr-1 text-green-400" />
-            €{job.presupuesto.toLocaleString('es-ES')} (Fijo)
+            €{(job.presupuesto ?? 0).toLocaleString('es-ES')} (Fijo)
           </span>
           <span className="flex items-center">
             <Clock className="w-4 h-4 mr-1 text-yellow-400" />
-            {job.duracionSemanas} Semanas
+            {job.duracionSemanas ?? '?'} Semanas
           </span>
           <span className="flex items-center text-gray-500">
             {job.fechaPublicacion}
@@ -104,7 +104,6 @@ const JobMarketDashboard = () => {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
-  // --- Search & Filter State ---
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [filters, setFilters] = useState({
@@ -157,8 +156,8 @@ const JobMarketDashboard = () => {
         const minBudget = parseFloat(filters.minBudget);
         const maxBudget = parseFloat(filters.maxBudget);
         const budgetMatch = 
-            (isNaN(minBudget) || job.presupuesto >= minBudget) &&
-            (isNaN(maxBudget) || job.presupuesto <= maxBudget);
+            (isNaN(minBudget) || (job.presupuesto ?? 0) >= minBudget) &&
+            (isNaN(maxBudget) || (job.presupuesto ?? 0) <= maxBudget);
             
         const minDuration = parseInt(filters.minDuration);
         const maxDuration = parseInt(filters.maxDuration);
@@ -179,7 +178,7 @@ const JobMarketDashboard = () => {
         case 'match':
             return (b.compatibilidadIA ?? 0) - (a.compatibilidadIA ?? 0);
         case 'budget':
-            return b.presupuesto - a.presupuesto;
+            return (b.presupuesto ?? 0) - (a.presupuesto ?? 0);
         default:
             return 0;
         }
@@ -187,8 +186,6 @@ const JobMarketDashboard = () => {
   }, [filteredJobs, sort]);
 
   const handleApplyClick = (job: Job) => {
-    // ELIMINADO EL BLOQUEO: Si el usuario es Pro, no debería ver el modal. 
-    // Si el perfil no ha cargado aún, esperamos, pero no bloqueamos.
     if (profile?.plan === 'Free') {
         setIsUpgradeModalOpen(true);
     } else {

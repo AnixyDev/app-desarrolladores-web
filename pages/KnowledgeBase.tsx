@@ -27,10 +27,13 @@ const useDebounce = (value: string, delay: number) => {
 
 
 const KnowledgeBase: React.FC = () => {
-    const { profile, consumeCredits } = useAppStore();
+    const { profile, consumeCredits, articles, fetchArticles, addArticle, updateArticle, deleteArticle, teamMembership } = useAppStore();
     const { addToast } = useToast();
 
-    const [articles, setArticles] = useState<KnowledgeArticle[]>([]);
+    useEffect(() => {
+        fetchArticles();
+    }, [fetchArticles]);
+
     const [searchTerm, setSearchTerm] = useState('');
     const debouncedSearchTerm = useDebounce(searchTerm, 500);
     const [rankedArticleIds, setRankedArticleIds] = useState<string[]>([]);
@@ -84,26 +87,33 @@ const KnowledgeBase: React.FC = () => {
         setIsModalOpen(true);
     };
     
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!currentArticle?.title || !currentArticle?.content) return;
-        
+
         if (currentArticle.id) {
-            setArticles(articles.map(a => a.id === currentArticle.id ? { ...a, ...currentArticle, updated_at: new Date().toISOString().slice(0, 10) } : a));
+            await updateArticle(currentArticle.id, {
+                title: currentArticle.title,
+                content: currentArticle.content,
+                tags: currentArticle.tags,
+            });
         } else {
-            const newArticle = { ...currentArticle, id: `kb-${Date.now()}`, created_at: new Date().toISOString().slice(0, 10), updated_at: new Date().toISOString().slice(0, 10) };
-            setArticles([...articles, newArticle as KnowledgeArticle]);
+            await addArticle({
+                title: currentArticle.title,
+                content: currentArticle.content,
+                tags: currentArticle.tags ?? [],
+            });
         }
         setIsModalOpen(false);
     };
-    
+
     const handleDelete = (article: KnowledgeArticle) => {
         setArticleToDelete(article);
         setIsConfirmModalOpen(true);
     };
 
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (articleToDelete) {
-            setArticles(articles.filter(a => a.id !== articleToDelete.id));
+            await deleteArticle(articleToDelete.id);
             setIsConfirmModalOpen(false);
             setArticleToDelete(null);
         }
@@ -115,7 +125,6 @@ const KnowledgeBase: React.FC = () => {
             return;
         }
         setIsLoading(true);
-        // Simulate AI call
         setTimeout(() => {
             const generatedContent = `Este es un documento generado por IA sobre "${generatorTopic}".\n\nSección 1: ...\nSección 2: ...`;
             setCurrentArticle({ title: generatorTopic, content: generatedContent, tags: [generatorTopic.toLowerCase()] });
@@ -147,7 +156,14 @@ const KnowledgeBase: React.FC = () => {
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-semibold text-white flex items-center gap-2"><BookIcon/> Knowledge Base del Equipo</h1>
+                <div>
+                    <h1 className="text-2xl font-semibold text-white flex items-center gap-2"><BookIcon/> Knowledge Base del Equipo</h1>
+                    {teamMembership && (
+                        <p className="text-xs text-gray-500 mt-1">
+                            Viendo el knowledge base de {teamMembership.ownerBusinessName || teamMembership.ownerFullName || 'tu equipo'}.
+                        </p>
+                    )}
+                </div>
                 <div className="flex gap-2">
                     <Button onClick={() => setIsGeneratorModalOpen(true)} variant="secondary"><FileSignatureIcon className="w-4 h-4 mr-2"/>Generar Documento con IA</Button>
                     <Button onClick={() => openModal()}><PlusIcon className="w-4 h-4 mr-2"/>Nuevo Artículo</Button>

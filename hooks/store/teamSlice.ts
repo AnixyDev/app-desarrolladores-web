@@ -7,8 +7,6 @@ export interface TeamSlice {
   users: UserData[];
   referrals: Referral[];
   articles: KnowledgeArticle[];
-  // NUEVO: si el usuario logueado fue invitado al equipo de otro freelancer,
-  // aquí queda esa membresía (a qué equipo pertenece y con qué rol).
   teamMembership: TeamMembership | null;
   fetchUsers: () => Promise<void>;
   fetchTeamMembership: () => Promise<void>;
@@ -17,6 +15,10 @@ export interface TeamSlice {
   updateUserStatus: (id: string, status: UserData['status']) => Promise<void>;
   updateUserHourlyRate: (id: string, rateCents: number) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
+  fetchArticles: () => Promise<void>;
+  addArticle: (article: Pick<KnowledgeArticle, 'title' | 'content' | 'tags'>) => Promise<void>;
+  updateArticle: (id: string, updates: Partial<Pick<KnowledgeArticle, 'title' | 'content' | 'tags'>>) => Promise<void>;
+  deleteArticle: (id: string) => Promise<void>;
 }
 
 export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, get) => ({
@@ -25,11 +27,6 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
     articles: [],
     teamMembership: null,
 
-    // NUEVO: vincula la cuenta del usuario logueado con cualquier invitación
-    // de equipo pendiente que tenga su mismo email (la primera vez), o
-    // recupera la membresía ya vinculada en logins siguientes. Sin esto,
-    // un invitado que aceptaba el email y entraba a la app no tenía forma
-    // de saber a qué equipo pertenecía — entraba a su propia cuenta vacía.
     fetchTeamMembership: async () => {
         const { data, error } = await supabase.rpc('link_team_membership');
         if (!error && data && data.length > 0) {
@@ -39,6 +36,7 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
                     membershipId: row.membership_id,
                     role: row.role,
                     status: row.status,
+                    ownerId: row.owner_user_id,
                     ownerBusinessName: row.owner_business_name,
                     ownerFullName: row.owner_full_name,
                 },
@@ -48,8 +46,6 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
         }
     },
 
-    // FIX: no existía. La tabla team_members existía en Supabase desde hace
-    // tiempo, pero nada la leía nunca — "users" solo vivía en memoria.
     fetchUsers: async () => {
         const { data, error } = await supabase
             .from('team_members')
@@ -69,13 +65,6 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
         }
     },
 
-    // FIX (actualizado): se descubrió que el proyecto SÍ tiene Resend
-    // configurado como SMTP personalizado de Supabase Auth (usado hoy por
-    // el magic link del Portal de Cliente). Así que en vez de abrir un
-    // borrador de correo manual, ahora se llama a la edge function
-    // invite-team-member, que usa supabase.auth.admin.inviteUserByEmail()
-    // — esto SÍ envía un email real en segundo plano, por el mismo canal
-    // de Resend que ya está probado y funcionando.
     inviteUser: async (name, email, role) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, message: 'No se encontró sesión de usuario.' };
@@ -115,8 +104,6 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
         if (fnError || fnData?.success === false) {
             const message = fnData?.message || 'No se pudo enviar el email de invitación.';
             console.error('No se pudo enviar el email de invitación:', message);
-            // La fila en team_members ya se guardó igualmente — el freelancer puede
-            // ver el motivo (ej. "ya existe cuenta con ese email") y decidir qué hacer.
             return { success: false, message };
         }
 
@@ -149,5 +136,54 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
         set(state => ({ users: state.users.filter(u => u.id !== id) }));
         const { error } = await supabase.from('team_members').delete().eq('id', id);
         if (error) set({ users: previous });
+    },
+
+    // Knowledge Base: antes vivía solo en useState local de la página y
+    // nunca tocaba Supabase. La RLS ya soporta dueño y miembro de equipo
+    // activo (is_active_team_member) — un select('*') sin filtrar ya
+    // devuelve la unión correcta según quién esté logueado.
+    fetchArticles: async () => {
+        const { data, error } = await supabase
+            .from('knowledge_articles')
+            .select('*')
+            .order('updated_at', { ascending: false });
+        if (!error && data) set({ articles: data as KnowledgeArticle[] });
+    },
+
+    addArticle: async (article) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+            .from('knowledge_articles')
+            .insert({ ...article, user_id: user.id })
+            .select()
+            .single();
+
+        if (!error && data) {
+            set(state => ({ articles: [data as KnowledgeArticle, ...state.articles] }));
+        }
+    },
+
+    updateArticle: async (id, updates) => {
+        const previous = get().articles;
+        set(state => ({
+            articles: state.articles.map(a => a.id === id ? { ...a, ...updates, updated_at: new Date().toISOString() } : a),
+        }));
+
+        const { error } = await supabase
+            .from('knowledge_articles')
+            .update({ ...updates, updated_at: new Date().toISOString() })
+            .eq('id', id);
+
+        if (error) set({ articles: previous });
+    },
+
+    deleteArticle: async (id) => {
+        const previous = get().articles;
+        set(state => ({ articles: state.articles.filter(a => a.id !== id) }));
+
+        const { error } = await supabase.from('knowledge_articles').delete().eq('id', id);
+        if (error) set({ articles: previous });
     },
 });

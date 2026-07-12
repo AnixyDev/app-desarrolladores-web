@@ -14,26 +14,40 @@ interface ManualEntry {
 }
 
 const MyTeamTimesheet: React.FC = () => {
-  const { tasks, projects, timeEntries, addTimeEntry, toggleTask } = useAppStore();
+  const { tasks, projects, timeEntries, addTimeEntry, toggleTask, teamMembership } = useAppStore();
   const { addToast } = useToast();
 
   const [currentTimer, setCurrentTimer] = useState<Task | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
-  
+
+  // Si hay una membresía de equipo activa, esta página se limita al
+  // workspace del dueño del equipo (no mezcla con proyectos propios).
+  const scopedProjects = useMemo(() => {
+    if (!teamMembership) return projects;
+    return projects.filter(p => p.user_id === teamMembership.ownerId);
+  }, [projects, teamMembership]);
+
+  const scopedProjectIds = useMemo(() => new Set(scopedProjects.map(p => p.id)), [scopedProjects]);
+
+  const scopedTimeEntries = useMemo(() => {
+    if (!teamMembership) return timeEntries;
+    return timeEntries.filter(t => scopedProjectIds.has(t.project_id));
+  }, [timeEntries, teamMembership, scopedProjectIds]);
+
   const initialManualEntry: ManualEntry = {
-      project_id: projects[0]?.id || '',
+      project_id: scopedProjects[0]?.id || '',
       description: '',
       hours: '',
       date: new Date().toISOString().slice(0, 10),
       billable: true
   };
   const [manualEntry, setManualEntry] = useState<ManualEntry>(initialManualEntry);
-  
+
   const relevantTasks = useMemo(() => {
-    // En una app real, aquí se filtrarían las tareas asignadas al usuario actual
-    return tasks;
-  }, [tasks]);
+    if (!teamMembership) return tasks;
+    return tasks.filter(t => scopedProjectIds.has(t.project_id));
+  }, [tasks, teamMembership, scopedProjectIds]);
 
   useEffect(() => {
     let interval: number | null = null;
@@ -122,7 +136,7 @@ const MyTeamTimesheet: React.FC = () => {
           {(task.status === 'done' || task.status === 'completed') ? <ListTodo className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
         </button>
       </div>
-      <p className="text-sm text-gray-400 mt-1 flex items-center"><GitBranch className="w-4 h-4 mr-2" /> {projects.find(p => p.id === task.project_id)?.name}</p>
+      <p className="text-sm text-gray-400 mt-1 flex items-center"><GitBranch className="w-4 h-4 mr-2" /> {scopedProjects.find(p => p.id === task.project_id)?.name}</p>
       
       {!(task.status === 'done' || task.status === 'completed') && (
         <div className="mt-4 pt-3 border-t border-gray-700 flex justify-end">
@@ -146,7 +160,11 @@ const MyTeamTimesheet: React.FC = () => {
             <Clock className="w-7 h-7 text-fuchsia-500 mr-3" />
             Mi Tiempo y Tareas
           </h1>
-          <p className="text-gray-400">Tu centro de productividad como miembro del equipo.</p>
+          <p className="text-gray-400">
+            {teamMembership
+              ? `Registrando horas en el equipo de ${teamMembership.ownerBusinessName || teamMembership.ownerFullName || 'tu equipo'}.`
+              : 'Tu centro de productividad como miembro del equipo.'}
+          </p>
         </header>
 
         <div className="bg-gray-900 p-6 rounded-xl shadow-2xl mb-8 border border-gray-800">
@@ -199,7 +217,7 @@ const MyTeamTimesheet: React.FC = () => {
                     <label className="block text-sm font-medium text-gray-300 mb-1">Proyecto</label>
                     <select name="project_id" value={manualEntry.project_id} onChange={handleManualInputChange} className="w-full p-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-fuchsia-500 outline-none" required>
                         <option value="" disabled>Selecciona un proyecto</option>
-                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        {scopedProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                 </div>
                 <div>
@@ -226,11 +244,11 @@ const MyTeamTimesheet: React.FC = () => {
             <div className="bg-gray-900 p-6 rounded-xl shadow-xl border border-gray-800">
               <h2 className="text-xl font-semibold text-white mb-4 border-b border-gray-800 pb-2 flex items-center"><Calendar className="w-5 h-5 mr-2 text-fuchsia-500" /> Registros Recientes</h2>
               <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                {timeEntries.map(entry => (
+                {scopedTimeEntries.map(entry => (
                   <div key={entry.id} className="p-3 bg-gray-800 rounded-lg flex justify-between items-center hover:bg-gray-700 transition duration-150">
                     <div>
                       <p className="text-sm font-medium text-white">{entry.description || 'Sin descripción'}</p>
-                      <p className="text-xs text-gray-400 flex items-center"><GitBranch className="w-3 h-3 mr-1" /> {projects.find(p=>p.id === entry.project_id)?.name} | {new Date(entry.start_time).toLocaleDateString()}</p>
+                      <p className="text-xs text-gray-400 flex items-center"><GitBranch className="w-3 h-3 mr-1" /> {scopedProjects.find(p=>p.id === entry.project_id)?.name} | {new Date(entry.start_time).toLocaleDateString()}</p>
                     </div>
                     <span className="text-lg font-bold text-fuchsia-500">{(entry.duration_seconds/3600).toFixed(2)}h</span>
                   </div>

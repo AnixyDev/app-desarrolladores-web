@@ -204,6 +204,7 @@ export interface TeamMembership {
   membershipId: string;
   role: string;
   status: string;
+  ownerId: string;
   ownerBusinessName: string | null;
   ownerFullName: string | null;
 }

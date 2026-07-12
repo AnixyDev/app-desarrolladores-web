@@ -13,7 +13,6 @@ export interface ProjectSlice {
   getProjectById: (id: string) => Project | undefined;
   getProjectByName: (name: string) => Project | undefined;
   addProject: (project: NewProject) => Promise<void>;
-  // AÑADIMOS ESTA LÍNEA PARA EL KANBAN Y EDICIONES GENERALES
   updateProject: (id: string, updates: Partial<Project>) => Promise<void>;
   updateProjectStatus: (id: string, status: Project['status']) => Promise<void>;
   deleteProject: (id: string) => Promise<void>;
@@ -61,7 +60,6 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         }
     },
 
-    // ESTA ES LA NUEVA FUNCIÓN QUE ARREGLA TU ERROR EN PROJECTPAGE
     updateProject: async (id, updates) => {
         const { error } = await supabase.from('projects').update(updates).eq('id', id);
         
@@ -70,7 +68,6 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
                 projects: state.projects.map(p => p.id === id ? { ...p, ...updates } : p) 
             }));
 
-            // Si el update incluye cambio de estado, enviamos notificación (opcional)
             if (updates.status) {
                 const project = get().projects.find(p => p.id === id);
                 const statusMap = {
@@ -88,15 +85,9 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     },
 
     updateProjectStatus: async (id, status) => {
-        // Ahora simplemente llamamos a la función general para no repetir código
         await get().updateProject(id, { status });
     },
 
-    // FIX: no existía ninguna forma de borrar un proyecto desde la UI.
-    // A nivel de BD, tasks/time_entries/contracts/comments/files del proyecto
-    // se borran en cascada; invoices/expenses/recurring_invoices solo se
-    // desvinculan (project_id pasa a null), no se borran — así no se pierde
-    // ningún dato de facturación real solo por borrar un proyecto.
     deleteProject: async (id) => {
         const { error } = await supabase.from('projects').delete().eq('id', id);
         if (!error) {
@@ -126,14 +117,12 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         const task = get().tasks.find(t => t.id === id);
         if (!task) return;
 
-        // Alterna entre 'todo' y 'completed'
         const isDone = task.status === 'completed' || task.status === 'done';
         const newStatus = isDone ? 'todo' : 'completed';
         set(state => ({ tasks: state.tasks.map(t => t.id === id ? { ...t, status: newStatus } : t) }));
 
         const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
         if (error) {
-            // Revertir en caso de error
             set(state => ({ tasks: state.tasks.map(t => t.id === id ? { ...t, status: task.status } : t) }));
         }
     },
@@ -149,13 +138,25 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const { data, error } = await supabase.from('time_entries').insert({ ...entry, user_id: user.id }).select().single();
+        // Si el usuario es un miembro de equipo invitado, las horas se
+        // atribuyen al dueño del equipo (user_id = ownerId) y se deja
+        // constancia de quién las registró (logged_by). Así cumple con la
+        // política RLS "time_entries_insert_team_member" y aparece en la
+        // facturación/reportes del dueño, no en una cuenta "huérfana".
+        const { teamMembership } = get();
+        const ownerId = teamMembership?.ownerId ?? user.id;
+
+        const { data, error } = await supabase
+            .from('time_entries')
+            .insert({ ...entry, user_id: ownerId, logged_by: user.id })
+            .select()
+            .single();
+
         if (!error && data) {
             set(state => ({ timeEntries: [data as TimeEntry, ...state.timeEntries].sort((a,b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()) }));
         }
     },
 
-    // FIX: no existía forma de editar ni borrar un registro de tiempo ya creado.
     updateTimeEntry: async (id, updates) => {
         const previous = get().timeEntries;
         set(state => ({
@@ -164,7 +165,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
 
         const { error } = await supabase.from('time_entries').update(updates).eq('id', id);
         if (error) {
-            set({ timeEntries: previous }); // revertir si falla
+            set({ timeEntries: previous });
         }
     },
 
@@ -174,7 +175,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
 
         const { error } = await supabase.from('time_entries').delete().eq('id', id);
         if (error) {
-            set({ timeEntries: previous }); // revertir si falla
+            set({ timeEntries: previous });
         }
     },
 });

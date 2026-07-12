@@ -80,11 +80,11 @@ const JobDetailPage: React.FC = () => {
                         <CardContent className="space-y-3">
                             <div className="flex items-center text-white">
                                 <DollarSign className="w-5 h-5 mr-3 text-green-400" />
-                                <span>{job.presupuesto.toLocaleString('es-ES')} € (Presupuesto Fijo)</span>
+                                <span>{(job.presupuesto ?? 0).toLocaleString('es-ES')} € (Presupuesto Fijo)</span>
                             </div>
                             <div className="flex items-center text-white">
                                 <Clock className="w-5 h-5 mr-3 text-yellow-400" />
-                                <span>{job.duracionSemanas} semanas (Duración Estimada)</span>
+                                <span>{job.duracionSemanas ?? '?'} semanas (Duración Estimada)</span>
                             </div>
                             <div className="flex items-center text-white">
                                 <Briefcase className="w-5 h-5 mr-3 text-blue-400" />
