@@ -1,7 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
-import { Briefcase, DollarSign, Clock, Hash, Send, Zap, Star } from 'lucide-react';
+import { Briefcase, DollarSign, Clock, Hash, Send, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
-import { redirectToCheckout } from '@/services/stripeService';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useNavigate } from 'react-router-dom';
 
@@ -38,7 +37,6 @@ const JobPostForm: React.FC = () => {
     duracionSemanas: '',
     habilidadesRequeridas: [],
   });
-  const [isFeatured, setIsFeatured] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const { addToast } = useToast();
@@ -70,42 +68,32 @@ const JobPostForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (isFeatured) {
-        setIsLoading(true);
-        try {
-            await redirectToCheckout('featuredJobPost');
-        } catch (error) {
-            addToast((error as Error).message, 'error');
-            setIsLoading(false);
-        }
-    } else {
-        if (!profile) {
-            addToast('No se pudo identificar al usuario.', 'error');
-            return;
-        }
-        const newJob = {
-            titulo: formData.titulo,
-            descripcionCorta: formData.descripcion.substring(0, 100) + '...',
-            descripcionLarga: formData.descripcion,
-            presupuesto: parseFloat(formData.presupuesto) || 0,
-            duracionSemanas: parseInt(formData.duracionSemanas, 10) || 0,
-            habilidades: formData.habilidadesRequeridas,
-            cliente: profile.business_name || profile.full_name,
-            fechaPublicacion: "Recién publicado",
-            isFeatured: false,
-            compatibilidadIA: 100, 
-            postedByUserId: profile.id
-        };
-        setIsLoading(true);
-        const result = await addJob(newJob);
-        setIsLoading(false);
+    if (!profile) {
+        addToast('No se pudo identificar al usuario.', 'error');
+        return;
+    }
+    const newJob = {
+        titulo: formData.titulo,
+        descripcionCorta: formData.descripcion.substring(0, 100) + '...',
+        descripcionLarga: formData.descripcion,
+        presupuesto: parseFloat(formData.presupuesto) || 0,
+        duracionSemanas: parseInt(formData.duracionSemanas, 10) || 0,
+        habilidades: formData.habilidadesRequeridas,
+        cliente: profile.business_name || profile.full_name,
+        fechaPublicacion: "Recién publicado",
+        isFeatured: false,
+        compatibilidadIA: 100, 
+        postedByUserId: profile.id
+    };
+    setIsLoading(true);
+    const result = await addJob(newJob);
+    setIsLoading(false);
 
-        if (result.success) {
-            addToast('¡Oferta de trabajo publicada con éxito!', 'success');
-            navigate('/my-job-posts');
-        } else {
-            addToast(result.message || 'No se pudo publicar la oferta.', 'error');
-        }
+    if (result.success) {
+        addToast('¡Oferta de trabajo publicada con éxito!', 'success');
+        navigate('/my-job-posts');
+    } else {
+        addToast(result.message || 'No se pudo publicar la oferta.', 'error');
     }
   };
 
@@ -182,6 +170,9 @@ const JobPostForm: React.FC = () => {
               {isLoading ? 'Cargando...' : 'Publicar Oferta'}
             </button>
           </div>
+          <p className="text-xs text-gray-500 mt-3 text-right">
+            ¿Quieres más visibilidad? Podrás destacar esta oferta desde "Mis Ofertas" una vez publicada.
+          </p>
         </form>
       </div>
     </div>

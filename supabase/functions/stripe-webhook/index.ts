@@ -120,6 +120,29 @@ serve(async (req) => {
             if (profile) {
               await supabase.from('profiles').update({ ai_credits: (profile.ai_credits || 0) + creditsToAdd }).eq('id', userId)
             }
+          } else if (itemKey === 'featuredJobPost') {
+            // FIX: no existía. JobPostForm.tsx llamaba a este checkout sin
+            // pasar ningún dato de la oferta y Stripe redirigía a /billing
+            // — se cobraba dinero real y nunca se creaba ni destacaba
+            // ninguna oferta. Ahora "Destacar" es una acción posterior
+            // desde MyJobPostsPage.tsx sobre una oferta ya publicada, con
+            // su job_id viajando en el metadata de la sesión. Se filtra
+            // también por user_id como comprobación de que el job
+            // pertenece a quien ha pagado.
+            const jobId = session.metadata?.job_id
+            if (jobId) {
+              const { error: featureError } = await supabase
+                .from('jobs')
+                .update({ isfeatured: true })
+                .eq('id', jobId)
+                .eq('user_id', userId)
+
+              if (featureError) {
+                console.error(`⚠️ No se pudo destacar la oferta ${jobId}:`, featureError.message)
+              }
+            } else {
+              console.error('⚠️ featuredJobPost sin job_id en el metadata de la sesión', session.id)
+            }
           }
 
           if (typeof session.customer === 'string') {

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -8,8 +9,9 @@ import { redirectToCheckout, redirectToCustomerPortal, StripeItemKey } from '@/s
 import { useToast } from '@/hooks/useToast';
 
 const BillingPage: React.FC = () => {
-    const { profile } = useAppStore();
+    const { profile, refreshProfile, fetchJobs } = useAppStore();
     const { addToast } = useToast();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [isLoadingPage, setIsLoadingPage] = useState(true);
     const [isLoadingAction, setIsLoadingAction] = useState<string | null>(null);
     const [isPortalLoading, setIsPortalLoading] = useState(false);
@@ -19,6 +21,28 @@ const BillingPage: React.FC = () => {
         const timer = setTimeout(() => setIsLoadingPage(false), 600);
         return () => clearTimeout(timer);
     }, []);
+
+    useEffect(() => {
+        const paymentStatus = searchParams.get('payment');
+        if (!paymentStatus) return;
+
+        if (paymentStatus === 'success') {
+            addToast('¡Pago completado con éxito!', 'success');
+            // El webhook de Stripe es la fuente de verdad (puede tardar
+            // unos segundos en procesarse); refrescamos perfil (plan/
+            // créditos) y ofertas (por si fue para destacar un job post)
+            // para reflejarlo en cuanto esté disponible.
+            refreshProfile();
+            fetchJobs();
+        } else if (paymentStatus === 'cancelled') {
+            addToast('Pago cancelado. No se ha realizado ningún cargo.', 'info');
+        }
+
+        searchParams.delete('payment');
+        searchParams.delete('session_id');
+        setSearchParams(searchParams, { replace: true });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     const handlePurchase = async (itemKey: StripeItemKey) => {
         setIsLoadingAction(itemKey);
