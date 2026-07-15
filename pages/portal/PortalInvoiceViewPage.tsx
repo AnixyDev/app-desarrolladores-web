@@ -1,33 +1,84 @@
-
-import React, { useState, lazy, Suspense } from 'react';
-import { useParams } from 'react-router-dom';
-import { useAppStore } from '@/hooks/useAppStore';
+// pages/portal/PortalInvoiceViewPage.tsx
+// FIX: esta página leía `useAppStore().invoices` (el store global, scoped a
+// la sesión del FREELANCER vía RLS auth.uid()=user_id). Un cliente entra al
+// portal con su propia sesión OTP, así que ese array siempre estaba vacío
+// y la página mostraba "Factura no encontrada" para cualquier cliente real.
+// Ahora sigue el mismo patrón que PortalDashboardPage.tsx: clientId viene
+// del contexto de PortalLayout y la factura se consulta directamente,
+// filtrada por client_id.
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { useParams, useOutletContext } from 'react-router-dom';
+import { supabase } from '@/lib/supabaseClient';
 import Card, { CardHeader, CardContent, CardFooter } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import { useToast } from '@/hooks/useToast';
+import { Invoice, Client } from '@/types';
 
 const StripePaymentModal = lazy(() => import('@/components/modals/StripePaymentModal'));
 
+interface PortalContext {
+    clientId: string;
+    ownerBusinessName: string | null;
+    ownerFullName: string | null;
+}
+
 const PortalInvoiceViewPage: React.FC = () => {
     const { invoiceId } = useParams<{ invoiceId: string }>();
-    const { invoices, getClientById, profile, markInvoiceAsPaid } = useAppStore();
+    const { clientId, ownerBusinessName, ownerFullName } = useOutletContext<PortalContext>();
     const { addToast } = useToast();
+
+    const [invoice, setInvoice] = useState<Invoice | null>(null);
+    const [client, setClient] = useState<Pick<Client, 'name' | 'company'> | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [notFound, setNotFound] = useState(false);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-    const invoice = invoices.find(i => i.id === invoiceId);
+    useEffect(() => {
+        if (!clientId || !invoiceId) return;
 
-    if (!invoice) {
+        const load = async () => {
+            setLoading(true);
+            const [invoiceRes, clientRes] = await Promise.all([
+                supabase.from('invoices').select('*').eq('id', invoiceId).eq('client_id', clientId).single(),
+                supabase.from('clients').select('name, company').eq('id', clientId).single(),
+            ]);
+
+            if (invoiceRes.error || !invoiceRes.data) {
+                setNotFound(true);
+            } else {
+                setInvoice(invoiceRes.data as Invoice);
+                setClient(clientRes.data as Pick<Client, 'name' | 'company'> | null);
+            }
+            setLoading(false);
+        };
+
+        load();
+    }, [clientId, invoiceId]);
+
+    // FIX: antes esto llamaba a markInvoiceAsPaid() del store global, que
+    // intenta un UPDATE en `invoices` con la sesión del cliente — sin
+    // garantía de que la RLS lo permita, y si fallaba, el error se tragaba
+    // en silencio (financeSlice.ts) mostrando igualmente "éxito". El Edge
+    // Function stripe-webhook ahora marca la factura como pagada de forma
+    // autoritativa en el servidor al recibir payment_intent.succeeded; aquí
+    // solo reflejamos el estado en la UI al instante.
+    const handlePaymentSuccess = () => {
+        setInvoice(prev => prev ? { ...prev, paid: true, payment_date: new Date().toISOString() } : prev);
+        addToast("¡Pago realizado con éxito! Gracias.", "success");
+    };
+
+    if (loading) {
+        return (
+            <div className="flex justify-center py-16">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500" />
+            </div>
+        );
+    }
+
+    if (notFound || !invoice) {
         return <div className="text-center text-red-500">Factura no encontrada.</div>;
     }
-    
-    const client = getClientById(invoice.client_id);
-    
-    const handlePaymentSuccess = () => {
-        markInvoiceAsPaid(invoice.id);
-        addToast("¡Pago realizado con éxito! Gracias.", "success");
-        // Don't close immediately here, modal handles delayed close for UX
-    };
 
     return (
         <Card className="max-w-4xl mx-auto">
@@ -47,9 +98,7 @@ const PortalInvoiceViewPage: React.FC = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-8">
                     <div>
                         <h4 className="font-semibold text-gray-300 mb-2">De:</h4>
-                        <p className="text-white">{profile.business_name}</p>
-                        <p className="text-gray-400">{profile.full_name}</p>
-                        <p className="text-gray-400">{profile.tax_id}</p>
+                        <p className="text-white">{ownerBusinessName || ownerFullName}</p>
                     </div>
                     <div>
                         <h4 className="font-semibold text-gray-300 mb-2">Para:</h4>

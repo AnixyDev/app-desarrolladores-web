@@ -206,6 +206,49 @@ serve(async (req) => {
         }
         break;
       }
+
+      // FIX: no existía ningún manejador para este evento. Los pagos de
+      // factura desde el portal de cliente (Elements/PaymentIntent via la
+      // función payment-sheet) nunca se reconciliaban aquí — la única
+      // fuente de verdad era una llamada UPDATE hecha desde el propio
+      // navegador del cliente, con su sesión sin privilegios, cuyo error
+      // (si la RLS la rechazaba, o por cualquier fallo de red) se
+      // ignoraba en silencio. Un cliente podía pagar de verdad en Stripe
+      // y la factura quedarse "pendiente" para siempre sin que nadie se
+      // enterase. Este handler usa el cliente con SERVICE_ROLE_KEY, que
+      // no depende de RLS, como fuente de verdad autoritativa.
+      case 'payment_intent.succeeded': {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent
+        const invoiceId = paymentIntent.metadata?.invoice_id
+
+        if (invoiceId) {
+          const { data: invoice, error: fetchErr } = await supabase
+            .from('invoices')
+            .select('id, total_cents, paid')
+            .eq('id', invoiceId)
+            .maybeSingle()
+
+          if (fetchErr || !invoice) {
+            console.error(`⚠️ payment_intent.succeeded: factura ${invoiceId} no encontrada`, fetchErr?.message)
+          } else if (invoice.paid) {
+            // Ya estaba marcada (p.ej. reintento del webhook) — no-op.
+          } else if (invoice.total_cents !== paymentIntent.amount_received) {
+            // Defensa en profundidad: el importe cobrado no coincide con
+            // el total de la factura. No se marca como pagada
+            // automáticamente; queda registrado para revisión manual.
+            console.error(
+              `⚠️ payment_intent.succeeded: importe no coincide para factura ${invoiceId} ` +
+              `(factura=${invoice.total_cents}, cobrado=${paymentIntent.amount_received})`
+            )
+          } else {
+            await supabase.from('invoices').update({
+              paid: true,
+              payment_date: new Date().toISOString(),
+            }).eq('id', invoiceId)
+          }
+        }
+        break;
+      }
     }
 
     const { error: insertError } = await supabase.from('processed_stripe_events').insert({

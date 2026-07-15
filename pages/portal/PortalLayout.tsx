@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Outlet, Navigate, useNavigate } from 'react-router-dom';
+import { Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 
 interface PortalClient {
@@ -18,6 +18,7 @@ const DEFAULT_BRAND_COLOR = '#d9009f';
 
 const PortalLayout: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [hasSession, setHasSession] = useState(false);
   const [client, setClient] = useState<PortalClient | null>(null);
@@ -104,6 +105,16 @@ const PortalLayout: React.FC = () => {
   const brandName = client?.ownerBusinessName || client?.ownerFullName || 'Portal de Cliente';
   const brandColor = client?.ownerBrandColor || DEFAULT_BRAND_COLOR;
 
+  // FIX: la ruta hija "index" del router (App.tsx) hacía
+  // <Navigate to="login" replace /> incondicionalmente. Como PortalLayout
+  // ya ha comprobado aquí arriba que hay sesión y cliente vinculado, un
+  // cliente que llega recién autenticado (tras pulsar el enlace mágico,
+  // que redirige a la raíz "/portal") acababa devuelto a la pantalla de
+  // login en vez de a su dashboard, aunque ya estuviera dentro.
+  if (location.pathname === '/portal' || location.pathname === '/portal/') {
+    return <Navigate to="/portal/dashboard" replace />;
+  }
+
   return (
     // La variable CSS --portal-brand-color permite que cualquier página hija
     // del portal (facturas, presupuestos, contratos...) use la marca del
@@ -140,8 +151,19 @@ const PortalLayout: React.FC = () => {
         </div>
       </header>
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {/* El contexto pasa el client_id (y la marca) a las páginas hijas */}
-        <Outlet context={{ clientId: client?.client_id, brandColor }} />
+        {/* El contexto pasa el client_id y los datos del freelancer dueño a
+            las páginas hijas. IMPORTANTE: las páginas del portal (factura,
+            contrato, presupuesto, propuesta...) deben usar este contexto y
+            consultas directas a Supabase filtradas por clientId, NUNCA el
+            store global (useAppStore) — ese store está scoped a la sesión
+            del FREELANCER (auth.uid() = user_id vía RLS) y para la sesión
+            OTP de un cliente siempre está vacío. */}
+        <Outlet context={{
+          clientId: client?.client_id,
+          brandColor,
+          ownerBusinessName: client?.ownerBusinessName,
+          ownerFullName: client?.ownerFullName,
+        }} />
       </main>
     </div>
   );
