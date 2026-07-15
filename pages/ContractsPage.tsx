@@ -29,50 +29,67 @@ const ContractsPage: React.FC = () => {
   const handleOpenCreate = () => { setEditingContract(null); setIsFormOpen(true); };
   const handleOpenEdit = (contract: Contract) => { setEditingContract(contract); setIsFormOpen(true); };
 
-  const handleFormSubmit = ({ clientId, projectId, content }: { clientId: string; projectId: string; content: string }) => {
-    if (editingContract) {
-      updateContract(editingContract.id, { client_id: clientId, project_id: projectId, content });
-      addToast('Contrato actualizado.', 'success');
-    } else {
-      addContract({ client_id: clientId, project_id: projectId, content, status: 'draft' });
-      addToast('Contrato creado.', 'success');
+  const handleFormSubmit = async ({ clientId, projectId, content }: { clientId: string; projectId: string; content: string }) => {
+    try {
+      if (editingContract) {
+        await updateContract(editingContract.id, { client_id: clientId, project_id: projectId, content });
+        addToast('Contrato actualizado.', 'success');
+      } else {
+        await addContract({ client_id: clientId, project_id: projectId, content, status: 'draft' });
+        addToast('Contrato creado.', 'success');
+      }
+      setIsFormOpen(false);
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo guardar el contrato.', 'error');
     }
-    setIsFormOpen(false);
   };
 
   // ── Handlers de firma ──────────────────────────────────────────────────────
 
   const handleOpenSign = (contract: Contract) => { setContractToSign(contract); setIsSignOpen(true); };
 
-  const handleSign = (signerName: string, signedAt: string) => {
+  const handleSign = async (signerName: string, signedAt: string) => {
     if (!contractToSign) return;
-    updateContract(contractToSign.id, {
-      status: 'signed',
-      signed_by: signerName,
-      signed_at: new Date(signedAt).toISOString(),
-    });
-    addToast(`Contrato marcado como firmado por ${signerName}.`, 'success');
-    setIsSignOpen(false);
-    setContractToSign(null);
+    try {
+      await updateContract(contractToSign.id, {
+        status: 'signed',
+        signed_by: signerName,
+        signed_at: new Date(signedAt).toISOString(),
+      });
+      addToast(`Contrato marcado como firmado por ${signerName}.`, 'success');
+      setIsSignOpen(false);
+      setContractToSign(null);
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo marcar el contrato como firmado.', 'error');
+    }
   };
 
   // ── Handlers de acciones ────────────────────────────────────────────────────
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (window.confirm('¿Estás seguro de eliminar este contrato?')) {
-      deleteContract(id);
-      addToast('Contrato eliminado.', 'info');
+      try {
+        await deleteContract(id);
+        addToast('Contrato eliminado.', 'info');
+      } catch (err) {
+        addToast((err as Error).message || 'No se pudo eliminar el contrato.', 'error');
+      }
     }
   };
 
-  const handleSend = (contract: Contract) => {
+  const handleSend = async (contract: Contract) => {
     const client = getClientById(contract.client_id);
     const project = getProjectById(contract.project_id);
     if (!client?.email || !project) {
       addToast('Faltan datos del cliente o del proyecto.', 'error');
       return;
     }
-    sendContract(contract.id);
+    try {
+      await sendContract(contract.id);
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo actualizar el estado del contrato.', 'error');
+      return;
+    }
     addToast('Estado actualizado a Enviado.', 'success');
     const portalLink = `${window.location.origin}/portal/contracts/${contract.id}`;
     const subject = `Contrato para el proyecto "${project.name}"`;

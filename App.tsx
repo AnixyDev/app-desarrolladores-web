@@ -14,18 +14,21 @@ import RegisterPage from './pages/auth/RegisterPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfService from './pages/TermsOfService';
 
+// FIX: Carga segura de componentes lazy con recarga en caso de error
 const safeLazy = (importFn: () => Promise<any>) => {
   return lazy(async () => {
     try {
       return await importFn();
     } catch (error) {
       console.error("Fallo de carga de módulo:", error);
+      // Si falla una importación, recargar la página (puede ser problema de caché)
       window.location.reload();
       throw error;
     }
   });
 };
 
+// Lazy Components (carga diferida para mejor performance)
 const DashboardPage = safeLazy(() => import('./pages/DashboardPage'));
 const ClientsPage = safeLazy(() => import('./pages/ClientsPage'));
 const ClientDetailPage = safeLazy(() => import('./pages/ClientDetailPage'));
@@ -67,13 +70,19 @@ const PortalLayout = safeLazy(() => import('./pages/portal/PortalLayout'));
 const PortalLoginPage = safeLazy(() => import('./pages/portal/PortalLoginPage'));
 const PortalDashboardPage = safeLazy(() => import('./pages/portal/PortalDashboardPage'));
 const PortalInvoiceViewPage = safeLazy(() => import('./pages/portal/PortalInvoiceViewPage'));
+const PortalContractViewPage = safeLazy(() => import('./pages/portal/PortalContractViewPage'));
+const PortalBudgetViewPage = safeLazy(() => import('./pages/portal/PortalBudgetViewPage'));
+const PortalProposalViewPage = safeLazy(() => import('./pages/portal/PortalProposalViewPage'));
+const PricingPage = safeLazy(() => import('./pages/PricingPage'));
 
+// Spinner de carga mientras se cargan componentes lazy
 const LoadingFallback = () => (
     <div className="flex h-screen w-full items-center justify-center bg-gray-950">
         <div className="w-12 h-12 border-[3px] border-primary-500/20 border-t-primary-500 rounded-full animate-spin"></div>
     </div>
 );
 
+// Layout principal de la aplicación (sidebar + header + contenido)
 const MainLayout = () => {
     const [sidebarOpen, setSidebarOpen] = React.useState(false);
     return (
@@ -95,11 +104,13 @@ const MainLayout = () => {
 function App() {
     const { initializeAuth, isAuthenticated, isProfileLoading } = useAppStore();
     
+    // FIX CRÍTICO: Solo inicializar UNA VEZ cuando la app arranca
     useEffect(() => {
         console.log("🎬 App.tsx: Inicializando autenticación...");
         initializeAuth();
     }, [initializeAuth]);
 
+    // Mostrar spinner mientras se verifica si hay sesión
     if (isProfileLoading) {
         console.log("⏳ App.tsx: Cargando perfil...");
         return <LoadingFallback />;
@@ -112,22 +123,30 @@ function App() {
                 <ToastContainer />
                 <CookieBanner />
                 <Routes>
+                    {/* Rutas de autenticación (login/register) */}
                     <Route path="/auth" element={<AuthLayout />}>
                         <Route path="login" element={<LoginPage />} />
                         <Route path="register" element={<RegisterPage />} />
                         <Route index element={<Navigate to="login" replace />} />
                     </Route>
                     
+                    {/* Portal para clientes */}
                     <Route path="/portal" element={<Suspense fallback={<LoadingFallback />}><PortalLayout /></Suspense>}>
                         <Route path="login" element={<PortalLoginPage />} />
-                        <Route path="dashboard/:clientId" element={<PortalDashboardPage />} />
-                        <Route path="invoice/:invoiceId" element={<PortalInvoiceViewPage />} />
-                        <Route index element={<Navigate to="login" replace />} />
+                        <Route path="dashboard" element={<PortalDashboardPage />} />
+                        <Route path="invoices/:invoiceId" element={<PortalInvoiceViewPage />} />
+                        <Route path="contracts/:contractId" element={<PortalContractViewPage />} />
+                        <Route path="budgets/:budgetId" element={<PortalBudgetViewPage />} />
+                        <Route path="proposals/:proposalId" element={<PortalProposalViewPage />} />
+                        <Route index element={<Navigate to="dashboard" replace />} />
                     </Route>
 
+                    {/* Páginas públicas */}
                     <Route path="/privacy" element={<PrivacyPolicyPage />} />
                     <Route path="/terms" element={<TermsOfService />} />
+                    <Route path="/pricing" element={<PricingPage />} />
                     
+                    {/* FIX: Rutas protegidas - solo accesibles si estás autenticado */}
                     <Route 
                         path="/" 
                         element={isAuthenticated ? <MainLayout /> : <LandingPage />}
@@ -170,6 +189,7 @@ function App() {
                         <Route path="admin" element={<AdminDashboard />} />
                     </Route>
 
+                    {/* Capturador de rutas no encontradas */}
                     <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
            </>

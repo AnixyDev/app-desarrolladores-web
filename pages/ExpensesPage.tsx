@@ -8,6 +8,7 @@ import Input from '@/components/ui/Input';
 import { Expense, RecurringExpense } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { PlusIcon, TrashIcon, RepeatIcon } from '@/components/icons/Icon';
+import { useToast } from '@/hooks/useToast';
 
 const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
@@ -21,6 +22,7 @@ const ExpensesPage: React.FC = () => {
         deleteRecurringExpense,
         projects,
     } = useAppStore();
+    const { addToast } = useToast();
 
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
@@ -57,25 +59,35 @@ const ExpensesPage: React.FC = () => {
     };
 
 
-    const handleExpenseSubmit = (e: React.FormEvent) => {
+    const handleExpenseSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        addExpense({
-            ...newExpense,
-            amount_cents: Math.round(Number(newExpense.amount_cents) * 100),
-            tax_percent: Number(newExpense.tax_percent) || 0,
-        } as any);
-        setIsExpenseModalOpen(false);
-        setNewExpense(initialExpenseState);
+        try {
+            await addExpense({
+                ...newExpense,
+                amount_cents: Math.round(Number(newExpense.amount_cents) * 100),
+                tax_percent: Number(newExpense.tax_percent) || 0,
+            } as any);
+            addToast('Gasto añadido.', 'success');
+            setIsExpenseModalOpen(false);
+            setNewExpense(initialExpenseState);
+        } catch (err) {
+            addToast((err as Error).message || 'No se pudo añadir el gasto.', 'error');
+        }
     };
 
-    const handleRecurringSubmit = (e: React.FormEvent) => {
+    const handleRecurringSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        addRecurringExpense({
-            ...newRecurringExpense,
-            amount_cents: Math.round(Number(newRecurringExpense.amount_cents) * 100),
-        });
-        setIsRecurringModalOpen(false);
-        setNewRecurringExpense(initialRecurringState);
+        try {
+            await addRecurringExpense({
+                ...newRecurringExpense,
+                amount_cents: Math.round(Number(newRecurringExpense.amount_cents) * 100),
+            });
+            addToast('Gasto recurrente añadido.', 'success');
+            setIsRecurringModalOpen(false);
+            setNewRecurringExpense(initialRecurringState);
+        } catch (err) {
+            addToast((err as Error).message || 'No se pudo añadir el gasto recurrente.', 'error');
+        }
     };
 
     const handleDeleteClick = (id: string, type: 'single' | 'recurring') => {
@@ -83,12 +95,16 @@ const ExpensesPage: React.FC = () => {
         setIsConfirmModalOpen(true);
     };
     
-    const confirmDelete = () => {
+    const confirmDelete = async () => {
         if (itemToDelete) {
-            if (itemToDelete.type === 'single') {
-                deleteExpense(itemToDelete.id);
-            } else {
-                deleteRecurringExpense(itemToDelete.id);
+            try {
+                if (itemToDelete.type === 'single') {
+                    await deleteExpense(itemToDelete.id);
+                } else {
+                    await deleteRecurringExpense(itemToDelete.id);
+                }
+            } catch (err) {
+                addToast((err as Error).message || 'No se pudo eliminar.', 'error');
             }
             setIsConfirmModalOpen(false);
             setItemToDelete(null);

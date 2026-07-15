@@ -125,6 +125,7 @@ const KnowledgeBase: React.FC = () => {
             return;
         }
         setIsLoading(true);
+        // Simulate AI call
         setTimeout(() => {
             const generatedContent = `Este es un documento generado por IA sobre "${generatorTopic}".\n\nSección 1: ...\nSección 2: ...`;
             setCurrentArticle({ title: generatorTopic, content: generatedContent, tags: [generatorTopic.toLowerCase()] });

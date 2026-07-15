@@ -104,6 +104,7 @@ const JobMarketDashboard = () => {
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
 
+  // --- Search & Filter State ---
   const [searchTerm, setSearchTerm] = useState('');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [filters, setFilters] = useState({
@@ -186,6 +187,8 @@ const JobMarketDashboard = () => {
   }, [filteredJobs, sort]);
 
   const handleApplyClick = (job: Job) => {
+    // ELIMINADO EL BLOQUEO: Si el usuario es Pro, no debería ver el modal. 
+    // Si el perfil no ha cargado aún, esperamos, pero no bloqueamos.
     if (profile?.plan === 'Free') {
         setIsUpgradeModalOpen(true);
     } else {

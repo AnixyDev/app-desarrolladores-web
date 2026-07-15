@@ -89,11 +89,24 @@ const BudgetsPage: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addBudget(newBudget);
-    setIsModalOpen(false);
-    setNewBudget(initialBudgetState);
+    try {
+      await addBudget(newBudget);
+      addToast('Presupuesto creado.', 'success');
+      setIsModalOpen(false);
+      setNewBudget(initialBudgetState);
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo crear el presupuesto.', 'error');
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, status: 'accepted' | 'rejected') => {
+    try {
+      await updateBudgetStatus(id, status);
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo actualizar el presupuesto.', 'error');
+    }
   };
 
   const handleAiGenerate = async () => {
@@ -218,9 +231,7 @@ const BudgetsPage: React.FC = () => {
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() =>
-                              updateBudgetStatus(budget.id, 'accepted')
-                            }
+                            onClick={() => handleUpdateStatus(budget.id, 'accepted')}
                           >
                             <CheckCircleIcon className="w-4 h-4 text-green-400" />
                           </Button>
@@ -228,9 +239,7 @@ const BudgetsPage: React.FC = () => {
                           <Button
                             size="sm"
                             variant="secondary"
-                            onClick={() =>
-                              updateBudgetStatus(budget.id, 'rejected')
-                            }
+                            onClick={() => handleUpdateStatus(budget.id, 'rejected')}
                           >
                             <XCircleIcon className="w-4 h-4 text-red-400" />
                           </Button>
@@ -257,10 +266,10 @@ const BudgetsPage: React.FC = () => {
                   <p className="text-xs text-gray-500">{budget.created_at}</p>
                   {budget.status === 'pending' && (
                     <div className="flex justify-end gap-2 pt-1 border-t border-gray-800/50">
-                      <Button size="sm" variant="secondary" onClick={() => updateBudgetStatus(budget.id, 'accepted')}>
+                      <Button size="sm" variant="secondary" onClick={() => handleUpdateStatus(budget.id, 'accepted')}>
                         <CheckCircleIcon className="w-4 h-4 text-green-400" />
                       </Button>
-                      <Button size="sm" variant="secondary" onClick={() => updateBudgetStatus(budget.id, 'rejected')}>
+                      <Button size="sm" variant="secondary" onClick={() => handleUpdateStatus(budget.id, 'rejected')}>
                         <XCircleIcon className="w-4 h-4 text-red-400" />
                       </Button>
                     </div>

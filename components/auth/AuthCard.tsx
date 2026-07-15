@@ -8,10 +8,10 @@ const AuthCard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 {children}
             </div>
             <div className="p-4 border-t border-gray-800 bg-gray-800/20 rounded-b-lg text-center mt-auto flex flex-wrap justify-center gap-4">
-                <Link to="/politica-de-privacidad" className="text-xs text-gray-500 hover:text-gray-300 hover:underline">
+                <Link to="/privacy" className="text-xs text-gray-500 hover:text-gray-300 hover:underline">
                     Privacidad
                 </Link>
-                <Link to="/condiciones-de-servicio" className="text-xs text-gray-500 hover:text-gray-300 hover:underline">
+                <Link to="/terms" className="text-xs text-gray-500 hover:text-gray-300 hover:underline">
                     Términos y Condiciones
                 </Link>
             </div>

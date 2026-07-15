@@ -1,4 +1,11 @@
 // pages/JobApplicantsPage.tsx
+// FIX: esta página era 100% mock (dos candidatos inventados con email/
+// teléfono/CV que no existen en el esquema) y nunca tocaba job_applications.
+// Ahora usa los datos reales ya resueltos por jobSlice.fetchApplications()
+// (nombre real vía join a profiles, propuesta real, estado real) y las
+// acciones aceptar/rechazar escriben de verdad en Supabase a través de
+// updateApplicationStatus, que requiere la política RLS
+// "job_applications_owner_update_status" (dueño de la oferta).
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Card, { CardContent } from '@/components/ui/Card';
@@ -32,6 +39,7 @@ const JobApplicantsPage: React.FC = () => {
   const job = jobId ? getJobById(jobId) : undefined;
   const applicants = useMemo(() => (jobId ? getApplicationsByJobId(jobId) : []), [jobId, getApplicationsByJobId]);
 
+  // Al entrar, marca como "vistas" las postulaciones que aún estaban en "sent"
   useEffect(() => {
     applicants.forEach(app => {
       if (app.status === 'sent') viewApplication(app.id);

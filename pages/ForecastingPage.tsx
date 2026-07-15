@@ -247,6 +247,22 @@ const handleSelectBudget = (budgetId: string) => {
 
   // Devuelve el estado real de cobro combinando `paid` (booleano, sincronizado por trigger)
   // con el importe parcial acumulado, para mostrar 4 estados: pagada / parcial / pendiente / sin importe
+  const handleDeleteInvoice = async (id: string) => {
+    try {
+      await deleteInvoice(id);
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo eliminar la factura.', 'error');
+    }
+  };
+
+  const handleDeleteRecurringInvoice = async (id: string) => {
+    try {
+      await deleteRecurringInvoice(id);
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo eliminar la factura recurrente.', 'error');
+    }
+  };
+
   const getPaymentStatus = (invoiceId: string, totalCents: number, isPaidFlag: boolean) => {
     const summary = paymentsByInvoice[invoiceId];
     const trackedPaidCents = summary?.paidCents ?? 0;
@@ -372,7 +388,7 @@ const handleSelectBudget = (budgetId: string) => {
                                 <Send className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => deleteInvoice(inv.id)}
+                                onClick={() => handleDeleteInvoice(inv.id)}
                                 className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                                 title="Eliminar"
                               >
@@ -404,7 +420,7 @@ const handleSelectBudget = (budgetId: string) => {
                       <p className="text-xs text-gray-500 capitalize">{ri.frequency}</p>
                     </div>
                     <button
-                      onClick={() => deleteRecurringInvoice(ri.id)}
+                      onClick={() => handleDeleteRecurringInvoice(ri.id)}
                       className="text-gray-500 hover:text-red-500 transition-colors"
                     >
                       <Trash className="w-4 h-4" />

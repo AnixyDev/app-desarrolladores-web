@@ -21,6 +21,11 @@ const MyTeamTimesheet: React.FC = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
 
+  // FIX: antes se mostraban TODAS las tareas/proyectos visibles por RLS
+  // (propios + del equipo mezclados), sin distinguir de qué workspace son.
+  // Esta página es específicamente la vista de "trabajo en el equipo de
+  // otro", así que si hay una membresía activa, se filtra estrictamente a
+  // los proyectos/tareas del dueño del equipo (teamMembership.ownerId).
   const scopedProjects = useMemo(() => {
     if (!teamMembership) return projects;
     return projects.filter(p => p.user_id === teamMembership.ownerId);
@@ -43,6 +48,9 @@ const MyTeamTimesheet: React.FC = () => {
   const [manualEntry, setManualEntry] = useState<ManualEntry>(initialManualEntry);
 
   const relevantTasks = useMemo(() => {
+    // Antes devolvía "tasks" sin filtrar (comentario decía "en una app real
+    // esto se filtraría"). Ahora sí se filtra: solo tareas de proyectos del
+    // workspace correspondiente (propio, o del equipo si hay membresía).
     if (!teamMembership) return tasks;
     return tasks.filter(t => scopedProjectIds.has(t.project_id));
   }, [tasks, teamMembership, scopedProjectIds]);

@@ -46,6 +46,7 @@ const JobPostForm: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // CORRECCIÓN: Permitir acceso si es Pro o Teams
     if (profile && profile.plan === 'Free') {
       setIsUpgradeModalOpen(true);
     }

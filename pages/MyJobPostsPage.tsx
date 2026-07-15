@@ -20,6 +20,7 @@ const MyJobPostsPage: React.FC = () => {
 
     const myJobs = jobs.filter(j => j.postedByUserId === profile?.id); 
     
+    // Solo mostramos el modal si el perfil está cargado Y es Free
     const showUpgrade = profile && profile.id && profile.plan === 'Free';
 
     const getApplicantCount = (jobId: string) => {

@@ -22,7 +22,6 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
     const [isLoading, setIsLoading] = useState(false);
     const [isRefining, setIsRefining] = useState<boolean>(false);
     const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
-    const [isSending, setIsSending] = useState(false);
 
     const userProfileSummary = profile?.bio || `Freelancer con experiencia en desarrollo full-stack. Tarifa por hora: ${profile.hourly_rate_cents / 100}€/h. Habilidades: ${profile.skills?.join(', ')}`;
 
@@ -69,11 +68,14 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
         if (isOpen) {
             handleGenerate();
         } else {
+            // Reset state when closing
             setProposalText('');
             setIsLoading(false);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, job]);
+
+    const [isSending, setIsSending] = useState(false);
 
     const handleSendApplication = async () => {
         if (!profile) return;

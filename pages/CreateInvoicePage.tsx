@@ -134,31 +134,36 @@ const CreateInvoicePage: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (newInvoice.isRecurring) {
-      addRecurringInvoice({
-        client_id: newInvoice.client_id,
-        project_id: newInvoice.project_id || null,
-        items: newInvoice.items,
-        tax_percent: newInvoice.tax_percent,
-        frequency: newInvoice.frequency,
-        start_date: newInvoice.start_date,
-      });
-    } else {
-      addInvoice(
-        {
+    try {
+      if (newInvoice.isRecurring) {
+        await addRecurringInvoice({
           client_id: newInvoice.client_id,
           project_id: newInvoice.project_id || null,
-          issue_date: newInvoice.issue_date,
-          due_date: newInvoice.due_date,
           items: newInvoice.items,
           tax_percent: newInvoice.tax_percent,
-          irpf_percent: newInvoice.irpf_percent,
-        },
-        timeEntryIdsToBill
-      );
+          frequency: newInvoice.frequency,
+          start_date: newInvoice.start_date,
+        });
+      } else {
+        await addInvoice(
+          {
+            client_id: newInvoice.client_id,
+            project_id: newInvoice.project_id || null,
+            issue_date: newInvoice.issue_date,
+            due_date: newInvoice.due_date,
+            items: newInvoice.items,
+            tax_percent: newInvoice.tax_percent,
+            irpf_percent: newInvoice.irpf_percent,
+          },
+          timeEntryIdsToBill
+        );
+      }
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo procesar la factura.', 'error');
+      return;
     }
 
     addToast('Factura procesada con éxito.', 'success');

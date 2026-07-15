@@ -150,9 +150,8 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
 },
   deleteInvoice: async (id) => {
     const { error } = await supabase.from('invoices').delete().eq('id', id);
-    if (!error) {
-      set(state => ({ invoices: state.invoices.filter(i => i.id !== id) }));
-    }
+    if (error) { console.error('Error deleting invoice:', error); throw error; }
+    set(state => ({ invoices: state.invoices.filter(i => i.id !== id) }));
   },
 
   markInvoiceAsPaid: async (id) => {
@@ -162,22 +161,22 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
       .update({ paid: true, payment_date: paymentDate })
       .eq('id', id);
 
-    if (!error) {
-      set(state => ({
-        invoices: state.invoices.map(i =>
-          i.id === id ? { ...i, paid: true, payment_date: paymentDate } : i
-        ),
-      }));
-      const invoice = get().invoices.find(i => i.id === id);
-      if (invoice) {
-        get().addNotification(`La factura #${invoice.invoice_number} ha sido pagada.`, '/invoices');
-      }
+    if (error) { console.error('Error marking invoice as paid:', error); throw error; }
+
+    set(state => ({
+      invoices: state.invoices.map(i =>
+        i.id === id ? { ...i, paid: true, payment_date: paymentDate } : i
+      ),
+    }));
+    const invoice = get().invoices.find(i => i.id === id);
+    if (invoice) {
+      get().addNotification(`La factura #${invoice.invoice_number} ha sido pagada.`, '/invoices');
     }
   },
 
   addRecurringInvoice: async (recurringData) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) throw new Error('Usuario no autenticado');
 
     const { data, error } = await supabase
       .from('recurring_invoices')
@@ -185,19 +184,18 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
       .select()
       .single();
 
-    if (!error && data) {
-      set(state => ({ recurringInvoices: [...state.recurringInvoices, data as RecurringInvoice] }));
-      get().checkAndGenerateRecurringInvoices();
-    }
+    if (error) { console.error('Error adding recurring invoice:', error); throw error; }
+
+    set(state => ({ recurringInvoices: [...state.recurringInvoices, data as RecurringInvoice] }));
+    get().checkAndGenerateRecurringInvoices();
   },
 
   deleteRecurringInvoice: async (id) => {
     const { error } = await supabase.from('recurring_invoices').delete().eq('id', id);
-    if (!error) {
-      set(state => ({
-        recurringInvoices: state.recurringInvoices.filter(ri => ri.id !== id),
-      }));
-    }
+    if (error) { console.error('Error deleting recurring invoice:', error); throw error; }
+    set(state => ({
+      recurringInvoices: state.recurringInvoices.filter(ri => ri.id !== id),
+    }));
   },
 
   checkAndGenerateRecurringInvoices: async () => {
@@ -209,7 +207,7 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
 
   addExpense: async (expense) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) throw new Error('Usuario no autenticado');
 
     const { data, error } = await supabase
       .from('expenses')
@@ -217,26 +215,20 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
       .select()
       .single();
     
-    if (error) {
-      console.error('Error adding expense:', error);
-      throw error;
-    }
+    if (error) { console.error('Error adding expense:', error); throw error; }
 
-    if (!error && data) {
-      set(state => ({ expenses: [data as Expense, ...state.expenses] }));
-    }
+    set(state => ({ expenses: [data as Expense, ...state.expenses] }));
   },
 
   deleteExpense: async (id) => {
     const { error } = await supabase.from('expenses').delete().eq('id', id);
-    if (!error) {
-      set(state => ({ expenses: state.expenses.filter(e => e.id !== id) }));
-    }
+    if (error) { console.error('Error deleting expense:', error); throw error; }
+    set(state => ({ expenses: state.expenses.filter(e => e.id !== id) }));
   },
 
   addRecurringExpense: async (expense) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) throw new Error('Usuario no autenticado');
 
     const { data, error } = await supabase
       .from('recurring_expenses')
@@ -244,25 +236,24 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
       .select()
       .single();
 
-    if (!error && data) {
-      set(state => ({
-        recurringExpenses: [data as RecurringExpense, ...state.recurringExpenses],
-      }));
-    }
+    if (error) { console.error('Error adding recurring expense:', error); throw error; }
+
+    set(state => ({
+      recurringExpenses: [data as RecurringExpense, ...state.recurringExpenses],
+    }));
   },
 
   deleteRecurringExpense: async (id) => {
     const { error } = await supabase.from('recurring_expenses').delete().eq('id', id);
-    if (!error) {
-      set(state => ({
-        recurringExpenses: state.recurringExpenses.filter(re => re.id !== id),
-      }));
-    }
+    if (error) { console.error('Error deleting recurring expense:', error); throw error; }
+    set(state => ({
+      recurringExpenses: state.recurringExpenses.filter(re => re.id !== id),
+    }));
   },
 
   addBudget: async (budgetData) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) throw new Error('Usuario no autenticado');
 
     const amount_cents = budgetData.items.reduce(
       (sum, item) => sum + item.price_cents * item.quantity,
@@ -275,23 +266,21 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
       .select()
       .single();
 
-    if (!error && data) {
-      set(state => ({ budgets: [data as Budget, ...state.budgets] }));
-    }
+    if (error) { console.error('Error adding budget:', error); throw error; }
+    set(state => ({ budgets: [data as Budget, ...state.budgets] }));
   },
 
   updateBudgetStatus: async (id, status) => {
     const { error } = await supabase.from('budgets').update({ status }).eq('id', id);
-    if (!error) {
-      set(state => ({
-        budgets: state.budgets.map(b => (b.id === id ? { ...b, status } : b)),
-      }));
-    }
+    if (error) { console.error('Error updating budget status:', error); throw error; }
+    set(state => ({
+      budgets: state.budgets.map(b => (b.id === id ? { ...b, status } : b)),
+    }));
   },
 
   addProposal: async (proposalData) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) throw new Error('Usuario no autenticado');
 
     const { data, error } = await supabase
       .from('proposals')
@@ -299,23 +288,20 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
       .select()
       .single();
 
-    if (!error && data) {
-      set(state => ({ proposals: [data as Proposal, ...state.proposals] }));
-    }
+    if (error) { console.error('Error adding proposal:', error); throw error; }
+    set(state => ({ proposals: [data as Proposal, ...state.proposals] }));
   },
   updateProposal: async (id, updates) => {
     const { error } = await supabase.from('proposals').update(updates).eq('id', id);
-    if (!error) {
-      set(state => ({
-        proposals: state.proposals.map(p => (p.id === id ? { ...p, ...updates } : p)),
-      }));
-    }
+    if (error) { console.error('Error updating proposal:', error); throw error; }
+    set(state => ({
+      proposals: state.proposals.map(p => (p.id === id ? { ...p, ...updates } : p)),
+    }));
   },
   deleteProposal: async (id) => {
     const { error } = await supabase.from('proposals').delete().eq('id', id);
-    if (!error) {
-      set(state => ({ proposals: state.proposals.filter(p => p.id !== id) }));
-    }
+    if (error) { console.error('Error deleting proposal:', error); throw error; }
+    set(state => ({ proposals: state.proposals.filter(p => p.id !== id) }));
   },
 
   addContract: async (contractData) => {
@@ -333,25 +319,21 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
       throw error;
     }
 
-    if (!error && data) {
-      set(state => ({ contracts: [data as Contract, ...state.contracts] }));
-    }
+    set(state => ({ contracts: [data as Contract, ...state.contracts] }));
   },
 
   updateContract: async (id, updates) => {
     const { error } = await supabase.from('contracts').update(updates).eq('id', id);
-    if (!error) {
-      set(state => ({
-        contracts: state.contracts.map(c => (c.id === id ? { ...c, ...updates } : c)),
-      }));
-    }
+    if (error) { console.error('Error updating contract:', error); throw error; }
+    set(state => ({
+      contracts: state.contracts.map(c => (c.id === id ? { ...c, ...updates } : c)),
+    }));
   },
 
   deleteContract: async (id) => {
     const { error } = await supabase.from('contracts').delete().eq('id', id);
-    if (!error) {
-      set(state => ({ contracts: state.contracts.filter(c => c.id !== id) }));
-    }
+    if (error) { console.error('Error deleting contract:', error); throw error; }
+    set(state => ({ contracts: state.contracts.filter(c => c.id !== id) }));
   },
 
   sendContract: async (id) => {
@@ -360,13 +342,12 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
       .update({ status: 'sent' })
       .eq('id', id);
 
-    if (!error) {
-      set(state => ({
-        contracts: state.contracts.map(c =>
-          c.id === id ? { ...c, status: 'sent' as Contract['status'] } : c
-        ),
-      }));
-    }
+    if (error) { console.error('Error sending contract:', error); throw error; }
+    set(state => ({
+      contracts: state.contracts.map(c =>
+        c.id === id ? { ...c, status: 'sent' as Contract['status'] } : c
+      ),
+    }));
   },
 
   signContract: async (id, signerName) => {
@@ -376,15 +357,14 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
       .update({ status: 'signed', signed_by: signerName, signed_at: signedAt })
       .eq('id', id);
 
-    if (!error) {
-      set(state => ({
-        contracts: state.contracts.map(c =>
-          c.id === id
-            ? { ...c, status: 'signed' as Contract['status'], signed_by: signerName, signed_at: signedAt }
-            : c
-        ),
-      }));
-    }
+    if (error) { console.error('Error signing contract:', error); throw error; }
+    set(state => ({
+      contracts: state.contracts.map(c =>
+        c.id === id
+          ? { ...c, status: 'signed' as Contract['status'], signed_by: signerName, signed_at: signedAt }
+          : c
+      ),
+    }));
   },
 
   setMonthlyGoal: (goal) => {

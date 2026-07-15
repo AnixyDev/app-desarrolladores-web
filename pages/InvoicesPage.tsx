@@ -240,6 +240,22 @@ const handleSelectBudget = (budgetId: string) => {
     addToast('Se abrió tu cliente de correo con el borrador de la factura.', 'success');
   };
 
+  const handleDeleteInvoice = async (id: string) => {
+    try {
+      await deleteInvoice(id);
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo eliminar la factura.', 'error');
+    }
+  };
+
+  const handleDeleteRecurringInvoice = async (id: string) => {
+    try {
+      await deleteRecurringInvoice(id);
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo eliminar la factura recurrente.', 'error');
+    }
+  };
+
   // Devuelve el estado real de cobro combinando `paid` (booleano, sincronizado por trigger)
   // con el importe parcial acumulado, para mostrar 4 estados: pagada / parcial / pendiente / sin importe
   const getPaymentStatus = (invoiceId: string, totalCents: number, isPaidFlag: boolean) => {
@@ -367,7 +383,7 @@ const handleSelectBudget = (budgetId: string) => {
                                 <Send className="w-4 h-4" />
                               </button>
                               <button
-                                onClick={() => deleteInvoice(inv.id)}
+                                onClick={() => handleDeleteInvoice(inv.id)}
                                 className="p-2 text-gray-400 hover:text-red-500 transition-colors"
                                 title="Eliminar"
                               >
@@ -432,7 +448,7 @@ const handleSelectBudget = (budgetId: string) => {
                           <button onClick={() => handleSendEmailInvoice(inv)} className="p-2 text-gray-400 hover:text-primary-400 transition-colors" title="Enviar por Email">
                             <Send className="w-4 h-4" />
                           </button>
-                          <button onClick={() => deleteInvoice(inv.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar">
+                          <button onClick={() => handleDeleteInvoice(inv.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar">
                             <Trash className="w-4 h-4" />
                           </button>
                         </div>
@@ -459,7 +475,7 @@ const handleSelectBudget = (budgetId: string) => {
                       <p className="text-xs text-gray-500 capitalize">{ri.frequency}</p>
                     </div>
                     <button
-                      onClick={() => deleteRecurringInvoice(ri.id)}
+                      onClick={() => handleDeleteRecurringInvoice(ri.id)}
                       className="text-gray-500 hover:text-red-500 transition-colors"
                     >
                       <Trash className="w-4 h-4" />
