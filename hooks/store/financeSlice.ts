@@ -121,12 +121,24 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
   const subtotal = invoiceData.items.reduce((sum, item) => sum + item.price_cents * item.quantity, 0);
   const total = Math.round(subtotal + (subtotal * ((invoiceData.tax_percent || 0) / 100)) - (subtotal * ((invoiceData.irpf_percent || 0) / 100)));
 
+  // FIX: la numeración de facturas debe ser correlativa por ley (AEAT);
+  // antes se generaba con Date.now(), sin garantía de unicidad ni de
+  // secuencia. generate_invoice_number() calcula el siguiente número
+  // correlativo del año para este usuario (INV-2026-0001, ...).
+  const { data: invoiceNumber, error: numberError } = await supabase.rpc('generate_invoice_number', {
+    p_user_id: user.id,
+  });
+  if (numberError) {
+    console.error('Error generando el número de factura:', numberError);
+    throw numberError;
+  }
+
   const { data, error } = await supabase
     .from('invoices')
     .insert({
       ...invoiceData,
       user_id: user.id, // Opcional si RLS usa auth.uid()
-      invoice_number: `INV-${Date.now().toString().slice(-6)}`,
+      invoice_number: invoiceNumber,
       subtotal_cents: subtotal,
       total_cents: total,
       paid: false
