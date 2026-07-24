@@ -10,7 +10,10 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   MessageSquareIcon,
+  SendIcon,
 } from '../components/icons/Icon';
+
+import { sendEmail } from '../services/emailService';
 
 import { generateItemsForDocument, AI_CREDIT_COSTS } from '../services/geminiService';
 import { useToast } from '../hooks/useToast';
@@ -107,6 +110,22 @@ const BudgetsPage: React.FC = () => {
     } catch (err) {
       addToast((err as Error).message || 'No se pudo actualizar el presupuesto.', 'error');
     }
+  };
+
+  // FIX: no existía ninguna forma de enviar el presupuesto al cliente — ni
+  // link al portal, ni email. Mismo patrón que ya usa ContractsPage.tsx:
+  // abre un borrador de correo con el link real de /portal/budgets/:id.
+  const handleSendBudget = (budget: typeof budgets[number]) => {
+    const client = getClientById(budget.client_id);
+    if (!client?.email) {
+      addToast('Este cliente no tiene email registrado.', 'error');
+      return;
+    }
+    const portalLink = `${window.location.origin}/portal/budgets/${budget.id}`;
+    const subject = `Presupuesto: ${budget.description}`;
+    const body = `Hola ${client.name},\n\nTe envío el presupuesto "${budget.description}" por un importe de ${formatCurrency(budget.amount_cents)}.\n\nPuedes verlo y aceptarlo o rechazarlo aquí:\n${portalLink}\n\nUn saludo.`;
+    sendEmail(client.email, subject, body);
+    addToast('Se abrió tu cliente de correo con el borrador del presupuesto.', 'success');
   };
 
   const handleAiGenerate = async () => {
@@ -226,25 +245,35 @@ const BudgetsPage: React.FC = () => {
                     </td>
 
                     <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
-                      {budget.status === 'pending' && (
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleUpdateStatus(budget.id, 'accepted')}
-                          >
-                            <CheckCircleIcon className="w-4 h-4 text-green-400" />
-                          </Button>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleSendBudget(budget)}
+                          title="Enviar al cliente"
+                        >
+                          <SendIcon className="w-4 h-4" />
+                        </Button>
+                        {budget.status === 'pending' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleUpdateStatus(budget.id, 'accepted')}
+                            >
+                              <CheckCircleIcon className="w-4 h-4 text-green-400" />
+                            </Button>
 
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleUpdateStatus(budget.id, 'rejected')}
-                          >
-                            <XCircleIcon className="w-4 h-4 text-red-400" />
-                          </Button>
-                        </div>
-                      )}
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleUpdateStatus(budget.id, 'rejected')}
+                            >
+                              <XCircleIcon className="w-4 h-4 text-red-400" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -264,16 +293,21 @@ const BudgetsPage: React.FC = () => {
                     <span className="text-white font-bold">{formatCurrency(budget.amount_cents)}</span>
                   </div>
                   <p className="text-xs text-gray-500">{budget.created_at}</p>
-                  {budget.status === 'pending' && (
-                    <div className="flex justify-end gap-2 pt-1 border-t border-gray-800/50">
-                      <Button size="sm" variant="secondary" onClick={() => handleUpdateStatus(budget.id, 'accepted')}>
-                        <CheckCircleIcon className="w-4 h-4 text-green-400" />
-                      </Button>
-                      <Button size="sm" variant="secondary" onClick={() => handleUpdateStatus(budget.id, 'rejected')}>
-                        <XCircleIcon className="w-4 h-4 text-red-400" />
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex justify-end gap-2 pt-1 border-t border-gray-800/50">
+                    <Button size="sm" variant="secondary" onClick={() => handleSendBudget(budget)} title="Enviar al cliente">
+                      <SendIcon className="w-4 h-4" />
+                    </Button>
+                    {budget.status === 'pending' && (
+                      <>
+                        <Button size="sm" variant="secondary" onClick={() => handleUpdateStatus(budget.id, 'accepted')}>
+                          <CheckCircleIcon className="w-4 h-4 text-green-400" />
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={() => handleUpdateStatus(budget.id, 'rejected')}>
+                          <XCircleIcon className="w-4 h-4 text-red-400" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

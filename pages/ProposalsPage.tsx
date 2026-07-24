@@ -12,8 +12,10 @@ import {
   PlusIcon, 
   TrashIcon, 
   SearchIcon,
-  FileTextIcon
+  FileTextIcon,
+  SendIcon
 } from '../components/icons/Icon';
+import { sendEmail } from '../services/emailService';
 import { useToast } from '../hooks/useToast';
 import { Proposal } from '@/types';
 
@@ -96,6 +98,32 @@ const ProposalsPage: React.FC = () => {
     } catch (e) {
       addToast('❌ Error al convertir la propuesta en factura.', 'error');
     }
+  };
+
+  // FIX: no existía ninguna forma de enviar la propuesta al cliente — ni
+  // link al portal, ni email. Mismo patrón que ContractsPage.tsx /
+  // BudgetsPage.tsx. También marca la propuesta como "sent" al enviarla de
+  // verdad, en vez de que ese estado solo pudiera fijarse a mano editando
+  // el formulario.
+  const handleSendProposal = async (proposal: Proposal) => {
+    const client = clients.find(c => c.id === proposal.client_id);
+    if (!client?.email) {
+      addToast('Este cliente no tiene email registrado.', 'error');
+      return;
+    }
+    const portalLink = `${window.location.origin}/portal/proposals/${proposal.id}`;
+    const subject = `Propuesta: ${proposal.title}`;
+    const body = `Hola ${client.name},\n\nTe envío la propuesta "${proposal.title}" por un importe de ${formatCurrency(proposal.amount_cents)}.\n\nPuedes verla y aceptarla o rechazarla aquí:\n${portalLink}\n\nUn saludo.`;
+    sendEmail(client.email, subject, body);
+
+    if (proposal.status === 'draft') {
+      try {
+        await updateProposal(proposal.id, { status: 'sent' });
+      } catch {
+        // No bloquea el envío del email si esto falla; se puede reintentar.
+      }
+    }
+    addToast('Se abrió tu cliente de correo con el borrador de la propuesta.', 'success');
   };
 
   const handleChange = (
@@ -277,6 +305,13 @@ const ProposalsPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                         <div className="flex justify-end gap-2">
+                           <button
+                             onClick={() => handleSendProposal(proposal)}
+                             title="Enviar al cliente"
+                             className="p-2 text-gray-500 hover:text-primary-400 hover:bg-primary-400/10 rounded-lg transition-all"
+                           >
+                             <SendIcon className="w-4 h-4" />
+                           </button>
                            {proposal.status === 'accepted' && (
                              <button
                                onClick={() => handleConvertToInvoice(proposal)}
@@ -318,6 +353,9 @@ const ProposalsPage: React.FC = () => {
                     </div>
                     <p className="text-xs text-gray-500">{formatDate(proposal.created_at)}</p>
                     <div className="flex justify-end gap-2 pt-1 border-t border-gray-800/50">
+                      <button onClick={() => handleSendProposal(proposal)} title="Enviar al cliente" className="p-2 text-gray-500 hover:text-primary-400 hover:bg-primary-400/10 rounded-lg transition-all">
+                        <SendIcon className="w-4 h-4" />
+                      </button>
                       {proposal.status === 'accepted' && (
                         <button onClick={() => handleConvertToInvoice(proposal)} title="Convertir en Factura" className="p-2 text-gray-500 hover:text-green-400 hover:bg-green-400/10 rounded-lg transition-all">
                           <FileTextIcon className="w-4 h-4" />

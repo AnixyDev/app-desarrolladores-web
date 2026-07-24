@@ -227,22 +227,36 @@ const handleSelectBudget = (budgetId: string) => {
     }
   };
 
-  // Abre el cliente de correo del usuario con un borrador prellenado.
-  // IMPORTANTE: esto NO envía el email en segundo plano por sí solo —
-  // abre la app de correo (Gmail, Outlook, Mail...) con el mensaje ya
-  // redactado para que el usuario pulse "Enviar" desde ahí. Enviar el
-  // email automáticamente sin intervención requeriría una Edge Function
-  // de backend (ej. con Resend) que hoy no existe en el proyecto.
-  const handleSendEmailInvoice = (invoice: typeof invoices[number]) => {
+  // Abre el cliente de correo del usuario con un borrador prellenado (mailto:).
+  // FIX: un enlace mailto: nunca puede adjuntar archivos (limitación del
+  // navegador/SO, no del código) — antes el cuerpo decía "Adjunto la
+  // factura..." sin haberse descargado ni adjuntado nada, y esta función
+  // nunca llamaba a generateInvoicePdf (esa llamada solo se había añadido
+  // al botón separado "Descargar PDF", handleDownloadPdf). Ahora descarga
+  // el PDF primero y avisa explícitamente de que hay que adjuntarlo a mano.
+  const handleSendEmailInvoice = async (invoice: typeof invoices[number]) => {
     const client = getClientById(invoice.client_id);
     if (!client?.email) {
       addToast('Este cliente no tiene email registrado.', 'error');
       return;
     }
+    if (!profile) {
+      addToast('No se pudo cargar tu perfil para generar el PDF.', 'error');
+      return;
+    }
+
+    try {
+      await generateInvoicePdf(invoice, client, profile);
+    } catch (error) {
+      console.error('Error generando el PDF:', error);
+      addToast('No se pudo generar el PDF de la factura.', 'error');
+      return;
+    }
+
     const subject = `Factura ${invoice.invoice_number}`;
-    const body = `Hola ${client.name},\n\nAdjunto la factura ${invoice.invoice_number} por un importe de ${formatCurrency(invoice.total_cents)}.\n\nUn saludo.`;
+    const body = `Hola ${client.name},\n\nTe envío la factura ${invoice.invoice_number} por un importe de ${formatCurrency(invoice.total_cents)}. Adjunto el PDF a este email.\n\nUn saludo.`;
     sendEmail(client.email, subject, body);
-    addToast('Se abrió tu cliente de correo con el borrador de la factura.', 'success');
+    addToast('PDF descargado y borrador de email abierto. Adjunta el PDF descargado antes de enviarlo.', 'success');
   };
 
   // Devuelve el estado real de cobro combinando `paid` (booleano, sincronizado por trigger)
