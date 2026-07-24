@@ -43,6 +43,7 @@ export const SIDEBAR_STRUCTURE: SidebarItem[] = [
     icon: 'DollarSign',
     items: [
       { href: '/invoices', label: 'Facturas', icon: 'FileText' },
+      { href: '/receipts', label: 'Recibos', icon: 'Receipt' },
       { href: '/expenses', label: 'Gastos', icon: 'BarChart2' },
       { href: '/tax-ledger', label: 'Libro Fiscal', icon: 'BookOpen' },
     ],

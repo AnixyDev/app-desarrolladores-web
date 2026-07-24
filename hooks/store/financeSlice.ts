@@ -8,6 +8,8 @@ import {
   Proposal,
   Contract,
   RecurringInvoice,
+  Receipt,
+  NewReceipt,
 } from '../../types';
 import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
@@ -30,9 +32,11 @@ export interface FinanceSlice {
   budgets: Budget[];
   proposals: Proposal[];
   contracts: Contract[];
+  receipts: Receipt[];
   monthlyGoalCents: number;
 
   fetchFinanceData: () => Promise<void>;
+  fetchReceipts: () => Promise<void>;
 
   addInvoice: (invoiceData: NewInvoiceInput, timeEntryIdsToBill?: string[]) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
@@ -61,6 +65,12 @@ export interface FinanceSlice {
   sendContract: (id: string) => Promise<void>;
   signContract: (id: string, signerName: string) => Promise<void>;
 
+  // Recibos: cobros sueltos no ligados a una factura formal (trabajos
+  // informales, arreglos puntuales) — el cliente se queda con el PDF como
+  // constancia de lo pagado.
+  addReceipt: (receipt: NewReceipt) => Promise<void>;
+  deleteReceipt: (id: string) => Promise<void>;
+
   setMonthlyGoal: (goal: number) => void;
 }
 
@@ -74,6 +84,7 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
   budgets: [],
   proposals: [],
   contracts: [],
+  receipts: [],
   monthlyGoalCents: 0,
 
   fetchFinanceData: async () => {
@@ -89,6 +100,7 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
       supabase.from('contracts').select('*').order('created_at', { ascending: false }),
       supabase.from('recurring_invoices').select('*'),
       supabase.from('recurring_expenses').select('*'),
+      supabase.from('receipts').select('*').order('created_at', { ascending: false }),
     ]);
 
     // Helper tipado: extrae datos o devuelve [] logueando el error
@@ -108,7 +120,14 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
       contracts: safeData<Contract>(results[4] as PromiseSettledResult<{ data: Contract[] | null; error: unknown }>),
       recurringInvoices: safeData<RecurringInvoice>(results[5] as PromiseSettledResult<{ data: RecurringInvoice[] | null; error: unknown }>),
       recurringExpenses: safeData<RecurringExpense>(results[6] as PromiseSettledResult<{ data: RecurringExpense[] | null; error: unknown }>),
+      receipts: safeData<Receipt>(results[7] as PromiseSettledResult<{ data: Receipt[] | null; error: unknown }>),
     });
+  },
+
+  fetchReceipts: async () => {
+    const { data, error } = await supabase.from('receipts').select('*').order('created_at', { ascending: false });
+    if (error) { console.error('Error cargando recibos:', error); return; }
+    set({ receipts: (data ?? []) as Receipt[] });
   },
 
   // En financeSlice.ts
@@ -377,6 +396,36 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
           : c
       ),
     }));
+  },
+
+  addReceipt: async (receiptData) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Usuario no autenticado');
+
+    const { data: receiptNumber, error: numberError } = await supabase.rpc('generate_receipt_number', {
+      p_user_id: user.id,
+    });
+    if (numberError) { console.error('Error generando número de recibo:', numberError); throw numberError; }
+
+    const { data, error } = await supabase
+      .from('receipts')
+      .insert({ ...receiptData, user_id: user.id, receipt_number: receiptNumber })
+      .select()
+      .single();
+
+    if (error) { console.error('Error adding receipt:', error); throw error; }
+    set(state => ({ receipts: [data as Receipt, ...state.receipts] }));
+  },
+
+  deleteReceipt: async (id) => {
+    const previous = get().receipts;
+    set(state => ({ receipts: state.receipts.filter(r => r.id !== id) }));
+
+    const { error } = await supabase.from('receipts').delete().eq('id', id);
+    if (error) {
+      set({ receipts: previous });
+      throw error;
+    }
   },
 
   setMonthlyGoal: (goal) => {

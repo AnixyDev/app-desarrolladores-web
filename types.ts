@@ -99,6 +99,30 @@ export interface Invoice {
   irpf_percent?: number;
 }
 
+export interface Receipt {
+  id: string;
+  user_id: string;
+  receipt_number: string;
+  client_id: string | null;
+  project_id: string | null;
+  concept: string;
+  amount_cents: number;
+  paid_at: string;
+  method: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface NewReceipt {
+  client_id: string | null;
+  project_id?: string | null;
+  concept: string;
+  amount_cents: number;
+  paid_at: string;
+  method?: string | null;
+  notes?: string | null;
+}
+
 export interface NewInvoice {
   client_id: string;
   project_id?: string | null;

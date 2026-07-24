@@ -1,21 +1,23 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 // FIX: Remove .tsx extensions from imports to resolve module resolution errors.
 import { useAppStore } from '@/hooks/useAppStore';
 import { formatCurrency } from '@/lib/utils';
 import { BriefcaseIcon, FileTextIcon, EditIcon, TrashIcon, PhoneIcon, MailIcon } from '../components/icons/Icon';
+import { Receipt as ReceiptIcon, Wallet } from 'lucide-react';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { Client, NewClient } from '@/types';
+import { supabase } from '@/lib/supabaseClient';
 
 const ClientIncomeChart = lazy(() => import('@/components/charts/ClientIncomeChart'));
 
 const ClientDetailPage: React.FC = () => {
     const { clientId } = useParams<{ clientId: string }>();
     const navigate = useNavigate();
-    const { getClientById, projects, invoices, updateClient, deleteClient } = useAppStore();
+    const { getClientById, projects, invoices, receipts, updateClient, deleteClient } = useAppStore();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     
@@ -24,6 +26,34 @@ const ClientDetailPage: React.FC = () => {
 
     const clientProjects = projects.filter(p => p.client_id === clientId);
     const clientInvoices = invoices.filter(i => i.client_id === clientId);
+    const clientReceipts = receipts.filter(r => r.client_id === clientId);
+
+    // FIX: no existía forma de ver cuánto ha pagado realmente un cliente en
+    // total — solo el total de facturas ya marcadas como "pagadas" del
+    // todo, sin contar pagos parciales (tabla `payments`) ni recibos
+    // sueltos. Se consulta aparte porque `payments` no vive en el store
+    // global (solo se usa puntualmente en InvoicesPage.tsx).
+    const [paymentsByInvoice, setPaymentsByInvoice] = useState<Record<string, number>>({});
+    useEffect(() => {
+        if (clientInvoices.length === 0) {
+            setPaymentsByInvoice({});
+            return;
+        }
+        const invoiceIds = clientInvoices.map(i => i.id);
+        supabase
+            .from('payments')
+            .select('invoice_id, amount_cents')
+            .in('invoice_id', invoiceIds)
+            .then(({ data, error }) => {
+                if (error) { console.error('Error cargando pagos del cliente:', error); return; }
+                const grouped: Record<string, number> = {};
+                (data || []).forEach(p => {
+                    grouped[p.invoice_id] = (grouped[p.invoice_id] || 0) + p.amount_cents;
+                });
+                setPaymentsByInvoice(grouped);
+            });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [clientId, clientInvoices.length]);
     
     if (!client) {
         return <div className="text-center text-red-500">Cliente no encontrado.</div>;
@@ -58,9 +88,13 @@ const ClientDetailPage: React.FC = () => {
         }
     }
 
-    const totalBilled = clientInvoices
-        .filter(i => i.paid)
-        .reduce((sum, i) => sum + i.total_cents, 0);
+    const totalInvoiced = clientInvoices.reduce((sum, i) => sum + i.total_cents, 0);
+    const totalCollectedFromInvoices = clientInvoices.reduce((sum, i) => {
+        if (i.paid) return sum + i.total_cents;
+        return sum + (paymentsByInvoice[i.id] || 0);
+    }, 0);
+    const pendingBalance = Math.max(0, totalInvoiced - totalCollectedFromInvoices);
+    const totalCollectedFromReceipts = clientReceipts.reduce((sum, r) => sum + r.amount_cents, 0);
 
     return (
         <div className="space-y-6">
@@ -84,7 +118,6 @@ const ClientDetailPage: React.FC = () => {
                     <CardContent className="space-y-2 text-sm">
                         <div><p className="text-gray-400">Email</p><a href={`mailto:${client.email}`} className="text-white hover:underline">{client.email}</a></div>
                         {client.phone && <div><p className="text-gray-400">Teléfono</p><p className="text-white">{client.phone}</p></div>}
-                        <div><p className="text-gray-400">Total Facturado (Pagado)</p><p className="text-white font-semibold text-lg">{formatCurrency(totalBilled)}</p></div>
                     </CardContent>
                 </Card>
 
@@ -100,7 +133,29 @@ const ClientDetailPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+                <CardHeader><h2 className="text-lg font-semibold text-white flex items-center gap-2"><Wallet className="w-5 h-5" /> Estado de Cuenta</h2></CardHeader>
+                <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div>
+                        <p className="text-xs text-gray-400 uppercase tracking-wide">Total Facturado</p>
+                        <p className="text-xl font-bold text-white mt-1">{formatCurrency(totalInvoiced)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-400 uppercase tracking-wide">Cobrado (Facturas)</p>
+                        <p className="text-xl font-bold text-green-400 mt-1">{formatCurrency(totalCollectedFromInvoices)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-400 uppercase tracking-wide">Pendiente (Facturas)</p>
+                        <p className={`text-xl font-bold mt-1 ${pendingBalance > 0 ? 'text-orange-400' : 'text-white'}`}>{formatCurrency(pendingBalance)}</p>
+                    </div>
+                    <div>
+                        <p className="text-xs text-gray-400 uppercase tracking-wide">Cobrado en Recibos</p>
+                        <p className="text-xl font-bold text-primary-400 mt-1">{formatCurrency(totalCollectedFromReceipts)}</p>
+                    </div>
+                </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card>
                     <CardHeader><h2 className="text-lg font-semibold text-white flex items-center gap-2"><BriefcaseIcon className="w-5 h-5"/> Proyectos</h2></CardHeader>
                     <CardContent className="p-0">
@@ -139,6 +194,27 @@ const ClientDetailPage: React.FC = () => {
                                     </div>
                                 </li>
                             )) : <p className="p-4 text-gray-400">No hay facturas para este cliente.</p>}
+                        </ul>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader><h2 className="text-lg font-semibold text-white flex items-center gap-2"><ReceiptIcon className="w-5 h-5"/> Recibos</h2></CardHeader>
+                    <CardContent className="p-0">
+                        <ul className="divide-y divide-gray-800">
+                             {clientReceipts.length > 0 ? clientReceipts.map(r => (
+                                <li key={r.id} className="p-4 hover:bg-gray-800/50">
+                                    <div className="flex justify-between items-center">
+                                        <div>
+                                            <p className="font-semibold text-white font-mono">{r.receipt_number}</p>
+                                            <p className="text-sm text-gray-400 truncate max-w-[160px]">{r.concept}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-semibold text-white">{formatCurrency(r.amount_cents)}</p>
+                                            <p className="text-xs text-gray-500">{r.paid_at}</p>
+                                        </div>
+                                    </div>
+                                </li>
+                            )) : <p className="p-4 text-gray-400">No hay recibos para este cliente.</p>}
                         </ul>
                     </CardContent>
                 </Card>

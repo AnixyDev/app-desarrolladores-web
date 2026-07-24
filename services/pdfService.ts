@@ -1,5 +1,5 @@
 // services/pdfService.ts
-import type { Invoice, Client, Profile } from '@/types';
+import type { Invoice, Client, Profile, Receipt } from '@/types';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import * as autoTableNamespace from 'jspdf-autotable';
@@ -111,6 +111,82 @@ export const generateInvoicePdf = async (invoice: Invoice, client: Client, profi
     doc.text('Documento generado automáticamente.', 14, 285);
     
     doc.save(`Factura-${invoice.invoice_number}.pdf`);
+};
+
+// NUEVO: recibo de pago suelto (no ligado a una factura formal). Pensado
+// para trabajos informales o cobros parciales de los que el cliente quiere
+// una constancia por escrito, sin generar un documento fiscal numerado
+// como las facturas — por eso lleva un aviso explícito de que NO es una
+// factura, para que no se confunda con un justificante válido ante la AEAT.
+export const generateReceiptPdf = (receipt: Receipt, clientName: string, profile: Profile) => {
+    const doc = new jsPDF();
+
+    // --- Header ---
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text(profile.business_name || profile.full_name, 14, 22);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(profile.full_name, 14, 30);
+    if (profile.tax_id) doc.text(`NIF/CIF: ${profile.tax_id}`, 14, 35);
+    doc.text(profile.email, 14, 40);
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('RECIBO', 200, 22, { align: 'right' });
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Nº: ${receipt.receipt_number}`, 200, 30, { align: 'right' });
+    doc.text(`Fecha: ${receipt.paid_at}`, 200, 35, { align: 'right' });
+
+    // --- Aviso: no es una factura ---
+    doc.setFillColor(255, 247, 224);
+    doc.rect(14, 50, 182, 12, 'F');
+    doc.setFontSize(8);
+    doc.setTextColor(150, 100, 0);
+    doc.text('Este documento es un recibo de pago y no tiene la consideración de factura.', 18, 57);
+    doc.setTextColor(0, 0, 0);
+
+    // --- Recibí de ---
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Recibí de:', 14, 75);
+    doc.setFont('helvetica', 'normal');
+    doc.text(clientName, 14, 81);
+
+    // --- Concepto e importe ---
+    doc.setFont('helvetica', 'bold');
+    doc.text('En concepto de:', 14, 95);
+    doc.setFont('helvetica', 'normal');
+    const conceptLines = doc.splitTextToSize(receipt.concept, 180);
+    doc.text(conceptLines, 14, 101);
+
+    const amountY = 101 + conceptLines.length * 6 + 12;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Importe recibido:', 14, amountY);
+    doc.text(formatCurrency(receipt.amount_cents), 200, amountY, { align: 'right' });
+
+    if (receipt.method) {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Método de pago: ${receipt.method}`, 14, amountY + 10);
+    }
+    if (receipt.notes) {
+        doc.setFontSize(9);
+        const notesLines = doc.splitTextToSize(`Notas: ${receipt.notes}`, 180);
+        doc.text(notesLines, 14, amountY + (receipt.method ? 18 : 10));
+    }
+
+    // --- Footer ---
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(120, 120, 120);
+    doc.text('Documento generado automáticamente. No sustituye una factura.', 14, 285);
+
+    doc.save(`Recibo-${receipt.receipt_number}.pdf`);
 };
 
 // FIX / NUEVO: exportación en PDF del "Libro Fiscal" (TaxLedgerPage.tsx).
