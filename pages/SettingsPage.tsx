@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import { supabase } from '@/lib/supabaseClient';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
@@ -12,6 +13,7 @@ type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing';
 const SettingsPage: React.FC = () => {
   const { profile, updateProfile, logout } = useAppStore();
   const { addToast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
@@ -67,7 +69,17 @@ const SettingsPage: React.FC = () => {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
 
-      if (error) throw error;
+      if (error) {
+        // FunctionsHttpError expone la Response cruda en `.context`; sin
+        // esto, error.message es un genérico "Edge Function returned a
+        // non-2xx status code" que no dice nada útil al usuario.
+        let detail = error.message;
+        try {
+          const body = await error.context?.json?.();
+          if (body?.error) detail = body.error;
+        } catch { /* noop: nos quedamos con error.message */ }
+        throw new Error(detail);
+      }
       if (!data?.url) throw new Error('No se pudo generar el enlace al portal de facturación.');
 
       window.location.href = data.url;
@@ -255,13 +267,27 @@ const SettingsPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <p className="text-sm text-gray-400">
-                  Gestiona tu suscripción, actualiza tu método de pago, descarga facturas anteriores o cancela tu plan desde el portal seguro de Stripe.
-                </p>
-                <Button onClick={handleOpenBillingPortal} isLoading={portalLoading}>
-                  {portalLoading ? <RefreshCwIcon className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Abrir portal de facturación
-                </Button>
+
+                {profile?.stripe_customer_id ? (
+                  <>
+                    <p className="text-sm text-gray-400">
+                      Gestiona tu suscripción, actualiza tu método de pago, descarga facturas anteriores o cancela tu plan desde el portal seguro de Stripe.
+                    </p>
+                    <Button onClick={handleOpenBillingPortal} isLoading={portalLoading}>
+                      {portalLoading ? <RefreshCwIcon className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Abrir portal de facturación
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-400">
+                      Todavía no tienes ninguna suscripción de pago activa, así que no hay nada que gestionar en el portal de Stripe. Consulta los planes disponibles para empezar.
+                    </p>
+                    <Button onClick={() => navigate('/billing')}>
+                      Ver planes
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}
