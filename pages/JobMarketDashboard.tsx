@@ -6,6 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import EmptyState from '@/components/ui/EmptyState';
 import { useToast } from '@/hooks/useToast';
+import { formatJobPublishDate } from '@/lib/utils';
 
 const ProposalGeneratorModal = lazy(() => import('@/components/modals/ProposalGeneratorModal'));
 const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
@@ -66,7 +67,7 @@ const JobCard: React.FC<{ job: Job, onApply: (job: Job) => void, onSave: (jobId:
             {job.duracionSemanas ?? '?'} Semanas
           </span>
           <span className="flex items-center text-gray-500">
-            {job.fechaPublicacion}
+            {formatJobPublishDate(job.fechaPublicacion)}
           </span>
         </div>
         

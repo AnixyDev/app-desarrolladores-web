@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,27 @@ serve(async (req) => {
   }
 
   try {
+    // FIX: esta función no comprobaba autenticación en absoluto — cualquiera
+    // con la anon key (pública, embebida en el frontend) podía llamarla sin
+    // límite y consumir la cuota de Gemini de la cuenta gratis. NOTA: nada
+    // en el frontend llama ya a esta función (el flujo real pasa por
+    // ai-gemini → action "generateFinancialForecast"); esto es solo una red
+    // de seguridad. Se recomienda borrar esta función desde el dashboard de
+    // Supabase (Edge Functions) ya que está huérfana.
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } }
+    );
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { data } = await req.json();
 
     const apiKey = Deno.env.get("GEMINI_API_KEY");

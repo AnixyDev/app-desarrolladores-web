@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/useToast';
 import { redirectToCheckout } from '@/services/stripeService';
+import { formatJobPublishDate } from '@/lib/utils';
 
 const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
 const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
@@ -106,7 +107,7 @@ const MyJobPostsPage: React.FC = () => {
                                                     {job.titulo}
                                                 </Link>
                                             </td>
-                                            <td className="p-4 text-gray-300">{job.fechaPublicacion}</td>
+                                            <td className="p-4 text-gray-300">{formatJobPublishDate(job.fechaPublicacion)}</td>
                                             <td className="p-4 text-white font-semibold">
                                                 <Link to={`/job-market/${job.id}/applicants`} className="flex items-center gap-2 text-primary-400 hover:underline">
                                                     <Users className="w-4 h-4"/>

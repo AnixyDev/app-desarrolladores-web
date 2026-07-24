@@ -5,6 +5,7 @@ import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { DollarSign, Clock, Zap, Star, Briefcase } from 'lucide-react';
+import { formatJobPublishDate } from '@/lib/utils';
 
 const ProposalGeneratorModal = lazy(() => import('@/components/modals/ProposalGeneratorModal'));
 const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
@@ -88,7 +89,7 @@ const JobDetailPage: React.FC = () => {
                             </div>
                             <div className="flex items-center text-white">
                                 <Briefcase className="w-5 h-5 mr-3 text-blue-400" />
-                                <span>Publicado: {job.fechaPublicacion}</span>
+                                <span>Publicado: {formatJobPublishDate(job.fechaPublicacion)}</span>
                             </div>
                         </CardContent>
                     </Card>

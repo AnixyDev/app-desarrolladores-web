@@ -32,13 +32,26 @@ serve(async (req) => {
       const taxAmount = subtotal * (rec.tax_percent / 100)
       const total = Math.round(subtotal + taxAmount)
 
+      // FIX: antes se usaba `INV-REC-${Date.now().toString().slice(-6)}`.
+      // Al generarse varias facturas seguidas en este mismo bucle, dos
+      // iteraciones pueden caer en el mismo milisegundo y producir el
+      // MISMO número de factura para dos clientes distintos — además de
+      // no cumplir con la numeración correlativa exigida por la AEAT.
+      const { data: invoiceNumber, error: numberError } = await supabase.rpc('generate_invoice_number', {
+        p_user_id: rec.user_id,
+      })
+      if (numberError) {
+        console.error(`Error generando número de factura para recurring ${rec.id}:`, numberError)
+        continue
+      }
+
       const { data: newInvoice, error: invoiceError } = await supabase
         .from('invoices')
         .insert({
           user_id: rec.user_id,
           client_id: rec.client_id,
           project_id: rec.project_id,
-          invoice_number: `INV-REC-${Date.now().toString().slice(-6)}`,
+          invoice_number: invoiceNumber,
           issue_date: today,
           due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           items: rec.items,

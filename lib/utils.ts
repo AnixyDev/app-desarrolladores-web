@@ -11,6 +11,23 @@ export const formatCurrency = (cents: number): string => {
     }).format(cents / 100);
 };
 
+// FIX: fechapublicacion en jobs es una columna `date` real (antes el
+// formulario mandaba el texto literal "Recién publicado", que Postgres
+// rechazaba con "invalid input syntax for type date"). Ahora se guarda la
+// fecha real y este helper decide cómo mostrarla: "Recién publicado" el
+// mismo día, o la fecha formateada a partir de entonces.
+export const formatJobPublishDate = (fechaPublicacion?: string | null): string => {
+    if (!fechaPublicacion) return '';
+    const published = new Date(fechaPublicacion);
+    if (isNaN(published.getTime())) return fechaPublicacion;
+
+    const today = new Date();
+    const isSameDay = published.toDateString() === today.toDateString();
+    if (isSameDay) return 'Recién publicado';
+
+    return published.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 /**
  * Calcula los totales de una factura de forma centralizada.
  * Maneja céntimos para evitar errores de redondeo en JS.

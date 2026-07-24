@@ -80,7 +80,7 @@ const JobPostForm: React.FC = () => {
         duracionSemanas: parseInt(formData.duracionSemanas, 10) || 0,
         habilidades: formData.habilidadesRequeridas,
         cliente: profile.business_name || profile.full_name,
-        fechaPublicacion: "Recién publicado",
+        fechaPublicacion: new Date().toISOString().slice(0, 10),
         isFeatured: false,
         compatibilidadIA: 100, 
         postedByUserId: profile.id

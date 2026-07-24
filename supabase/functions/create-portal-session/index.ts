@@ -17,6 +17,21 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY')!, {
     apiVersion: '2023-10-16',
 });
 
+// FIX: antes este cliente (con solo la ANON_KEY, sin el JWT del usuario
+// adjunto) se usaba para consultar `profiles`, una tabla con RLS que exige
+// auth.uid() = id. Sin sesión adjunta, esa consulta se ejecutaba como
+// anónimo y devolvía siempre 0 filas — así que CUALQUIER usuario (pagara o
+// no) recibía el 404 "No se encontro el ID de cliente de Stripe", aunque
+// el dato existiera de verdad. Como la identidad del que llama ya se ha
+// verificado abajo con getUser(authHeader), se usa el cliente con
+// SERVICE_ROLE_KEY para esta consulta puntual — igual que ya se hace en
+// stripe-webhook e invite-team-member — filtrada siempre por el userId ya
+// confirmado, nunca por datos que pueda inventarse el que llama.
+const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+);
+
 const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_ANON_KEY')!
@@ -47,7 +62,7 @@ Deno.serve(async (req) => {
 
     const userId = userAuth.user.id;
 
-    const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabaseAdmin
         .from('profiles')
         .select('stripe_customer_id')
         .eq('id', userId)
