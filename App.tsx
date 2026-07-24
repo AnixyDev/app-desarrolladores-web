@@ -13,6 +13,7 @@ import LandingPage from './pages/LandingPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfService from './pages/TermsOfService';
+import PricingPage from './pages/PricingPage';
 
 // FIX: Carga segura de componentes lazy con recarga en caso de error
 const safeLazy = (importFn: () => Promise<any>) => {
@@ -73,7 +74,6 @@ const PortalInvoiceViewPage = safeLazy(() => import('./pages/portal/PortalInvoic
 const PortalContractViewPage = safeLazy(() => import('./pages/portal/PortalContractViewPage'));
 const PortalBudgetViewPage = safeLazy(() => import('./pages/portal/PortalBudgetViewPage'));
 const PortalProposalViewPage = safeLazy(() => import('./pages/portal/PortalProposalViewPage'));
-const PricingPage = safeLazy(() => import('./pages/PricingPage'));
 
 // Spinner de carga mientras se cargan componentes lazy
 const LoadingFallback = () => (
