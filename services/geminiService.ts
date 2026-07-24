@@ -46,14 +46,25 @@ export interface ProfitabilityData {
 ========================= */
 
 async function callAI(action: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
-  // bright-task es la Edge Function activa en Supabase con soporte completo de Gemini
-    const { data, error } = await supabase.functions.invoke('ai-gemini', {
+  const { data, error } = await supabase.functions.invoke('ai-gemini', {
     body: { action, payload },
   });
 
   if (error) {
-    console.error('Error invoking bright-task:', error);
-    throw new Error(error.message || 'Error en la función de IA. Inténtalo de nuevo.');
+    // FunctionsHttpError expone la Response cruda en `.context` — sin
+    // esto, error.message es un genérico "Edge Function returned a
+    // non-2xx status code" que oculta el motivo real (cuota de Gemini
+    // agotada, modelo retirado, GEMINI_API_KEY inválida, etc.), que la
+    // función ya devuelve en el cuerpo { error: "..." }.
+    let detail = error.message;
+    try {
+      const body = await (error as any).context?.json?.();
+      if (body?.error) detail = body.error;
+    } catch {
+      // noop: nos quedamos con error.message si el body no es JSON legible
+    }
+    console.error('Error invoking ai-gemini:', detail);
+    throw new Error(detail || 'Error en la función de IA. Inténtalo de nuevo.');
   }
 
   return data;

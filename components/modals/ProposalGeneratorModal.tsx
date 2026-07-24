@@ -22,6 +22,7 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
     const [isLoading, setIsLoading] = useState(false);
     const [isRefining, setIsRefining] = useState<boolean>(false);
     const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
+    const [generationError, setGenerationError] = useState<string | null>(null);
 
     const userProfileSummary = profile?.bio || `Freelancer con experiencia en desarrollo full-stack. Tarifa por hora: ${profile.hourly_rate_cents / 100}€/h. Habilidades: ${profile.skills?.join(', ')}`;
 
@@ -33,12 +34,19 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
         }
 
         setIsLoading(true);
+        setGenerationError(null);
         try {
             const text = await generateProposalText(job.titulo, job.descripcionLarga || job.descripcionCorta || '', userProfileSummary);
             setProposalText(text);
             consumeCredits(AI_CREDIT_COSTS.generateProposal);
             addToast('Propuesta generada con IA', 'success');
         } catch (error) {
+            // FIX: antes, si esto fallaba, el modal se quedaba en blanco —
+            // ni el spinner de carga ni el borrador se mostraban (ambos
+            // dependen de proposalText, que nunca llegaba a rellenarse), y
+            // el único aviso era un toast que podía desaparecer sin que se
+            // llegara a leer. Ahora el motivo real queda fijo en el modal.
+            setGenerationError((error as Error).message || 'Error al generar la propuesta.');
             addToast('Error al generar la propuesta', 'error');
         } finally {
             setIsLoading(false);
@@ -71,6 +79,7 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
             // Reset state when closing
             setProposalText('');
             setIsLoading(false);
+            setGenerationError(null);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, job]);
@@ -99,6 +108,15 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
                         <div className="text-center p-8">
                             <RefreshCwIcon className="w-10 h-10 text-primary-400 mx-auto animate-spin mb-4" />
                             <p className="text-white">Analizando la oferta y generando tu propuesta...</p>
+                        </div>
+                    )}
+                    {!isLoading && generationError && !proposalText && (
+                        <div className="text-center p-8 space-y-4">
+                            <p className="text-red-400 text-sm">{generationError}</p>
+                            <Button variant="secondary" onClick={handleGenerate}>
+                                <SparklesIcon className="w-4 h-4 mr-2" />
+                                Reintentar
+                            </Button>
                         </div>
                     )}
                     {!isLoading && proposalText && (
