@@ -26,16 +26,26 @@ const TaxLedgerPage: React.FC = () => {
         // Ajustar fin de día para incluir todas las transacciones del último día
         endDate.setHours(23, 59, 59, 999);
 
-        const filteredInvoices = invoices.filter(i => {
+        const invoicesInPeriod = invoices.filter(i => {
             const issueDate = new Date(i.issue_date);
             return issueDate >= startDate && issueDate <= endDate;
         });
+
+        // FIX: una factura sin IVA NI IRPF aplicado no debe contarse como
+        // ingreso fiscal "normal" en el Libro Fiscal — mezclarla con las
+        // facturas correctamente tributadas falsearía el Modelo 303/130.
+        // Se separan en dos grupos: las que sí llevan fiscalidad aplicada
+        // (entran en los cálculos oficiales) y las que no (se muestran
+        // aparte, con aviso, para que se revisen y corrijan).
+        const filteredInvoices = invoicesInPeriod.filter(i => (i.tax_percent || 0) > 0 || (i.irpf_percent || 0) > 0);
+        const excludedInvoices = invoicesInPeriod.filter(i => !((i.tax_percent || 0) > 0 || (i.irpf_percent || 0) > 0));
+
         const filteredExpenses = expenses.filter(e => {
             const expenseDate = new Date(e.date);
             return expenseDate >= startDate && expenseDate <= endDate;
         });
 
-        return { filteredInvoices, filteredExpenses };
+        return { filteredInvoices, excludedInvoices, filteredExpenses };
     }, [invoices, expenses, year, quarter]);
     
     const totals = useMemo(() => {
@@ -291,6 +301,32 @@ const TaxLedgerPage: React.FC = () => {
             </div>
         </CardContent>
       </Card>
+
+      {filteredData.excludedInvoices.length > 0 && (
+        <div className="p-4 bg-orange-900/20 border border-orange-800 rounded-lg">
+          <div className="flex items-start gap-2 mb-3">
+            <AlertTriangleIcon className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-orange-300 font-semibold text-sm">
+                {filteredData.excludedInvoices.length} factura{filteredData.excludedInvoices.length > 1 ? 's' : ''} sin IVA ni IRPF aplicado — excluida{filteredData.excludedInvoices.length > 1 ? 's' : ''} del Libro Fiscal
+              </p>
+              <p className="text-orange-300/80 text-xs mt-1">
+                No se han incluido en los cálculos del Modelo 303/130 de este trimestre. Revísalas: añádeles el IVA/IRPF que corresponda si son ingresos declarables normales, o pásalas a{' '}
+                <Link to="/receipts" className="underline">Recibos</Link> si son cobros informales que no deben facturarse formalmente.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            {filteredData.excludedInvoices.map(inv => (
+              <div key={inv.id} className="flex justify-between items-center text-sm py-1.5 border-t border-orange-800/40">
+                <span className="text-gray-300 font-mono">{inv.invoice_number}</span>
+                <span className="text-gray-400">{clients.find(c => c.id === inv.client_id)?.name || 'Cliente desconocido'}</span>
+                <span className="text-orange-300 font-semibold">{formatCurrency(inv.total_cents)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
         <Card>
