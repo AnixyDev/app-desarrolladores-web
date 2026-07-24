@@ -64,6 +64,32 @@ body {
   animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Landing page: cursor de terminal parpadeando */
+@keyframes terminalBlink {
+  0%, 45% { opacity: 1; }
+  46%, 100% { opacity: 0; }
+}
+.animate-terminal-cursor {
+  animation: terminalBlink 1s step-end infinite;
+}
+
+/* Landing page: aparición suave al hacer scroll */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise-in {
+  animation: riseIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-terminal-cursor,
+  .animate-rise-in,
+  .animate-fade-in {
+    animation: none !important;
+  }
+}
+
 /* Ajustes de tipografía para inputs */
 input, textarea, select {
   @apply focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200;
