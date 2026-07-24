@@ -209,12 +209,13 @@ interface TaxReportTotals {
 export const generateTaxReportPdf = (
     profile: Profile,
     year: number,
-    quarter: number,
+    quarter: number | 'annual',
     irpfPercentage: number,
     totals: TaxReportTotals
 ) => {
     const autoTable = resolveAutoTable();
     const doc = new jsPDF();
+    const periodLabel = quarter === 'annual' ? `Año completo ${year}` : `${quarter}º Trimestre ${year}`;
 
     // --- Header (mismo estilo que las facturas, para coherencia de marca) ---
     doc.setFontSize(20);
@@ -232,7 +233,7 @@ export const generateTaxReportPdf = (
 
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Periodo: ${quarter}º Trimestre ${year}`, 200, 30, { align: 'right' });
+    doc.text(`Periodo: ${periodLabel}`, 200, 30, { align: 'right' });
     doc.text(`Generado: ${new Date().toLocaleDateString('es-ES')}`, 200, 35, { align: 'right' });
 
     // --- Aviso legal (bien visible, arriba del todo) ---
@@ -308,5 +309,5 @@ export const generateTaxReportPdf = (
         14, 285
     );
 
-    doc.save(`Borrador-Fiscal-${year}-T${quarter}.pdf`);
+    doc.save(quarter === 'annual' ? `Borrador-Fiscal-${year}-Anual.pdf` : `Borrador-Fiscal-${year}-T${quarter}.pdf`);
 };

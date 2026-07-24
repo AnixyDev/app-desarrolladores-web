@@ -11,7 +11,7 @@ import { generateTaxReportPdf } from '@/services/pdfService';
 const TaxLedgerPage: React.FC = () => {
     const { invoices, expenses, clients, profile } = useAppStore();
     const [year, setYear] = useState(new Date().getFullYear());
-    const [quarter, setQuarter] = useState(Math.floor(new Date().getMonth() / 3) + 1);
+    const [quarter, setQuarter] = useState<number | 'annual'>(Math.floor(new Date().getMonth() / 3) + 1);
     const [irpfPercentage, setIrpfPercentage] = useState(20);
 
     const availableYears = useMemo(() => {
@@ -21,8 +21,14 @@ const TaxLedgerPage: React.FC = () => {
     }, [invoices, expenses]);
 
     const filteredData = useMemo(() => {
-        const startDate = new Date(year, (quarter - 1) * 3, 1);
-        const endDate = new Date(year, quarter * 3, 0);
+        // NUEVO: "Anual" cubre el año entero; un trimestre concreto sigue
+        // funcionando exactamente igual que antes.
+        const startDate = quarter === 'annual'
+            ? new Date(year, 0, 1)
+            : new Date(year, (quarter - 1) * 3, 1);
+        const endDate = quarter === 'annual'
+            ? new Date(year, 11, 31)
+            : new Date(year, quarter * 3, 0);
         // Ajustar fin de día para incluir todas las transacciones del último día
         endDate.setHours(23, 59, 59, 999);
 
@@ -136,7 +142,7 @@ const TaxLedgerPage: React.FC = () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
-        link.setAttribute('download', `libro_fiscal_${year}_T${quarter}.csv`);
+        link.setAttribute('download', quarter === 'annual' ? `libro_fiscal_${year}_anual.csv` : `libro_fiscal_${year}_T${quarter}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -208,11 +214,16 @@ const TaxLedgerPage: React.FC = () => {
                 <Button onClick={handleExportCSV} variant="secondary" size="sm" className="mr-2">
                     <DownloadIcon className="w-4 h-4 mr-2" /> Exportar CSV
                 </Button>
-                <select value={quarter} onChange={e => setQuarter(Number(e.target.value))} className="px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white">
+                <select
+                    value={quarter}
+                    onChange={e => setQuarter(e.target.value === 'annual' ? 'annual' : Number(e.target.value))}
+                    className="px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white"
+                >
                     <option value={1}>1º Trimestre (1T)</option>
                     <option value={2}>2º Trimestre (2T)</option>
                     <option value={3}>3º Trimestre (3T)</option>
                     <option value={4}>4º Trimestre (4T)</option>
+                    <option value="annual">Año Completo</option>
                 </select>
                  <select value={year} onChange={e => setYear(Number(e.target.value))} className="px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white">
                     {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
@@ -297,7 +308,12 @@ const TaxLedgerPage: React.FC = () => {
             
             <div className="mt-4 flex items-start p-3 bg-blue-900/20 border border-blue-800 rounded text-xs text-blue-300">
                 <AlertTriangleIcon className="w-4 h-4 mr-2 shrink-0 mt-0.5"/>
-                <p>Esto es una simulación basada en tus datos registrados. Recuerda que para el Modelo 130 los importes son acumulativos anuales, aunque aquí se muestra una vista trimestral aislada para facilitar el control.</p>
+                <p>
+                    Esto es una simulación basada en tus datos registrados.{' '}
+                    {quarter === 'annual'
+                        ? 'Estás viendo el año completo — recuerda que el Modelo 130 se presenta trimestralmente, esta vista es solo para tener una visión de conjunto.'
+                        : 'Recuerda que para el Modelo 130 los importes son acumulativos anuales, aunque aquí se muestra una vista trimestral aislada para facilitar el control.'}
+                </p>
             </div>
         </CardContent>
       </Card>
