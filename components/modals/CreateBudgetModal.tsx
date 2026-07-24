@@ -1,32 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { useAppStore } from '@/hooks/useAppStore';
-import { NewBudget, InvoiceItem } from '@/types';
+import { NewBudget, InvoiceItem, Budget } from '@/types';
 import { PlusIcon, TrashIcon } from '@/components/icons/Icon';
 
 interface CreateBudgetModalProps {
   isOpen: boolean;
   onClose: () => void;
+  // NUEVO: si se pasa un presupuesto, el modal cambia a modo edición —
+  // mismo formulario, pero precargado y guardando con updateBudget en vez
+  // de crear uno nuevo.
+  budgetToEdit?: Budget | null;
 }
 
-const CreateBudgetModal: React.FC<CreateBudgetModalProps> = ({ isOpen, onClose }) => {
-  const { clients, addBudget } = useAppStore();
+const CreateBudgetModal: React.FC<CreateBudgetModalProps> = ({ isOpen, onClose, budgetToEdit }) => {
+  const { clients, addBudget, updateBudget } = useAppStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const [form, setForm] = useState<NewBudget>({
+  const isEditing = !!budgetToEdit;
+
+  const emptyForm: NewBudget = {
     client_id: clients[0]?.id || '',
     description: '',
     items: [{ description: '', quantity: 1, price_cents: 0 }],
     status: 'pending'
-  });
+  };
+
+  const [form, setForm] = useState<NewBudget>(emptyForm);
+
+  // Al abrir en modo edición (o al cambiar de presupuesto a editar),
+  // precarga el formulario con sus datos actuales.
+  useEffect(() => {
+    if (isOpen) {
+      setForm(budgetToEdit ? {
+        client_id: budgetToEdit.client_id,
+        description: budgetToEdit.description,
+        items: budgetToEdit.items,
+        status: budgetToEdit.status,
+      } : emptyForm);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, budgetToEdit]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await addBudget(form);
+      if (isEditing && budgetToEdit) {
+        await updateBudget(budgetToEdit.id, form);
+      } else {
+        await addBudget(form);
+      }
       onClose();
     } catch (error) {
       console.error(error);
@@ -50,7 +75,7 @@ const CreateBudgetModal: React.FC<CreateBudgetModalProps> = ({ isOpen, onClose }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Crear Nuevo Presupuesto">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEditing ? 'Editar Presupuesto' : 'Crear Nuevo Presupuesto'}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-400 mb-1">Cliente</label>
@@ -122,7 +147,7 @@ const CreateBudgetModal: React.FC<CreateBudgetModalProps> = ({ isOpen, onClose }
         <div className="flex justify-end gap-3 mt-6">
           <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? 'Creando...' : 'Crear Presupuesto'}
+            {isSubmitting ? (isEditing ? 'Guardando...' : 'Creando...') : (isEditing ? 'Guardar Cambios' : 'Crear Presupuesto')}
           </Button>
         </div>
       </form>

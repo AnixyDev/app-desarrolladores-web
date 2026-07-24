@@ -1,107 +1,45 @@
-import React, { useState, useMemo, lazy, Suspense } from 'react';
+import React, { useState } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import StatusChip from '@/components/ui/StatusChip';
 import EmptyState from '@/components/ui/EmptyState';
-import { InvoiceItem } from '@/types';
+import { Budget } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import {
   CheckCircleIcon,
   XCircleIcon,
   MessageSquareIcon,
   SendIcon,
+  EditIcon,
 } from '../components/icons/Icon';
 
 import { sendEmail } from '../services/emailService';
-
-import { generateItemsForDocument, AI_CREDIT_COSTS } from '../services/geminiService';
 import { useToast } from '../hooks/useToast';
-// Al principio del archivo
 import CreateBudgetModal from '../components/modals/CreateBudgetModal';
-
-const BuyCreditsModal = lazy(
-  () => import('../components/modals/BuyCreditsModal')
-);
 
 const BudgetsPage: React.FC = () => {
   const {
     budgets,
-    clients,
-    profile,
-    addBudget,
-    updateBudgetStatus,
     getClientById,
-    consumeCredits,
+    updateBudgetStatus,
   } = useAppStore();
 
   const { addToast } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAIGeneratorOpen, setIsAIGeneratorOpen] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
+  // NUEVO: presupuesto que se está editando (null = el modal está en modo
+  // "crear nuevo"). CreateBudgetModal usa esto para precargar el formulario.
+  const [budgetToEdit, setBudgetToEdit] = useState<Budget | null>(null);
 
-  const initialBudgetState = {
-    client_id: clients.length > 0 ? clients[0].id : '',
-    description: '',
-    items: [{ description: '', quantity: 1, price_cents: 0 }],
+  const openCreateModal = () => {
+    setBudgetToEdit(null);
+    setIsModalOpen(true);
   };
 
-  const [newBudget, setNewBudget] = useState(initialBudgetState);
-
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setNewBudget(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleItemChange = (
-    index: number,
-    field: keyof InvoiceItem,
-    value: string | number
-  ) => {
-    const items = [...newBudget.items];
-
-    if (field === 'price_cents') {
-      items[index][field] = Math.round(Number(value) * 100);
-    } else if (field === 'quantity') {
-      items[index][field] = Number(value);
-    } else {
-      items[index][field] = String(value);
-    }
-
-    setNewBudget(prev => ({ ...prev, items }));
-  };
-
-  const addItem = () => {
-    setNewBudget(prev => ({
-      ...prev,
-      items: [...prev.items, { description: '', quantity: 1, price_cents: 0 }],
-    }));
-  };
-
-  const removeItem = (index: number) => {
-    if (newBudget.items.length > 1) {
-      setNewBudget(prev => ({
-        ...prev,
-        items: prev.items.filter((_, i) => i !== index),
-      }));
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await addBudget(newBudget);
-      addToast('Presupuesto creado.', 'success');
-      setIsModalOpen(false);
-      setNewBudget(initialBudgetState);
-    } catch (err) {
-      addToast((err as Error).message || 'No se pudo crear el presupuesto.', 'error');
-    }
+  const openEditModal = (budget: Budget) => {
+    setBudgetToEdit(budget);
+    setIsModalOpen(true);
   };
 
   const handleUpdateStatus = async (id: string, status: 'accepted' | 'rejected') => {
@@ -128,47 +66,6 @@ const BudgetsPage: React.FC = () => {
     addToast('Se abrió tu cliente de correo con el borrador del presupuesto.', 'success');
   };
 
-  const handleAiGenerate = async () => {
-    if (!profile) return;
-
-    if (profile.ai_credits < AI_CREDIT_COSTS.generateInvoiceItems) {
-      setIsBuyCreditsModalOpen(true);
-      return;
-    }
-
-    setIsAiLoading(true);
-
-    try {
-      const items = await generateItemsForDocument(
-        aiPrompt,
-        profile.hourly_rate_cents
-      );
-
-      if (items.length > 0) {
-        setNewBudget(prev => ({ ...prev, items }));
-        consumeCredits(AI_CREDIT_COSTS.generateInvoiceItems);
-        addToast('Conceptos generados con IA.', 'success');
-        setIsAIGeneratorOpen(false);
-      } else {
-        addToast('No se pudieron generar conceptos.', 'error');
-      }
-    } catch (err) {
-      addToast((err as Error).message, 'error');
-    } finally {
-      setIsAiLoading(false);
-    }
-  };
-  
-
-  const totalAmount = useMemo(
-    () =>
-      newBudget.items.reduce(
-        (sum, item) => sum + item.price_cents * item.quantity,
-        0
-      ),
-    [newBudget.items]
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -177,7 +74,7 @@ const BudgetsPage: React.FC = () => {
         </h1>
 
         <Button
-          onClick={() => setIsModalOpen(true)}
+          onClick={openCreateModal}
         >
           Crear Presupuesto
         </Button>
@@ -190,7 +87,7 @@ const BudgetsPage: React.FC = () => {
           message="Crea y envía presupuestos a tus clientes."
           action={{
             text: 'Crear Presupuesto',
-            onClick: () => setIsModalOpen(true),
+            onClick: openCreateModal,
           }}
         />
       ) : (
@@ -249,6 +146,14 @@ const BudgetsPage: React.FC = () => {
                         <Button
                           size="sm"
                           variant="secondary"
+                          onClick={() => openEditModal(budget)}
+                          title="Editar"
+                        >
+                          <EditIcon className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
                           onClick={() => handleSendBudget(budget)}
                           title="Enviar al cliente"
                         >
@@ -294,6 +199,9 @@ const BudgetsPage: React.FC = () => {
                   </div>
                   <p className="text-xs text-gray-500">{budget.created_at}</p>
                   <div className="flex justify-end gap-2 pt-1 border-t border-gray-800/50">
+                    <Button size="sm" variant="secondary" onClick={() => openEditModal(budget)} title="Editar">
+                      <EditIcon className="w-4 h-4" />
+                    </Button>
                     <Button size="sm" variant="secondary" onClick={() => handleSendBudget(budget)} title="Enviar al cliente">
                       <SendIcon className="w-4 h-4" />
                     </Button>
@@ -316,20 +224,13 @@ const BudgetsPage: React.FC = () => {
         </Card>
       )}
      
-{isModalOpen && (
-  <CreateBudgetModal 
-    isOpen={isModalOpen} 
-    onClose={() => setIsModalOpen(false)} 
-  />
-)}
-      <Suspense fallback={null}>
-        {isBuyCreditsModalOpen && (
-          <BuyCreditsModal
-            isOpen
-            onClose={() => setIsBuyCreditsModalOpen(false)}
-          />
-        )}
-      </Suspense>
+      {isModalOpen && (
+        <CreateBudgetModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          budgetToEdit={budgetToEdit}
+        />
+      )}
     </div>
   );
 };

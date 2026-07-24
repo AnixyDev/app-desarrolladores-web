@@ -53,6 +53,7 @@ export interface FinanceSlice {
   deleteRecurringExpense: (id: string) => Promise<void>;
 
   addBudget: (budget: NewBudgetInput) => Promise<void>;
+  updateBudget: (id: string, budget: NewBudgetInput) => Promise<void>;
   updateBudgetStatus: (id: string, status: Budget['status']) => Promise<void>;
 
   addProposal: (proposal: NewProposalInput) => Promise<void>;
@@ -299,6 +300,32 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
 
     if (error) { console.error('Error adding budget:', error); throw error; }
     set(state => ({ budgets: [data as Budget, ...state.budgets] }));
+  },
+
+  // NUEVO: editar los datos de un presupuesto ya creado (cliente,
+  // descripción, conceptos) — antes solo se podía cambiar su estado
+  // (aceptado/rechazado), no corregir un error o actualizar el importe.
+  updateBudget: async (id, budgetData) => {
+    const amount_cents = budgetData.items.reduce(
+      (sum, item) => sum + item.price_cents * item.quantity,
+      0
+    );
+
+    const previous = get().budgets;
+    set(state => ({
+      budgets: state.budgets.map(b => (b.id === id ? { ...b, ...budgetData, amount_cents } : b)),
+    }));
+
+    const { error } = await supabase
+      .from('budgets')
+      .update({ ...budgetData, amount_cents })
+      .eq('id', id);
+
+    if (error) {
+      set({ budgets: previous });
+      console.error('Error updating budget:', error);
+      throw error;
+    }
   },
 
   updateBudgetStatus: async (id, status) => {
