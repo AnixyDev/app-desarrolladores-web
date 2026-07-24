@@ -40,6 +40,34 @@ Reglas para cifras monetarias (muy importante):
 const PRIMARY_MODEL = "gemini-2.5-flash";
 const FALLBACK_MODEL = "gemini-2.5-flash-lite";
 
+// FIX: hasta ahora el usuario final veía el error crudo de Gemini tal cual
+// ("RESOURCE_EXHAUSTED", JSON con "code": 429, etc.) — útil para depurar,
+// pero no para alguien que solo quiere generar una propuesta. El mensaje
+// técnico completo se sigue registrando con console.error más abajo (ahí
+// es donde hay que mirar para diagnosticar); esto solo traduce lo que
+// llega al frontend a algo que un usuario no técnico pueda entender.
+function translateGeminiError(rawMessage: string): string {
+  const msg = rawMessage.toLowerCase();
+
+  if (msg.includes("resource_exhausted") || msg.includes("quota") || msg.includes("prepayment credits") || msg.includes("429")) {
+    return "El asistente de IA no está disponible ahora mismo (se ha alcanzado el límite de uso). Inténtalo de nuevo más tarde.";
+  }
+  if (msg.includes("api key not valid") || msg.includes("api_key_invalid") || msg.includes("permission_denied") || msg.includes("401") || msg.includes("403")) {
+    return "El asistente de IA no está disponible ahora mismo. Nuestro equipo ya ha sido avisado.";
+  }
+  if (msg.includes("not found") || msg.includes("404") || msg.includes("empty gemini response")) {
+    return "El asistente de IA no ha podido generar una respuesta esta vez. Inténtalo de nuevo en unos minutos.";
+  }
+  if (msg.includes("missing gemini_api_key")) {
+    return "El asistente de IA no está configurado correctamente. Nuestro equipo ya ha sido avisado.";
+  }
+  if (msg.includes("unauthorized")) {
+    return "Tu sesión ha caducado. Vuelve a iniciar sesión e inténtalo de nuevo.";
+  }
+
+  return "Ha ocurrido un error con el asistente de IA. Inténtalo de nuevo en unos minutos.";
+}
+
 /* Llama a la API REST de Gemini directamente (sin SDK) */
 async function callGeminiWithModel(apiKey: string, model: string, fullPrompt: string): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -287,14 +315,16 @@ ${proposal}`
         });
     }
   } catch (e) {
-    // FIX: antes no se registraba nada server-side — solo se devolvía el
-    // error en el body de la respuesta 500, así que diagnosticar un fallo
-    // real (cuota de Gemini agotada, modelo retirado, payload mal formado)
-    // dependía enteramente de lo que el usuario copiara de la consola del
-    // navegador. Ahora queda también en los logs de la función.
-    console.error("[ai-gemini] Error:", (e as Error)?.message ?? e);
+    // El mensaje técnico completo (motivo real: cuota agotada, modelo
+    // retirado, payload mal formado...) queda aquí, en los logs del
+    // servidor — es lo que hay que mirar para diagnosticar de verdad.
+    const rawMessage = String((e as Error)?.message ?? e);
+    console.error("[ai-gemini] Error:", rawMessage);
+
+    // Lo que recibe el frontend (y por tanto el usuario) es la versión
+    // traducida y sin jerga técnica.
     return new Response(
-      JSON.stringify({ error: String((e as Error)?.message ?? e) }),
+      JSON.stringify({ error: translateGeminiError(rawMessage) }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
