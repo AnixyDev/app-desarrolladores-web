@@ -67,7 +67,7 @@ const BillingPage: React.FC = () => {
     const isPro = profile.plan === 'Pro';
     const isTeams = profile.plan === 'Teams';
 
-    const SubscriptionCard = ({ plan, title, price, period, features, isCurrent, itemKey, icon: Icon, recommended }: any) => (
+    const SubscriptionCard = ({ plan, title, price, period, features, isCurrent, itemKey, icon: Icon, recommended, priceNote }: any) => (
         <div className={`relative flex flex-col p-6 sm:p-8 bg-gray-900 rounded-3xl border transition-all duration-300 ${isCurrent ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-gray-800 hover:border-gray-700 hover:shadow-2xl shadow-black'}`}>
             {recommended && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
@@ -83,6 +83,7 @@ const BillingPage: React.FC = () => {
                     <span className="text-4xl font-black text-white tracking-tighter">{price}</span>
                     <span className="text-sm text-gray-500 font-medium">/{period}</span>
                 </div>
+                {priceNote && <p className="text-xs text-gray-500 mt-1">{priceNote}</p>}
             </div>
             <ul className="flex-1 space-y-4 mb-10">
                 {features.map((f: string, i: number) => (
@@ -95,7 +96,7 @@ const BillingPage: React.FC = () => {
             <Button 
                 onClick={() => handlePurchase(itemKey)} 
                 disabled={!!isLoadingAction || isCurrent} 
-                className={`w-full h-12 rounded-xl text-sm font-bold transition-all ${isCurrent ? 'bg-gray-800 text-gray-500 cursor-default opacity-50' : recommended ? 'bg-white text-black hover:scale-[1.02] active:scale-[0.98]' : 'bg-gray-800 hover:bg-gray-700'}`}
+                className={`w-full h-12 rounded-xl text-sm font-bold transition-all ${isCurrent ? 'bg-gray-800 text-gray-500 cursor-default opacity-50' : recommended ? '!bg-white !text-black hover:scale-[1.02] active:scale-[0.98]' : 'bg-gray-800 hover:bg-gray-700'}`}
             >
                 {isLoadingAction === itemKey ? <RefreshCwIcon className="w-5 h-5 animate-spin mx-auto"/> : isCurrent ? 'Plan Actual' : 'Seleccionar Plan'}
             </Button>
@@ -134,6 +135,7 @@ const BillingPage: React.FC = () => {
                     <>
                         <SubscriptionCard
                             plan="Pro" title="Freelancer Pro" price="3,95€" period="mes"
+                            priceNote={billingCycle === 'yearly' ? 'Este plan solo está disponible con facturación mensual.' : undefined}
                             features={["Proyectos e Hitos ilimitados", "Facturación AEAT (TicketBAI ready)", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
                             isCurrent={isPro} itemKey="proPlan" icon={CreditCard}
                         />
@@ -158,7 +160,7 @@ const BillingPage: React.FC = () => {
                         <div className="space-y-2">
                             <h4 className="text-xl font-bold text-white">¿Necesitas un plan personalizado?</h4>
                             <p className="text-gray-400 text-sm">Si eres una agencia de más de 20 personas, ofrecemos despliegues en infraestructura privada (On-Premise) y soporte dedicado.</p>
-                            <a href="mailto:ventas@devfreelancer.app" className="text-primary-400 text-sm font-bold hover:underline mt-2 inline-block">Hablar con ventas →</a>
+                            <a href="mailto:anixydev@gmail.com" className="text-primary-400 text-sm font-bold hover:underline mt-2 inline-block">Hablar con ventas →</a>
                         </div>
                     </CardContent>
                 </Card>
