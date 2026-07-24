@@ -195,7 +195,19 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             setTimeout(async () => {
                 if (session?.user) {
                     console.log("✅ Usuario autenticado detectado");
-                    await get().refreshProfile(session);
+
+                    // FIX: Supabase puede emitir varios eventos (SIGNED_IN,
+                    // INITIAL_SESSION, TOKEN_REFRESHED...) seguidos para la
+                    // MISMA sesión ya resuelta — sobre todo justo después de
+                    // un login por enlace mágico/OAuth con el token todavía
+                    // en la URL. Antes, cada evento disparaba un refreshProfile()
+                    // completo (nueva consulta a `profiles` + re-render), aunque
+                    // el perfil de ese usuario ya estuviera cargado. Si el
+                    // usuario no ha cambiado, no hace falta repetir la consulta.
+                    const alreadyLoaded = get().isAuthenticated && get().profile.id === session.user.id;
+                    if (!alreadyLoaded) {
+                        await get().refreshProfile(session);
+                    }
 
                     // Cargar datos en segundo plano, pero solo UNA vez por usuario/sesión.
                     // Evita que INITIAL_SESSION + SIGNED_IN disparen los fetch dos veces
