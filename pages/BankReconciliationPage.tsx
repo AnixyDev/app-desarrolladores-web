@@ -39,8 +39,7 @@ const BankReconciliationPage: React.FC = () => {
 
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [transactions, setTransactions] = useState<BankTransaction[]>([]);
-  const [institutions, setInstitutions] = useState<{ name: string; country: string }[]>([]);
-  const [loadingInstitutions, setLoadingInstitutions] = useState(false);
+  const [institutionName, setInstitutionName] = useState('');
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncErrors, setSyncErrors] = useState<string[]>([]);
@@ -121,25 +120,17 @@ const BankReconciliationPage: React.FC = () => {
     }
   };
 
-  const handleLoadInstitutions = async () => {
-    setLoadingInstitutions(true);
-    try {
-      const result = await callFn('bank-connect', 'list_institutions', { country: 'ES' });
-      setInstitutions(result.institutions || []);
-    } catch (err) {
-      addToast((err as Error).message || 'No se pudo cargar la lista de bancos.', 'error');
-    } finally {
-      setLoadingInstitutions(false);
+  const handleConnectBank = async () => {
+    if (!institutionName.trim()) {
+      addToast('Escribe el nombre exacto de tu banco.', 'error');
+      return;
     }
-  };
-
-  const handleConnectBank = async (institutionName: string, country: string) => {
     setConnecting(true);
     try {
       const redirectUrl = `${window.location.origin}/bank-reconciliation`;
       const result = await callFn('bank-connect', 'create_requisition', {
-        institution_name: institutionName,
-        country,
+        institution_name: institutionName.trim(),
+        country: 'ES',
         redirect_url: redirectUrl,
       });
       window.location.href = result.link;
@@ -254,25 +245,26 @@ const BankReconciliationPage: React.FC = () => {
       {accounts.length === 0 ? (
         <Card>
           <CardContent className="space-y-4 py-6">
-            <p className="text-sm text-gray-400">Todavía no has conectado ninguna cuenta bancaria.</p>
-            {institutions.length === 0 ? (
-              <Button onClick={handleLoadInstitutions} disabled={loadingInstitutions}>
-                {loadingInstitutions ? 'Cargando bancos...' : 'Conectar un banco'}
-              </Button>
-            ) : (
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {institutions.map(inst => (
-                  <button
-                    key={inst.name}
-                    onClick={() => handleConnectBank(inst.name, inst.country)}
-                    disabled={connecting}
-                    className="w-full text-left p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-white transition-colors"
-                  >
-                    {inst.name}
-                  </button>
-                ))}
-              </div>
-            )}
+            <p className="text-sm text-gray-400">
+              Tu aplicación está en modo restringido (normal al principio) — todavía no puede listar
+              todos los bancos automáticamente, pero sí puede conectar con uno concreto si escribes
+              su nombre exacto. Los más comunes en España: <span className="text-gray-300">CaixaBank, BBVA, Banco Santander,
+              Banco Sabadell, Bankinter, Kutxabank, Unicaja Banco</span>. Si el tuyo no es uno de
+              estos, consulta el nombre exacto en{' '}
+              <a href="https://tilisy.com/en/banks?country=ES" target="_blank" rel="noreferrer" className="text-primary-400 underline">
+                tilisy.com/en/banks?country=ES
+              </a>.
+            </p>
+            <input
+              type="text"
+              value={institutionName}
+              onChange={(e) => setInstitutionName(e.target.value)}
+              placeholder="Ej. CaixaBank"
+              className="w-full p-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-primary-500 outline-none"
+            />
+            <Button onClick={handleConnectBank} disabled={connecting} className="w-full">
+              {connecting ? 'Conectando...' : 'Conectar banco'}
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -299,7 +291,7 @@ const BankReconciliationPage: React.FC = () => {
               <Card key={tx.id}>
                 <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4">
                   <div>
-                    <p className="text-white font-semibold">{formatCurrency(tx.amount_cents)} — {tx.counterparty_name || 'Desconocido'}</p>
+                    <p className="text-white font-semibold">{formatCurrency(tx.amount_cents)} — {tx.counterparty_name || tx.description || 'Desconocido'}</p>
                     <p className="text-sm text-gray-400">{tx.description}</p>
                     <p className="text-sm text-gray-500">{tx.booking_date} · sugerido para: <span className="text-primary-400">{getInvoiceLabel(tx.matched_invoice_id)}</span> ({Math.round((tx.match_confidence || 0) * 100)}% de confianza)</p>
                   </div>
@@ -336,7 +328,7 @@ const BankReconciliationPage: React.FC = () => {
                   {transactions.map(tx => (
                     <tr key={tx.id} className="border-b border-gray-800">
                       <td className="p-3 text-gray-400">{tx.booking_date}</td>
-                      <td className="p-3 text-white">{tx.counterparty_name || '—'}</td>
+                      <td className="p-3 text-white">{tx.counterparty_name || tx.description || '—'}</td>
                       <td className="p-3 text-right text-white">{formatCurrency(tx.amount_cents)}</td>
                       <td className="p-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs ${
