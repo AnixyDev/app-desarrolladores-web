@@ -44,6 +44,8 @@ export const useAppStore = create<AppState>()(
         savedJobIds: state.savedJobIds,
         monthlyGoalCents: state.monthlyGoalCents,
         activeTimer: state.activeTimer,
+        notifications: state.notifications,
+        notifiedEvents: state.notifiedEvents,
       }),
     }
   )
