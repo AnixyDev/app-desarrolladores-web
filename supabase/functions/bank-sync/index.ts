@@ -1,8 +1,8 @@
 // supabase/functions/bank-sync/index.ts
 //
-// Sincroniza movimientos bancarios (Enable Banking) y los coteja con
-// facturas pendientes. El cotejo es solo una SUGERENCIA — nunca marca
-// nada como cobrado sin que el usuario confirme (action=confirm_match).
+// Sincroniza movimientos bancarios (GoCardless) y los coteja con facturas
+// pendientes. El cotejo es solo una SUGERENCIA — nunca marca nada como
+// cobrado sin que el usuario confirme explícitamente (action=confirm_match).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -12,7 +12,7 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const EB_BASE_URL = 'https://api.enablebanking.com';
+const GC_BASE_URL = 'https://bankaccountdata.gocardless.com/api/v2';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -21,7 +21,7 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-async function getAesKey(rawHex: string): Promise<CryptoKey> {
+async function getKey(rawHex: string): Promise<CryptoKey> {
   const keyBytes = new Uint8Array(rawHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
   return crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 }
@@ -34,35 +34,17 @@ async function decryptFromBase64(b64: string, key: CryptoKey): Promise<string> {
   return new TextDecoder().decode(plainBuf);
 }
 
-function base64url(input: ArrayBuffer | string): string {
-  const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : new Uint8Array(input);
-  let str = '';
-  for (const b of bytes) str += String.fromCharCode(b);
-  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function getGoCardlessToken(secretId: string, secretKey: string): Promise<string> {
+  const res = await fetch(`${GC_BASE_URL}/token/new/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ secret_id: secretId, secret_key: secretKey }),
+  });
+  if (!res.ok) throw new Error(`GoCardless auth error ${res.status}: ${await res.text()}`);
+  return (await res.json()).access;
 }
 
-function pemToArrayBuffer(pem: string): ArrayBuffer {
-  const b64 = pem.replace(/-----BEGIN (.*)-----/, '').replace(/-----END (.*)-----/, '').replace(/\s+/g, '');
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
-
-async function importEnableBankingPrivateKey(pem: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey('pkcs8', pemToArrayBuffer(pem), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
-}
-
-async function createEnableBankingJWT(appId: string, privateKeyPem: string): Promise<string> {
-  const key = await importEnableBankingPrivateKey(privateKeyPem);
-  const iat = Math.floor(Date.now() / 1000);
-  const header = { typ: 'JWT', alg: 'RS256', kid: appId };
-  const body = { iss: 'enablebanking.com', aud: 'api.enablebanking.com', iat, exp: iat + 3600 };
-  const signingInput = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(body))}`;
-  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(signingInput));
-  return `${signingInput}.${base64url(signature)}`;
-}
-
+// Normaliza texto para comparar (quita acentos, mayúsculas, espacios extra)
 function normalize(text: string): string {
   return (text || '')
     .toLowerCase()
@@ -94,14 +76,23 @@ Deno.serve(async (req) => {
 
     const { action, payload } = await req.json();
 
+    // --- Confirmar / ignorar una sugerencia de cotejo: no necesita tocar
+    // la API de GoCardless para nada, solo la base de datos propia. ---
     if (action === 'confirm_match') {
       const { transaction_id, invoice_id } = payload || {};
       if (!transaction_id || !invoice_id) return jsonResponse({ error: 'Faltan datos.' }, 400);
 
       const { data: tx, error: txError } = await supabaseAdmin
-        .from('bank_transactions').select('*').eq('id', transaction_id).eq('user_id', user.id).single();
+        .from('bank_transactions')
+        .select('*')
+        .eq('id', transaction_id)
+        .eq('user_id', user.id)
+        .single();
       if (txError || !tx) return jsonResponse({ error: 'Movimiento no encontrado.' }, 404);
 
+      // Registra el cobro real en `payments` — el mismo mecanismo que ya
+      // usa el registro manual (RegisterPaymentModal), así el estado de
+      // "pagada/parcial/pendiente" de la factura se recalcula solo.
       const { error: paymentError } = await supabaseAdmin.from('payments').insert({
         user_id: user.id,
         invoice_id,
@@ -124,34 +115,42 @@ Deno.serve(async (req) => {
     if (action === 'ignore_match') {
       const { transaction_id } = payload || {};
       const { error } = await supabaseAdmin
-        .from('bank_transactions').update({ match_status: 'ignored' }).eq('id', transaction_id).eq('user_id', user.id);
+        .from('bank_transactions')
+        .update({ match_status: 'ignored' })
+        .eq('id', transaction_id)
+        .eq('user_id', user.id);
       if (error) throw error;
       return jsonResponse({ success: true });
     }
 
+    // --- Sincronizar movimientos nuevos y sugerir cotejos ---
     if (action !== 'sync') return jsonResponse({ error: 'Acción desconocida.' }, 400);
 
     const { data: secrets } = await supabaseAdmin
       .from('user_secrets')
-      .select('enablebanking_app_id, enablebanking_private_key_encrypted')
+      .select('gocardless_secret_id_encrypted, gocardless_secret_key_encrypted')
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (!secrets?.enablebanking_app_id) {
-      return jsonResponse({ error: 'No has configurado tus credenciales de Enable Banking.' }, 400);
+    if (!secrets?.gocardless_secret_id_encrypted) {
+      return jsonResponse({ error: 'No has configurado tus credenciales de GoCardless.' }, 400);
     }
 
-    const aesKey = await getAesKey(encryptionKeyHex);
-    const privateKeyPem = await decryptFromBase64(secrets.enablebanking_private_key_encrypted, aesKey);
-    const jwt = await createEnableBankingJWT(secrets.enablebanking_app_id, privateKeyPem);
-    const ebHeaders = { Authorization: `Bearer ${jwt}` };
+    const key = await getKey(encryptionKeyHex);
+    const secretId = await decryptFromBase64(secrets.gocardless_secret_id_encrypted, key);
+    const secretKey = await decryptFromBase64(secrets.gocardless_secret_key_encrypted, key);
+    const token = await getGoCardlessToken(secretId, secretKey);
 
-    const { data: accounts } = await supabaseAdmin.from('bank_accounts').select('*').eq('user_id', user.id);
+    const { data: accounts } = await supabaseAdmin
+      .from('bank_accounts')
+      .select('*')
+      .eq('user_id', user.id);
 
     let newTransactions = 0;
     let newSuggestions = 0;
     const errors: string[] = [];
 
+    // Facturas candidatas a cotejo: no pagadas del todo.
     const { data: invoices } = await supabaseAdmin
       .from('invoices')
       .select('id, invoice_number, total_cents, paid, client_id, clients(name)')
@@ -160,31 +159,35 @@ Deno.serve(async (req) => {
 
     for (const account of accounts || []) {
       try {
-        const res = await fetch(`${EB_BASE_URL}/accounts/${account.gocardless_account_id}/transactions`, { headers: ebHeaders });
+        // Respetar los límites de peticiones del banco (hasta 4/día) — no
+        // reintentar en bucle, solo un intento por cuenta y seguir.
+        const res = await fetch(`${GC_BASE_URL}/accounts/${account.gocardless_account_id}/transactions/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!res.ok) {
           errors.push(`${account.account_name}: ${res.status === 429 ? 'límite de peticiones del banco alcanzado hoy' : await res.text()}`);
           continue;
         }
         const data = await res.json();
-        const txList = data?.transactions || [];
+        const booked = data?.transactions?.booked || [];
 
-        for (const t of txList) {
-          const amountCents = Math.round(parseFloat(t.transaction_amount?.amount || '0') * 100);
-          if (amountCents <= 0) continue; // solo ingresos
+        for (const t of booked) {
+          const amountCents = Math.round(parseFloat(t.transactionAmount?.amount || '0') * 100);
+          // Solo nos interesan los ingresos (positivos) para cotejar con facturas.
+          if (amountCents <= 0) continue;
 
-          const ebTxId = t.entry_reference || t.transaction_id || `${t.booking_date}-${amountCents}-${t.remittance_information?.[0] || ''}`;
-          const counterpartyName = t.creditor?.name || t.debtor?.name || '';
-          const description = (t.remittance_information || []).join(' ');
+          const gcTxId = t.transactionId || t.internalTransactionId || `${t.bookingDate}-${amountCents}-${t.remittanceInformationUnstructured || ''}`;
+          const counterpartyName = t.debtorName || t.creditorName || '';
+          const description = t.remittanceInformationUnstructured || (t.remittanceInformationUnstructuredArray || []).join(' ') || '';
 
           const { data: inserted, error: insertError } = await supabaseAdmin
             .from('bank_transactions')
             .upsert({
               user_id: user.id,
               bank_account_id: account.id,
-              gocardless_transaction_id: ebTxId,
-              enablebanking_transaction_id: ebTxId,
+              gocardless_transaction_id: gcTxId,
               amount_cents: amountCents,
-              booking_date: t.booking_date,
+              booking_date: t.bookingDate,
               counterparty_name: counterpartyName,
               description,
               raw_data: t,
@@ -193,22 +196,26 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           if (insertError) { errors.push(insertError.message); continue; }
-          if (!inserted) continue;
+          if (!inserted) continue; // ya existía, no es nuevo
           newTransactions++;
 
+          // Cotejo: mismo importe exacto es la señal más fiable. Si hay
+          // varias facturas con el mismo importe, se afina por si el
+          // nombre del cliente aparece en el concepto/nombre del pagador.
           const candidates = (invoices || []).filter(inv => inv.total_cents === amountCents);
           if (candidates.length === 0) continue;
 
           let best = candidates[0];
-          let confidence = 0.6;
-          const normalizedText = normalize(`${counterpartyName} ${description}`);
+          let confidence = 0.6; // importe exacto, sin más pistas
           if (candidates.length > 1) {
+            const normalizedText = normalize(`${counterpartyName} ${description}`);
             const withNameMatch = candidates.find(c => {
               const clientName = normalize((c as any).clients?.name || '');
               return clientName && normalizedText.includes(clientName);
             });
             if (withNameMatch) { best = withNameMatch; confidence = 0.9; }
           } else {
+            const normalizedText = normalize(`${counterpartyName} ${description}`);
             const clientName = normalize((best as any).clients?.name || '');
             if (clientName && normalizedText.includes(clientName)) confidence = 0.95;
           }

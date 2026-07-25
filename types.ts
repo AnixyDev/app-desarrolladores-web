@@ -160,6 +160,44 @@ export interface NewReceipt {
   notes?: string | null;
 }
 
+export interface BankConnection {
+  id: string;
+  user_id: string;
+  gocardless_requisition_id: string;
+  institution_id: string;
+  institution_name: string;
+  status: 'pending' | 'linked' | 'expired' | 'error';
+  created_at: string;
+  expires_at: string | null;
+}
+
+export interface BankAccount {
+  id: string;
+  user_id: string;
+  connection_id: string;
+  gocardless_account_id: string;
+  iban: string | null;
+  account_name: string | null;
+  currency: string;
+  last_synced_at: string | null;
+  created_at: string;
+}
+
+export interface BankTransaction {
+  id: string;
+  user_id: string;
+  bank_account_id: string;
+  amount_cents: number;
+  currency: string;
+  booking_date: string;
+  counterparty_name: string | null;
+  description: string | null;
+  matched_invoice_id: string | null;
+  match_status: 'unmatched' | 'suggested' | 'confirmed' | 'ignored';
+  match_confidence: number | null;
+  created_at: string;
+}
+
 export interface NewInvoice {
   client_id: string;
   project_id?: string | null;
