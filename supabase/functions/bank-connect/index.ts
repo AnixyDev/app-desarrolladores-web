@@ -202,8 +202,8 @@ Deno.serve(async (req) => {
             const detailsRes = await fetch(`${EB_BASE_URL}/accounts/${accountUid}/details`, { headers: ebHeaders });
             if (detailsRes.ok) {
               const details = await detailsRes.json();
-              iban = details?.account?.identification ?? details?.uid ?? null;
-              name = details?.name || details?.account?.name || name;
+              iban = details?.account_id?.iban ?? null;
+              name = details?.name || name;
             }
           } catch { /* no crítico, seguimos con lo que tenemos */ }
 
