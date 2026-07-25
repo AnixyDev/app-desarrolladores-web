@@ -20,7 +20,7 @@ serve(async (req) => {
     const { data: recurringInvoices, error: fetchError } = await supabase
       .from('recurring_invoices')
       .select('*')
-      .lte('next_date', today)
+      .lte('next_due_date', today)
 
     if (fetchError) throw fetchError
 
@@ -69,7 +69,7 @@ serve(async (req) => {
       }
 
       // 3. Calcular la siguiente fecha
-      const nextDate = new Date(rec.next_date)
+      const nextDate = new Date(rec.next_due_date)
       if (rec.frequency === 'monthly') {
         nextDate.setMonth(nextDate.getMonth() + 1)
       } else if (rec.frequency === 'yearly') {
@@ -80,11 +80,11 @@ serve(async (req) => {
       // 4. Actualizar la factura recurrente
       const { error: updateError } = await supabase
         .from('recurring_invoices')
-        .update({ next_date: nextDateStr })
+        .update({ next_due_date: nextDateStr })
         .eq('id', rec.id)
 
       if (updateError) {
-        console.error(`Error updating next_date for recurring ${rec.id}:`, updateError)
+        console.error(`Error updating next_due_date for recurring ${rec.id}:`, updateError)
       }
 
       results.push({ recurring_id: rec.id, invoice_id: newInvoice.id })

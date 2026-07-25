@@ -498,7 +498,7 @@ const handleSelectBudget = (budgetId: string) => {
                       <div>
                         <p className="text-sm font-bold text-white">{getClientName(ri.client_id)}</p>
                         <p className="text-xs text-gray-500">
-                          {ri.frequency === 'monthly' ? 'Mensual' : ri.frequency === 'yearly' ? 'Anual' : ri.frequency} · Próxima: {ri.next_date}
+                          {ri.frequency === 'monthly' ? 'Mensual' : ri.frequency === 'yearly' ? 'Anual' : ri.frequency} · Próxima: {ri.next_due_date}
                         </p>
                       </div>
                       <button

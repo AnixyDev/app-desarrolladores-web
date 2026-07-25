@@ -17,7 +17,7 @@ import { supabase } from '@/lib/supabaseClient';
 // ─── Tipos de entrada (sin campos que genera el servidor) ─────────────────────
 
 type NewInvoiceInput = Omit<Invoice, 'id' | 'user_id' | 'created_at' | 'invoice_number' | 'subtotal_cents' | 'total_cents' | 'paid' | 'payment_date'>;
-type NewRecurringInvoiceInput = Omit<RecurringInvoice, 'id' | 'user_id' | 'created_at' | 'next_date'>;
+type NewRecurringInvoiceInput = Omit<RecurringInvoice, 'id' | 'user_id' | 'created_at' | 'next_due_date'>;
 type NewBudgetInput = Omit<Budget, 'id' | 'user_id' | 'created_at' | 'amount_cents' | 'status'> & { items: InvoiceItem[] };
 type NewProposalInput = Omit<Proposal, 'id' | 'user_id' | 'created_at'>;
 type NewContractInput = Omit<Contract, 'id' | 'user_id' | 'created_at' | 'signed_by' | 'signed_at'>;
@@ -42,7 +42,7 @@ export interface FinanceSlice {
   deleteInvoice: (id: string) => Promise<void>;
   markInvoiceAsPaid: (id: string) => Promise<void>;
 
-  addRecurringInvoice: (recurringData: Omit<RecurringInvoice, 'id' | 'user_id' | 'created_at' | 'next_date'>) => Promise<void>;
+  addRecurringInvoice: (recurringData: Omit<RecurringInvoice, 'id' | 'user_id' | 'created_at' | 'next_due_date'>) => Promise<void>;
   deleteRecurringInvoice: (id: string) => Promise<void>;
   checkAndGenerateRecurringInvoices: () => Promise<void>;
 
@@ -212,7 +212,7 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
 
     const { data, error } = await supabase
       .from('recurring_invoices')
-      .insert({ ...recurringData, user_id: user.id, next_date: recurringData.start_date, items: recurringData.items, tax_percent: recurringData.tax_percent })
+      .insert({ ...recurringData, user_id: user.id, next_due_date: recurringData.start_date, items: recurringData.items, tax_percent: recurringData.tax_percent })
       .select()
       .single();
 
