@@ -31,6 +31,7 @@ const InvoicesPage: React.FC = () => {
     recurringInvoices,
     clients,
     profile,
+    fiscalRecords,
     getClientById,
     addInvoice,
     deleteInvoice,
@@ -208,6 +209,14 @@ const handleSelectBudget = (budgetId: string) => {
     return clients.find(c => c.id === clientId)?.name || 'Cliente desconocido';
   };
 
+  // Busca el registro fiscal (huella) de esta factura, si el cumplimiento
+  // Veri*Factu está activo — se usa para pintar el QR tributario en el PDF.
+  const getFiscalDataForInvoice = (invoiceId: string) => {
+    const record = fiscalRecords.find(r => r.invoice_id === invoiceId && r.record_type === 'alta');
+    if (!record) return null;
+    return { modalidad: record.modalidad, hash: record.hash };
+  };
+
   // Genera y descarga el PDF de la factura usando el servicio ya existente en el proyecto
   const handleDownloadPdf = async (invoice: typeof invoices[number]) => {
     const client = getClientById(invoice.client_id);
@@ -220,7 +229,7 @@ const handleSelectBudget = (budgetId: string) => {
       return;
     }
     try {
-      await generateInvoicePdf(invoice, client, profile);
+      await generateInvoicePdf(invoice, client, profile, getFiscalDataForInvoice(invoice.id));
     } catch (error) {
       console.error('Error generando el PDF:', error);
       addToast('No se pudo generar el PDF de la factura.', 'error');
@@ -246,7 +255,7 @@ const handleSelectBudget = (budgetId: string) => {
     }
 
     try {
-      await generateInvoicePdf(invoice, client, profile);
+      await generateInvoicePdf(invoice, client, profile, getFiscalDataForInvoice(invoice.id));
     } catch (error) {
       console.error('Error generando el PDF:', error);
       addToast('No se pudo generar el PDF de la factura.', 'error');
@@ -353,7 +362,14 @@ const handleSelectBudget = (budgetId: string) => {
 
                       return (
                         <tr key={inv.id} className="text-sm text-gray-300 hover:bg-gray-800/30 transition-colors">
-                          <td className="px-6 py-4 font-mono text-white">{inv.invoice_number}</td>
+                          <td className="px-6 py-4 font-mono text-white">
+                        {inv.invoice_number}
+                        {inv.fiscal_locked && (
+                          <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/30" title="Registro fiscal Veri*Factu generado — esta factura está bloqueada frente a ediciones">
+                            🔒 Veri*Factu
+                          </span>
+                        )}
+                      </td>
                           <td className="px-6 py-4">{getClientName(inv.client_id)}</td>
                           <td className="px-6 py-4">{new Date(inv.due_date).toLocaleDateString()}</td>
                           <td className="px-6 py-4 text-right font-bold text-white">{formatCurrency(inv.total_cents)}</td>
@@ -429,7 +445,14 @@ const handleSelectBudget = (budgetId: string) => {
                       <div key={inv.id} className="p-4 space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="font-mono text-white font-bold">{inv.invoice_number}</p>
+                            <p className="font-mono text-white font-bold">
+                              {inv.invoice_number}
+                              {inv.fiscal_locked && (
+                                <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/30">
+                                  🔒
+                                </span>
+                              )}
+                            </p>
                             <p className="text-sm text-gray-400">{getClientName(inv.client_id)}</p>
                           </div>
                           <span className={`px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${status.className}`}>

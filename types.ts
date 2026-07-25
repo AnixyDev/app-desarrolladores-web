@@ -34,6 +34,31 @@ export interface Profile {
   stripe_subscription_id?: string;
   current_period_end?: string;
   subscription_status?: string;
+  // NUEVO: cumplimiento Veri*Factu (RD 1007/2023). Desactivado por
+  // defecto — cada usuario lo activa cuando le corresponda según su
+  // fecha límite (autónomos: 1 julio 2027).
+  veri_factu_enabled?: boolean;
+  veri_factu_modality?: 'verifactu' | 'no_verifactu';
+}
+
+export interface FiscalRecord {
+  id: string;
+  user_id: string;
+  invoice_id: string;
+  record_type: 'alta' | 'anulacion';
+  nif_emisor: string;
+  nombre_emisor: string;
+  numero_factura: string;
+  fecha_expedicion: string;
+  tipo_factura: string;
+  importe_total_cents: number;
+  hash_anterior: string | null;
+  hash: string;
+  hash_input: string;
+  modalidad: 'verifactu' | 'no_verifactu';
+  estado_envio: 'no_aplica' | 'pendiente' | 'enviado' | 'aceptado' | 'aceptado_con_errores' | 'rechazado';
+  csv_respuesta_aeat: string | null;
+  created_at: string;
 }
 
 export interface Client {
@@ -97,6 +122,10 @@ export interface Invoice {
   payment_date?: string | null;
   created_at: string;
   irpf_percent?: number;
+  // NUEVO: cumplimiento Veri*Factu
+  fiscal_locked?: boolean;
+  rectifies_invoice_id?: string | null;
+  is_rectified?: boolean;
 }
 
 export interface Receipt {

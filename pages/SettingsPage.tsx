@@ -5,13 +5,13 @@ import { supabase } from '@/lib/supabaseClient';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import { UserIcon as User, BellIcon as Bell, ShieldIcon as Shield, CreditCard, Globe, RefreshCwIcon } from '@/components/icons/Icon';
+import { UserIcon as User, BellIcon as Bell, ShieldIcon as Shield, CreditCard, Globe, RefreshCwIcon, ShieldCheckIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 
-type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing';
+type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal';
 
 const SettingsPage: React.FC = () => {
-  const { profile, updateProfile, logout } = useAppStore();
+  const { profile, updateProfile, logout, updateVeriFactuSettings, verifyFiscalChain } = useAppStore();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -28,6 +28,11 @@ const SettingsPage: React.FC = () => {
     reminder_template_upcoming: profile?.reminder_template_upcoming || '',
     reminder_template_overdue: profile?.reminder_template_overdue || '',
   });
+
+  const [fiscalSaving, setFiscalSaving] = useState(false);
+  const [fiscalModality, setFiscalModality] = useState<'verifactu' | 'no_verifactu'>(profile?.veri_factu_modality || 'no_verifactu');
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<{ valid: boolean; brokenAt?: string } | null>(null);
   const [notifLoading, setNotifLoading] = useState(false);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -123,6 +128,7 @@ const SettingsPage: React.FC = () => {
           <TabButton tab="notifications" icon={Bell} label="Notificaciones" />
           <TabButton tab="security" icon={Shield} label="Seguridad" />
           <TabButton tab="billing" icon={CreditCard} label="Facturación" />
+          <TabButton tab="fiscal" icon={ShieldCheckIcon} label="Cumplimiento Fiscal" />
         </aside>
 
         <div className="md:col-span-3 space-y-6">
@@ -290,6 +296,129 @@ const SettingsPage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {activeTab === 'fiscal' && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <SectionTitle icon={ShieldCheckIcon} title="Cumplimiento Veri*Factu" />
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="p-4 bg-blue-900/20 border border-blue-800 rounded-lg text-sm text-blue-200">
+                    <p className="font-semibold mb-1">¿Qué es esto?</p>
+                    <p>
+                      El Real Decreto 1007/2023 exige que el software de facturación garantice la
+                      integridad de tus facturas (huella encadenada, sin poder editarlas ni borrarlas
+                      una vez emitidas). Para autónomos, es obligatorio desde el <strong>1 de julio de 2027</strong>.
+                      Actívalo cuando te corresponda — no hace falta esperar al último día, pero tampoco
+                      pasa nada por activarlo ya.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between bg-gray-800 p-4 rounded-lg">
+                    <div>
+                      <p className="font-semibold text-white">Activar cumplimiento fiscal</p>
+                      <p className="text-sm text-gray-400">
+                        {profile?.veri_factu_enabled
+                          ? 'Activado — tus facturas nuevas generan registro fiscal y quedan bloqueadas frente a ediciones.'
+                          : 'Desactivado — tus facturas se comportan como hasta ahora (editables y borrables).'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setFiscalSaving(true);
+                        try {
+                          await updateVeriFactuSettings(!profile?.veri_factu_enabled, fiscalModality);
+                          addToast(!profile?.veri_factu_enabled ? 'Cumplimiento fiscal activado.' : 'Cumplimiento fiscal desactivado.', 'success');
+                        } catch (err) {
+                          addToast((err as Error).message || 'No se pudo actualizar.', 'error');
+                        } finally {
+                          setFiscalSaving(false);
+                        }
+                      }}
+                      disabled={fiscalSaving}
+                      className={`relative w-14 h-7 rounded-full transition-colors ${profile?.veri_factu_enabled ? 'bg-primary-600' : 'bg-gray-600'}`}
+                    >
+                      <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${profile?.veri_factu_enabled ? 'translate-x-8' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Modalidad</label>
+                    <div className="space-y-2">
+                      <label className="flex items-start gap-3 p-3 bg-gray-800 rounded-lg cursor-pointer border border-gray-700 hover:border-gray-600">
+                        <input
+                          type="radio"
+                          name="modality"
+                          checked={fiscalModality === 'no_verifactu'}
+                          onChange={async () => {
+                            setFiscalModality('no_verifactu');
+                            if (profile?.veri_factu_enabled) await updateVeriFactuSettings(true, 'no_verifactu');
+                          }}
+                          className="mt-1"
+                        />
+                        <div>
+                          <p className="text-white font-medium">No Verifactu (recomendado para empezar)</p>
+                          <p className="text-xs text-gray-400">Huella encadenada e inmutabilidad garantizadas localmente, sin envío automático a la AEAT. No requiere certificado digital.</p>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-3 p-3 bg-gray-800 rounded-lg cursor-pointer border border-gray-700 hover:border-gray-600 opacity-60">
+                        <input
+                          type="radio"
+                          name="modality"
+                          checked={fiscalModality === 'verifactu'}
+                          disabled
+                          className="mt-1"
+                        />
+                        <div>
+                          <p className="text-white font-medium">Verifactu (envío en tiempo real) — próximamente</p>
+                          <p className="text-xs text-gray-400">Requiere certificado digital y la conexión con la AEAT. Todavía no disponible.</p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <SectionTitle icon={ShieldCheckIcon} title="Verificación de la cadena de huellas" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-gray-400">
+                    Recalcula cada huella de tus facturas emitidas y comprueba que coincide con la
+                    guardada — si algo no cuadra, indica una manipulación o un fallo. Esta comprobación
+                    es obligatoria ofrecerla en modalidad No Verifactu.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    onClick={async () => {
+                      setVerifying(true);
+                      setVerifyResult(null);
+                      const result = await verifyFiscalChain();
+                      setVerifyResult(result);
+                      setVerifying(false);
+                    }}
+                    disabled={verifying}
+                  >
+                    {verifying ? <RefreshCwIcon className="w-4 h-4 animate-spin mr-2" /> : <ShieldCheckIcon className="w-4 h-4 mr-2" />}
+                    {verifying ? 'Verificando...' : 'Verificar integridad de la cadena'}
+                  </Button>
+                  {verifyResult && (
+                    <div className={`p-3 rounded-lg text-sm ${verifyResult.valid ? 'bg-green-900/20 border border-green-800 text-green-300' : 'bg-red-900/20 border border-red-800 text-red-300'}`}>
+                      {verifyResult.valid
+                        ? '✅ La cadena de huellas es íntegra — no se ha detectado ninguna alteración.'
+                        : `⚠️ Se ha detectado una inconsistencia a partir de la factura ${verifyResult.brokenAt}. Revísalo con tu gestoría.`}
+                    </div>
+                  )}
+                  <Button variant="secondary" onClick={() => navigate('/fiscal')}>
+                    Ver registro fiscal completo
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </div>
       </div>

@@ -3,6 +3,7 @@ import type { Invoice, Client, Profile, Receipt } from '@/types';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import * as autoTableNamespace from 'jspdf-autotable';
+import QRCode from 'qrcode';
 
 // FIX: la interoperabilidad CJS/ESM de jspdf-autotable con Vite/Rolldown ha ido
 // cambiando de forma entre intentos (a veces el export real está en `.default`,
@@ -20,7 +21,39 @@ function resolveAutoTable(): (doc: jsPDF, options: any) => void {
     return fn;
 }
 
-export const generateInvoicePdf = async (invoice: Invoice, client: Client, profile: Profile) => {
+// --- Cumplimiento Veri*Factu (RD 1007/2023 / Orden HAC/1177/2024) ---
+// Datos mínimos del registro fiscal necesarios para pintar el QR y el
+// texto obligatorio en el PDF. No incluye el hash completo en el QR (la
+// norma no lo pide ahí, solo en el registro interno) — el QR es una URL
+// de cotejo contra la sede de la AEAT.
+export interface FiscalPdfData {
+  modalidad: 'verifactu' | 'no_verifactu';
+  hash: string;
+}
+
+// URL de cotejo AEAT (producción). Formato y parámetros (nif, numserie,
+// fecha DD-MM-YYYY, importe con punto decimal) verificados contra la
+// Orden HAC/1177/2024 — antes de operar en modalidad Veri*Factu real,
+// reconfirmar contra el documento técnico oficial de la AEAT.
+const AEAT_QR_BASE_URL = 'https://www2.agenciatributaria.es/wlpl/TIKE-CONT/ValidarQR';
+
+async function buildInvoiceQrDataUrl(profile: Profile, invoice: Invoice): Promise<string> {
+  const fecha = new Date(invoice.issue_date).toLocaleDateString('es-ES', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+  }).replace(/\//g, '-');
+  const importe = (invoice.total_cents / 100).toFixed(2);
+  const params = new URLSearchParams({
+    nif: profile.tax_id || '',
+    numserie: invoice.invoice_number,
+    fecha,
+    importe,
+  });
+  const qrUrl = `${AEAT_QR_BASE_URL}?${params.toString()}`;
+  // Nivel de corrección M e ISO/IEC 18004, como exige la Orden HAC/1177/2024.
+  return QRCode.toDataURL(qrUrl, { errorCorrectionLevel: 'M', margin: 2, width: 300 });
+}
+
+export const generateInvoicePdf = async (invoice: Invoice, client: Client, profile: Profile, fiscalData?: FiscalPdfData | null) => {
     const autoTable = resolveAutoTable();
     const doc = new jsPDF();
     
@@ -31,21 +64,43 @@ export const generateInvoicePdf = async (invoice: Invoice, client: Client, profi
         invoice.irpf_percent || 0
     );
 
+    // --- QR tributario (obligatorio si el cumplimiento Veri*Factu está
+    // activo) — según la norma debe ir arriba del todo, antes que el resto
+    // del contenido, por eso se pinta primero y se desplaza el resto del
+    // header a la derecha para dejarle sitio.
+    let headerLeftX = 14;
+    if (fiscalData) {
+        try {
+            const qrDataUrl = await buildInvoiceQrDataUrl(profile, invoice);
+            doc.setFontSize(6);
+            doc.setFont('helvetica', 'normal');
+            doc.text('QR tributario', 14, 10);
+            doc.addImage(qrDataUrl, 'PNG', 14, 12, 26, 26);
+            if (fiscalData.modalidad === 'verifactu') {
+                doc.setFontSize(6);
+                doc.text('Factura verificable en la sede electrónica de la AEAT', 14, 40, { maxWidth: 26 });
+            }
+            headerLeftX = 46;
+        } catch (e) {
+            console.error('No se pudo generar el QR tributario:', e);
+        }
+    }
+
     // --- Header ---
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
-    doc.text(profile.business_name || profile.full_name, 14, 22);
+    doc.text(profile.business_name || profile.full_name, headerLeftX, 22);
     
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(profile.full_name, 14, 30);
-    doc.text(`NIF/CIF: ${profile.tax_id}`, 14, 35);
-    doc.text(profile.email, 14, 40);
+    doc.text(profile.full_name, headerLeftX, 30);
+    doc.text(`NIF/CIF: ${profile.tax_id}`, headerLeftX, 35);
+    doc.text(profile.email, headerLeftX, 40);
 
     // --- Invoice Info ---
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text(`FACTURA`, 200, 22, { align: 'right' });
+    doc.text(fiscalData?.modalidad === 'verifactu' ? 'FACTURA (VERI*FACTU)' : 'FACTURA', 200, 22, { align: 'right' });
     
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
@@ -109,6 +164,10 @@ export const generateInvoicePdf = async (invoice: Invoice, client: Client, profi
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
     doc.text('Documento generado automáticamente.', 14, 285);
+    if (fiscalData) {
+        doc.setFontSize(6);
+        doc.text(`Huella: ${fiscalData.hash}`, 14, 290);
+    }
     
     doc.save(`Factura-${invoice.invoice_number}.pdf`);
 };

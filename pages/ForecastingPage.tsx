@@ -31,6 +31,7 @@ const InvoicesPage: React.FC = () => {
     recurringInvoices,
     clients,
     profile,
+    fiscalRecords,
     getClientById,
     addInvoice,
     deleteInvoice,
@@ -208,6 +209,12 @@ const handleSelectBudget = (budgetId: string) => {
     return clients.find(c => c.id === clientId)?.name || 'Cliente desconocido';
   };
 
+  const getFiscalDataForInvoice = (invoiceId: string) => {
+    const record = fiscalRecords.find(r => r.invoice_id === invoiceId && r.record_type === 'alta');
+    if (!record) return null;
+    return { modalidad: record.modalidad, hash: record.hash };
+  };
+
   // Genera y descarga el PDF de la factura usando el servicio ya existente
   // (pdfService.ts) que hasta ahora no estaba conectado a ningún botón.
   const handleDownloadPdf = async (invoice: typeof invoices[number]) => {
@@ -221,7 +228,7 @@ const handleSelectBudget = (budgetId: string) => {
       return;
     }
     try {
-      await generateInvoicePdf(invoice, client, profile);
+      await generateInvoicePdf(invoice, client, profile, getFiscalDataForInvoice(invoice.id));
     } catch (error) {
       console.error('Error generando el PDF:', error);
       addToast('No se pudo generar el PDF de la factura.', 'error');
@@ -247,7 +254,7 @@ const handleSelectBudget = (budgetId: string) => {
     }
 
     try {
-      await generateInvoicePdf(invoice, client, profile);
+      await generateInvoicePdf(invoice, client, profile, getFiscalDataForInvoice(invoice.id));
     } catch (error) {
       console.error('Error generando el PDF:', error);
       addToast('No se pudo generar el PDF de la factura.', 'error');

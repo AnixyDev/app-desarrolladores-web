@@ -10,6 +10,7 @@ import {
   RecurringInvoice,
   Receipt,
   NewReceipt,
+  FiscalRecord,
 } from '../../types';
 import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
@@ -33,10 +34,14 @@ export interface FinanceSlice {
   proposals: Proposal[];
   contracts: Contract[];
   receipts: Receipt[];
+  fiscalRecords: FiscalRecord[];
   monthlyGoalCents: number;
 
   fetchFinanceData: () => Promise<void>;
   fetchReceipts: () => Promise<void>;
+  fetchFiscalRecords: () => Promise<void>;
+  verifyFiscalChain: () => Promise<{ valid: boolean; brokenAt?: string }>;
+  updateVeriFactuSettings: (enabled: boolean, modality: 'verifactu' | 'no_verifactu') => Promise<void>;
 
   addInvoice: (invoiceData: NewInvoiceInput, timeEntryIdsToBill?: string[]) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
@@ -86,6 +91,7 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
   proposals: [],
   contracts: [],
   receipts: [],
+  fiscalRecords: [],
   monthlyGoalCents: 0,
 
   fetchFinanceData: async () => {
@@ -131,6 +137,44 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
     set({ receipts: (data ?? []) as Receipt[] });
   },
 
+  // --- Cumplimiento Veri*Factu ---
+  fetchFiscalRecords: async () => {
+    const { data, error } = await supabase.from('fiscal_records').select('*').order('created_at', { ascending: true });
+    if (error) { console.error('Error cargando registros fiscales:', error); return; }
+    set({ fiscalRecords: (data ?? []) as FiscalRecord[] });
+  },
+
+  // Recalcula cada huella de la cadena y la compara con la guardada — es
+  // la funcionalidad de verificación que la propia AEAT exige ofrecer en
+  // modalidad No-Verifactu. Delega el recálculo en la función de Postgres
+  // (misma lógica que generó los hashes, para comparar de forma fiable).
+  verifyFiscalChain: async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { valid: false };
+
+    const { data, error } = await supabase.rpc('verify_fiscal_chain', { p_user_id: user.id });
+    if (error) {
+      console.error('Error verificando la cadena fiscal:', error);
+      return { valid: false };
+    }
+
+    const broken = (data || []).find((r: any) => !r.is_valid);
+    return broken ? { valid: false, brokenAt: broken.numero_factura } : { valid: true };
+  },
+
+  updateVeriFactuSettings: async (enabled, modality) => {
+    const profile = get().profile;
+    if (!profile) return;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ veri_factu_enabled: enabled, veri_factu_modality: modality })
+      .eq('id', profile.id);
+
+    if (error) { console.error('Error actualizando ajustes Veri*Factu:', error); throw error; }
+    set(state => ({ profile: { ...state.profile, veri_factu_enabled: enabled, veri_factu_modality: modality } as any }));
+  },
+
   // En financeSlice.ts
 
 addInvoice: async (invoiceData, timeEntryIdsToBill) => {
@@ -172,15 +216,47 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
     throw error; 
   }
 
+  // NUEVO: si el usuario tiene activado el cumplimiento Veri*Factu, cada
+  // factura genera su registro fiscal (huella encadenada) justo después
+  // de crearse, y queda bloqueada frente a ediciones/borrado directo.
+  let finalInvoice = data;
+  const profile = get().profile;
+  if (profile?.veri_factu_enabled) {
+    const { data: fiscalRecord, error: fiscalError } = await supabase.rpc('generate_fiscal_record', {
+      p_invoice_id: data.id,
+    });
+    if (fiscalError) {
+      console.error('Error generando el registro fiscal Veri*Factu:', fiscalError);
+      // La factura ya se creó — no se revierte, pero se avisa. El usuario
+      // puede reintentar el registro fiscal desde /fiscal.
+    } else {
+      finalInvoice = { ...data, fiscal_locked: true };
+      set(state => ({ fiscalRecords: [fiscalRecord as FiscalRecord, ...state.fiscalRecords] }));
+    }
+  }
+
   // Actualización de estado solo si la DB confirma éxito
-  set(state => ({ invoices: [data, ...state.invoices] }));
+  set(state => ({ invoices: [finalInvoice, ...state.invoices] }));
   
   if (timeEntryIdsToBill?.length) {
     await supabase.from('time_entries').update({ invoice_id: data.id }).in('id', timeEntryIdsToBill);
     get().fetchTimeEntries?.();
   }
 },
+  // NUEVO: si la factura tiene registro fiscal Veri*Factu, hay que
+  // anularla primero (genera un registro de anulación encadenado) antes
+  // de poder borrarla — el trigger de la base de datos lo exige.
   deleteInvoice: async (id) => {
+    const invoice = get().invoices.find(i => i.id === id);
+    if (invoice?.fiscal_locked) {
+      const { error: cancelError } = await supabase.rpc('generate_fiscal_cancellation', { p_invoice_id: id });
+      if (cancelError) {
+        console.error('Error anulando el registro fiscal:', cancelError);
+        throw new Error('Esta factura tiene registro fiscal Veri*Factu y no se pudo anular. No se ha eliminado.');
+      }
+      get().fetchFiscalRecords?.();
+    }
+
     const { error } = await supabase.from('invoices').delete().eq('id', id);
     if (error) { console.error('Error deleting invoice:', error); throw error; }
     set(state => ({ invoices: state.invoices.filter(i => i.id !== id) }));

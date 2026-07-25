@@ -44,6 +44,7 @@ export const SIDEBAR_STRUCTURE: SidebarItem[] = [
     items: [
       { href: '/invoices', label: 'Facturas', icon: 'FileText' },
       { href: '/receipts', label: 'Recibos', icon: 'Receipt' },
+      { href: '/fiscal', label: 'Registro Fiscal', icon: 'ShieldCheck' },
       { href: '/expenses', label: 'Gastos', icon: 'BarChart2' },
       { href: '/tax-ledger', label: 'Libro Fiscal', icon: 'BookOpen' },
     ],
