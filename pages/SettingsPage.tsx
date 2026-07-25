@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import { supabase } from '@/lib/supabaseClient';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import { UserIcon as User, BellIcon as Bell, ShieldIcon as Shield, CreditCard, Globe, RefreshCwIcon, ShieldCheckIcon } from '@/components/icons/Icon';
+import { UserIcon as User, BellIcon as Bell, ShieldIcon as Shield, CreditCard, Globe, RefreshCwIcon, ShieldCheckIcon, TrashIcon, UploadIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal';
@@ -21,6 +21,11 @@ const SettingsPage: React.FC = () => {
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || '',
     business_name: profile?.business_name || '',
+    tax_id: profile?.tax_id || '',
+    fiscal_street: profile?.fiscal_street || '',
+    fiscal_postal_code: profile?.fiscal_postal_code || '',
+    fiscal_city: profile?.fiscal_city || '',
+    fiscal_province: profile?.fiscal_province || '',
   });
 
   const [notifData, setNotifData] = useState({
@@ -33,6 +38,116 @@ const SettingsPage: React.FC = () => {
   const [fiscalModality, setFiscalModality] = useState<'verifactu' | 'no_verifactu'>(profile?.veri_factu_modality || 'no_verifactu');
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ valid: boolean; brokenAt?: string } | null>(null);
+
+  // --- Credenciales propias (API key de Gemini, certificado digital) ---
+  const [secretsStatus, setSecretsStatus] = useState<{
+    gemini_configured: boolean; gemini_updated_at: string | null;
+    certificate_configured: boolean; certificate_uploaded_at: string | null;
+  } | null>(null);
+  const [loadingSecretsStatus, setLoadingSecretsStatus] = useState(true);
+  const [geminiKeyInput, setGeminiKeyInput] = useState('');
+  const [savingGeminiKey, setSavingGeminiKey] = useState(false);
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [certPassword, setCertPassword] = useState('');
+  const [savingCert, setSavingCert] = useState(false);
+
+  const callManageSecrets = async (action: string, payload?: Record<string, unknown>) => {
+    const { data, error } = await supabase.functions.invoke('manage-secrets', { body: { action, payload } });
+    if (error) {
+      let detail = error.message;
+      try {
+        const body = await (error as any).context?.json?.();
+        if (body?.error) detail = body.error;
+      } catch { /* noop */ }
+      throw new Error(detail);
+    }
+    return data;
+  };
+
+  const fetchSecretsStatus = async () => {
+    setLoadingSecretsStatus(true);
+    try {
+      const status = await callManageSecrets('status');
+      setSecretsStatus(status);
+    } catch (err) {
+      console.error('Error cargando estado de credenciales:', err);
+    } finally {
+      setLoadingSecretsStatus(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'fiscal') fetchSecretsStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const handleSaveGeminiKey = async () => {
+    if (!geminiKeyInput.trim()) {
+      addToast('Introduce tu API key de Gemini.', 'error');
+      return;
+    }
+    setSavingGeminiKey(true);
+    try {
+      await callManageSecrets('save_gemini_key', { api_key: geminiKeyInput.trim() });
+      setGeminiKeyInput('');
+      addToast('API key guardada de forma cifrada.', 'success');
+      fetchSecretsStatus();
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo guardar la API key.', 'error');
+    } finally {
+      setSavingGeminiKey(false);
+    }
+  };
+
+  const handleDeleteGeminiKey = async () => {
+    try {
+      await callManageSecrets('delete_gemini_key');
+      addToast('API key eliminada.', 'info');
+      fetchSecretsStatus();
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo eliminar la API key.', 'error');
+    }
+  };
+
+  const fileToBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(',')[1] || '');
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+
+  const handleSaveCertificate = async () => {
+    if (!certFile || !certPassword) {
+      addToast('Selecciona el fichero del certificado y su contraseña.', 'error');
+      return;
+    }
+    setSavingCert(true);
+    try {
+      const fileBase64 = await fileToBase64(certFile);
+      await callManageSecrets('save_certificate', { file_base64: fileBase64, password: certPassword });
+      setCertFile(null);
+      setCertPassword('');
+      addToast('Certificado guardado de forma cifrada.', 'success');
+      fetchSecretsStatus();
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo guardar el certificado.', 'error');
+    } finally {
+      setSavingCert(false);
+    }
+  };
+
+  const handleDeleteCertificate = async () => {
+    try {
+      await callManageSecrets('delete_certificate');
+      addToast('Certificado eliminado.', 'info');
+      fetchSecretsStatus();
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo eliminar el certificado.', 'error');
+    }
+  };
   const [notifLoading, setNotifLoading] = useState(false);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -158,6 +273,37 @@ const SettingsPage: React.FC = () => {
                         value={formData.business_name}
                         onChange={(e) => setFormData({ ...formData, business_name: e.target.value })}
                       />
+                      <Input
+                        label="NIF / CIF"
+                        value={formData.tax_id}
+                        onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="pt-2 border-t border-gray-800">
+                      <p className="text-sm font-semibold text-gray-300 mb-3">Domicilio fiscal</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <Input
+                          label="Calle y número"
+                          value={formData.fiscal_street}
+                          onChange={(e) => setFormData({ ...formData, fiscal_street: e.target.value })}
+                        />
+                        <Input
+                          label="Código postal"
+                          value={formData.fiscal_postal_code}
+                          onChange={(e) => setFormData({ ...formData, fiscal_postal_code: e.target.value })}
+                        />
+                        <Input
+                          label="Ciudad"
+                          value={formData.fiscal_city}
+                          onChange={(e) => setFormData({ ...formData, fiscal_city: e.target.value })}
+                        />
+                        <Input
+                          label="Provincia"
+                          value={formData.fiscal_province}
+                          onChange={(e) => setFormData({ ...formData, fiscal_province: e.target.value })}
+                        />
+                      </div>
                     </div>
                     <div className="flex justify-end pt-4">
                       <Button type="submit" isLoading={loading}>
@@ -416,6 +562,87 @@ const SettingsPage: React.FC = () => {
                   <Button variant="secondary" onClick={() => navigate('/fiscal')}>
                     Ver registro fiscal completo
                   </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <SectionTitle icon={Globe} title="Tu propia API key de Gemini" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-gray-400">
+                    Por defecto, el Asistente IA usa una cuenta compartida — si se agota su cuota,
+                    la IA deja de funcionar para todo el mundo a la vez. Si añades tu propia API key
+                    (gratis en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-primary-400 underline">Google AI Studio</a>),
+                    tus peticiones usan tu propia cuota, independiente de la de los demás.
+                  </p>
+                  {loadingSecretsStatus ? (
+                    <p className="text-sm text-gray-500">Cargando...</p>
+                  ) : secretsStatus?.gemini_configured ? (
+                    <div className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
+                      <span className="text-sm text-green-400">✅ Configurada {secretsStatus.gemini_updated_at && `(actualizada el ${new Date(secretsStatus.gemini_updated_at).toLocaleDateString('es-ES')})`}</span>
+                      <Button size="sm" variant="danger" onClick={handleDeleteGeminiKey}>
+                        <TrashIcon className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="password"
+                        value={geminiKeyInput}
+                        onChange={(e) => setGeminiKeyInput(e.target.value)}
+                        placeholder="AIza..."
+                        className="flex-1 p-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-primary-500 outline-none"
+                      />
+                      <Button onClick={handleSaveGeminiKey} disabled={savingGeminiKey}>
+                        {savingGeminiKey ? 'Guardando...' : 'Guardar'}
+                      </Button>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500">Se guarda cifrada — nadie, ni siquiera nosotros, puede volver a verla en texto plano una vez guardada.</p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <SectionTitle icon={UploadIcon} title="Certificado digital (para Veri*Factu)" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-gray-400">
+                    Necesario para la modalidad Verifactu (envío en tiempo real a la AEAT) — tus
+                    facturas se firman bajo tu propio NIF, no el nuestro. De momento esta modalidad
+                    no está activa (ver arriba), pero puedes dejar tu certificado preparado.
+                  </p>
+                  {loadingSecretsStatus ? (
+                    <p className="text-sm text-gray-500">Cargando...</p>
+                  ) : secretsStatus?.certificate_configured ? (
+                    <div className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
+                      <span className="text-sm text-green-400">✅ Certificado guardado {secretsStatus.certificate_uploaded_at && `(subido el ${new Date(secretsStatus.certificate_uploaded_at).toLocaleDateString('es-ES')})`}</span>
+                      <Button size="sm" variant="danger" onClick={handleDeleteCertificate}>
+                        <TrashIcon className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <input
+                        type="file"
+                        accept=".p12,.pfx"
+                        onChange={(e) => setCertFile(e.target.files?.[0] || null)}
+                        className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gray-800 file:text-white hover:file:bg-gray-700"
+                      />
+                      <input
+                        type="password"
+                        value={certPassword}
+                        onChange={(e) => setCertPassword(e.target.value)}
+                        placeholder="Contraseña del certificado"
+                        className="w-full p-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-primary-500 outline-none"
+                      />
+                      <Button onClick={handleSaveCertificate} disabled={savingCert} className="w-full">
+                        {savingCert ? 'Subiendo y cifrando...' : 'Guardar certificado'}
+                      </Button>
+                    </div>
+                  )}
+                  <p className="text-xs text-gray-500">El fichero y la contraseña se cifran antes de guardarse — nunca se almacenan en claro.</p>
                 </CardContent>
               </Card>
             </div>

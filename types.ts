@@ -14,6 +14,14 @@ export interface Profile {
   business_name: string;
   tax_id: string;
   address?: string;
+  // NUEVO: domicilio fiscal completo — 'address' nunca llegó a
+  // implementarse en la base de datos pese a estar en el tipo; estos
+  // campos sí existen de verdad y son necesarios para una factura
+  // legalmente completa (RD 1619/2012).
+  fiscal_street?: string;
+  fiscal_postal_code?: string;
+  fiscal_city?: string;
+  fiscal_province?: string;
   avatar_url: string;
   plan: 'Free' | 'Pro' | 'Teams';
   role: 'Admin' | 'Developer' | 'Manager' | string;
