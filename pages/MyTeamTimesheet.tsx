@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Clock, CheckCircle, ListTodo, Calendar, Pause, Play, Plus, GitBranch } from 'lucide-react';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';
-import { TimeEntry, Task } from '@/types';
+import { Task } from '@/types';
 
 
 interface ManualEntry {
@@ -14,12 +14,25 @@ interface ManualEntry {
 }
 
 const MyTeamTimesheet: React.FC = () => {
-  const { tasks, projects, timeEntries, addTimeEntry, toggleTask, teamMembership } = useAppStore();
+  const { tasks, projects, timeEntries, addTimeEntry, toggleTask, teamMembership, activeTimer, startTimer, stopTimer } = useAppStore();
   const { addToast } = useToast();
 
-  const [currentTimer, setCurrentTimer] = useState<Task | null>(null);
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
+  // NUEVO: el cronómetro ya no vive aquí — vive en el store global
+  // (activeTimer), basado en un timestamp de inicio. Esta variable local
+  // solo sirve para refrescar la pantalla cada segundo mientras se está en
+  // esta página; el tiempo real siempre se recalcula desde activeTimer.startedAt,
+  // así que sigue contando aunque se navegue a otra página y se vuelva.
+  const [displayTick, setDisplayTick] = useState(0);
+
+  useEffect(() => {
+    if (!activeTimer) return;
+    const interval = window.setInterval(() => setDisplayTick(t => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [activeTimer]);
+
+  const elapsedTime = activeTimer ? Math.floor((Date.now() - activeTimer.startedAt) / 1000) : 0;
+  // displayTick solo se usa para forzar el re-render cada segundo (arriba); no se lee directamente.
+  void displayTick;
 
   // FIX: antes se mostraban TODAS las tareas/proyectos visibles por RLS
   // (propios + del equipo mezclados), sin distinguir de qué workspace son.
@@ -48,24 +61,9 @@ const MyTeamTimesheet: React.FC = () => {
   const [manualEntry, setManualEntry] = useState<ManualEntry>(initialManualEntry);
 
   const relevantTasks = useMemo(() => {
-    // Antes devolvía "tasks" sin filtrar (comentario decía "en una app real
-    // esto se filtraría"). Ahora sí se filtra: solo tareas de proyectos del
-    // workspace correspondiente (propio, o del equipo si hay membresía).
     if (!teamMembership) return tasks;
     return tasks.filter(t => scopedProjectIds.has(t.project_id));
   }, [tasks, teamMembership, scopedProjectIds]);
-
-  useEffect(() => {
-    let interval: number | null = null;
-    if (isRunning) {
-      interval = window.setInterval(() => {
-        setElapsedTime(prevTime => prevTime + 1);
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isRunning]);
 
   const formatTime = (totalSeconds: number) => {
     const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
@@ -74,32 +72,25 @@ const MyTeamTimesheet: React.FC = () => {
     return `${hours}:${minutes}:${seconds}`;
   };
 
-  const toggleTimer = (task: Task | null = null) => {
-    if (isRunning) {
-      const duration_seconds = elapsedTime;
-      if (currentTimer) {
-        const start_time = new Date(Date.now() - duration_seconds * 1000).toISOString();
-        const end_time = new Date().toISOString();
-        addTimeEntry({
-          project_id: currentTimer.project_id,
-          description: currentTimer.description,
-          start_time,
-          end_time,
-          duration_seconds,
-          invoice_id: null
-        });
-        addToast(`Tiempo registrado para "${currentTimer.description}"`, 'success');
-      }
-      setIsRunning(false);
-      setElapsedTime(0);
-      setCurrentTimer(null);
-    } else if (task) {
-      setCurrentTimer(task);
-      setIsRunning(true);
+  const handleStart = (task: Task) => {
+    if (activeTimer) return; // ya hay uno en marcha
+    startTimer(task);
+  };
+
+  // Detiene el cronómetro y registra el tiempo — es la única forma de
+  // pararlo. Cambiar de página, cerrar la pestaña o recargar NO lo para
+  // (activeTimer se persiste en localStorage y se recalcula por timestamp).
+  const handleStop = async () => {
+    const description = activeTimer?.description;
+    const result = await stopTimer();
+    if (result.success) {
+      addToast(`Tiempo registrado para "${description}"`, 'success');
+    } else {
+      addToast(result.message || 'No se pudo registrar el tiempo.', 'error');
     }
   };
 
-  const handleManualEntry = (e: React.FormEvent) => {
+  const handleManualEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualEntry.project_id || !manualEntry.hours) {
         addToast('Por favor, selecciona un proyecto e introduce las horas.', 'error');
@@ -111,16 +102,20 @@ const MyTeamTimesheet: React.FC = () => {
     const start_time = new Date(entryDate.getFullYear(), entryDate.getMonth(), entryDate.getDate(), 9, 0, 0).toISOString();
     const end_time = new Date(new Date(start_time).getTime() + duration_seconds * 1000).toISOString();
 
-    addTimeEntry({
-        project_id: manualEntry.project_id,
-        description: manualEntry.description,
-        start_time,
-        end_time,
-        duration_seconds,
-        invoice_id: null,
-    });
-    addToast('Entrada manual añadida con éxito.', 'success');
-    setManualEntry(initialManualEntry);
+    try {
+      await addTimeEntry({
+          project_id: manualEntry.project_id,
+          description: manualEntry.description,
+          start_time,
+          end_time,
+          duration_seconds,
+          invoice_id: null,
+      });
+      addToast('Entrada manual añadida con éxito.', 'success');
+      setManualEntry(initialManualEntry);
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo añadir la entrada.', 'error');
+    }
   };
   
   const handleManualInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -130,33 +125,38 @@ const MyTeamTimesheet: React.FC = () => {
 
   const buttonStyle = 'px-4 py-2 font-semibold rounded-lg transition duration-200 shadow-md shadow-fuchsia-500/30 flex items-center justify-center';
 
-  const TaskCard: React.FC<{ task: Task }> = ({ task }) => (
-    <div className={`bg-gray-800 p-4 rounded-xl shadow-lg border-l-4 ${(task.status === 'done' || task.status === 'completed') ? 'border-gray-500' : 'border-fuchsia-500'}`}>
-      <div className="flex justify-between items-start">
-        <h3 className={`font-semibold text-lg ${(task.status === 'done' || task.status === 'completed') ? 'text-gray-500 line-through' : 'text-white'}`}>{task.description}</h3>
-        <button 
-          onClick={() => toggleTask(task.id)}
-          className={`p-1 rounded-full transition-colors ${(task.status === 'done' || task.status === 'completed') ? 'bg-gray-700 text-gray-400 hover:text-white' : 'bg-green-700 text-white hover:bg-green-600'}`}
-          aria-label={(task.status === 'done' || task.status === 'completed') ? 'Marcar como Pendiente' : 'Marcar como Completada'}
-        >
-          {(task.status === 'done' || task.status === 'completed') ? <ListTodo className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
-        </button>
-      </div>
-      <p className="text-sm text-gray-400 mt-1 flex items-center"><GitBranch className="w-4 h-4 mr-2" /> {scopedProjects.find(p => p.id === task.project_id)?.name}</p>
-      
-      {!(task.status === 'done' || task.status === 'completed') && (
-        <div className="mt-4 pt-3 border-t border-gray-700 flex justify-end">
-          <button 
-            onClick={() => toggleTimer(task)}
-            disabled={isRunning && (!currentTimer || currentTimer.id !== task.id)}
-            className={`w-full ${buttonStyle} ${isRunning && currentTimer?.id === task.id ? 'bg-red-600 text-white hover:bg-red-700' : isRunning ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-fuchsia-600 text-black hover:bg-fuchsia-700'}`}
+  const TaskCard: React.FC<{ task: Task }> = ({ task }) => {
+    const isThisTaskRunning = activeTimer?.taskId === task.id;
+    const isDone = task.status === 'done' || task.status === 'completed';
+
+    return (
+      <div className={`bg-gray-800 p-4 rounded-xl shadow-lg border-l-4 ${isDone ? 'border-gray-500' : 'border-fuchsia-500'}`}>
+        <div className="flex justify-between items-start">
+          <h3 className={`font-semibold text-lg ${isDone ? 'text-gray-500 line-through' : 'text-white'}`}>{task.description}</h3>
+          <button
+            onClick={() => toggleTask(task.id)}
+            className={`p-1 rounded-full transition-colors ${isDone ? 'bg-gray-700 text-gray-400 hover:text-white' : 'bg-green-700 text-white hover:bg-green-600'}`}
+            aria-label={isDone ? 'Marcar como Pendiente' : 'Marcar como Completada'}
           >
-            {isRunning && currentTimer?.id === task.id ? <><Pause className="w-5 h-5 mr-2" /> Detener</> : <><Play className="w-5 h-5 mr-2" /> Iniciar Tiempo</>}
+            {isDone ? <ListTodo className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
           </button>
         </div>
-      )}
-    </div>
-  );
+        <p className="text-sm text-gray-400 mt-1 flex items-center"><GitBranch className="w-4 h-4 mr-2" /> {scopedProjects.find(p => p.id === task.project_id)?.name}</p>
+
+        {!isDone && (
+          <div className="mt-4 pt-3 border-t border-gray-700 flex justify-end">
+            <button
+              onClick={() => isThisTaskRunning ? handleStop() : handleStart(task)}
+              disabled={!!activeTimer && !isThisTaskRunning}
+              className={`w-full ${buttonStyle} ${isThisTaskRunning ? 'bg-red-600 text-white hover:bg-red-700' : activeTimer ? 'bg-gray-600 text-gray-400 cursor-not-allowed' : 'bg-fuchsia-600 text-black hover:bg-fuchsia-700'}`}
+            >
+              {isThisTaskRunning ? <><Pause className="w-5 h-5 mr-2" /> Detener</> : <><Play className="w-5 h-5 mr-2" /> Iniciar Tiempo</>}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 p-4 sm:p-8">
@@ -179,15 +179,18 @@ const MyTeamTimesheet: React.FC = () => {
               <p className="text-sm uppercase tracking-wider text-fuchsia-500 font-bold">Temporizador Global</p>
               <h2 className="text-4xl font-extrabold text-white mt-1">{formatTime(elapsedTime)}</h2>
               <p className="text-gray-400 text-sm mt-1">
-                {currentTimer ? `Trabajando en: ${currentTimer.description}` : 'Selecciona una tarea para iniciar el tiempo.'}
+                {activeTimer ? `Trabajando en: ${activeTimer.description}` : 'Selecciona una tarea para iniciar el tiempo.'}
               </p>
+              {activeTimer && (
+                <p className="text-xs text-gray-500 mt-1">Sigue contando aunque cambies de página — solo se para al pulsar "Detener y Registrar".</p>
+              )}
             </div>
             
             <div className="flex space-x-3">
               <button 
-                onClick={() => toggleTimer(null)}
-                disabled={!isRunning}
-                className={`${buttonStyle} ${!isRunning ? 'bg-gray-700 text-gray-500' : 'bg-red-600 text-white hover:bg-red-700 shadow-red-500/30'}`}
+                onClick={handleStop}
+                disabled={!activeTimer}
+                className={`${buttonStyle} ${!activeTimer ? 'bg-gray-700 text-gray-500' : 'bg-red-600 text-white hover:bg-red-700 shadow-red-500/30'}`}
               >
                 <Pause className="w-5 h-5 mr-2" />
                 Detener y Registrar

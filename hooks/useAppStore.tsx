@@ -43,6 +43,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         savedJobIds: state.savedJobIds,
         monthlyGoalCents: state.monthlyGoalCents,
+        activeTimer: state.activeTimer,
       }),
     }
   )

@@ -3,10 +3,25 @@ import { Project, NewProject, Task, TimeEntry, NewTimeEntry } from '@/types';
 import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
 
+// NUEVO: el cronómetro vivía en useState local de MyTeamTimesheet.tsx —
+// se paraba (y se perdía el tiempo acumulado) en cuanto se navegaba a
+// otra página, porque el componente se desmontaba. Ahora vive en el store
+// global y se basa en un timestamp de inicio (startedAt), no en un
+// contador que necesita un intervalo corriendo sin parar: el tiempo
+// transcurrido real siempre se puede recalcular con Date.now() - startedAt,
+// sin importar por qué páginas se haya navegado mientras tanto.
+export interface ActiveTimer {
+  taskId: string;
+  projectId: string;
+  description: string;
+  startedAt: number;
+}
+
 export interface ProjectSlice {
   projects: Project[];
   tasks: Task[];
   timeEntries: TimeEntry[];
+  activeTimer: ActiveTimer | null;
   fetchProjects: () => Promise<void>;
   fetchTasks: () => Promise<void>;
   fetchTimeEntries: () => Promise<void>;
@@ -24,12 +39,16 @@ export interface ProjectSlice {
   addTimeEntry: (entry: Omit<NewTimeEntry, 'user_id'>) => Promise<void>;
   updateTimeEntry: (id: string, updates: Partial<NewTimeEntry>) => Promise<void>;
   deleteTimeEntry: (id: string) => Promise<void>;
+  startTimer: (task: Task) => void;
+  stopTimer: () => Promise<{ success: boolean; message?: string }>;
+  cancelTimer: () => void;
 }
 
 export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = (set, get) => ({
     projects: [],
     tasks: [],
     timeEntries: [],
+    activeTimer: null,
 
     fetchProjects: async () => {
         const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
@@ -147,7 +166,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
 
     addTimeEntry: async (entry) => {
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        if (!user) throw new Error('Usuario no autenticado');
 
         const { teamMembership } = get();
         const ownerId = teamMembership?.ownerId ?? user.id;
@@ -158,10 +177,57 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
             .select()
             .single();
 
-        if (!error && data) {
-            set(state => ({ timeEntries: [data as TimeEntry, ...state.timeEntries].sort((a,b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()) }));
+        if (error) { console.error('Error adding time entry:', error); throw error; }
+        set(state => ({ timeEntries: [data as TimeEntry, ...state.timeEntries].sort((a,b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()) }));
+    },
+
+    // NUEVO: inicia el cronómetro global. Solo guarda el timestamp de
+    // inicio — el tiempo transcurrido se recalcula siempre a partir de él,
+    // así que sigue siendo válido aunque el componente que lo muestra se
+    // desmonte (cambiar de página) y se vuelva a montar después.
+    startTimer: (task) => {
+        if (get().activeTimer) return; // ya hay uno corriendo, no pisar
+        set({
+            activeTimer: {
+                taskId: task.id,
+                projectId: task.project_id,
+                description: task.description,
+                startedAt: Date.now(),
+            },
+        });
+    },
+
+    // Detiene el cronómetro y registra el parte de horas correspondiente.
+    // Solo se limpia activeTimer si el registro se guarda con éxito — si
+    // falla, el cronómetro sigue corriendo para no perder el tiempo ya
+    // trabajado, y se puede reintentar.
+    stopTimer: async () => {
+        const timer = get().activeTimer;
+        if (!timer) return { success: false, message: 'No hay ningún cronómetro en marcha.' };
+
+        const duration_seconds = Math.max(1, Math.round((Date.now() - timer.startedAt) / 1000));
+        const start_time = new Date(timer.startedAt).toISOString();
+        const end_time = new Date().toISOString();
+
+        try {
+            await get().addTimeEntry({
+                project_id: timer.projectId,
+                description: timer.description,
+                start_time,
+                end_time,
+                duration_seconds,
+                invoice_id: null,
+            });
+            set({ activeTimer: null });
+            return { success: true };
+        } catch (err) {
+            return { success: false, message: (err as Error).message || 'No se pudo registrar el tiempo.' };
         }
     },
+
+    // Descarta el cronómetro en marcha sin registrar nada (p. ej. si el
+    // usuario se equivocó de tarea).
+    cancelTimer: () => set({ activeTimer: null }),
 
     // FIX: no existía forma de editar ni borrar un registro de tiempo ya creado.
     updateTimeEntry: async (id, updates) => {
