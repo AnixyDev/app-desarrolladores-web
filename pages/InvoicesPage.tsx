@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal';
+import CreateRecurringInvoiceModal from '@/components/modals/CreateRecurringInvoiceModal';
 import { generateInvoicePdf } from '@/services/pdfService';
 import { sendEmail } from '@/services/emailService';
 
@@ -485,22 +486,32 @@ const handleSelectBudget = (budgetId: string) => {
               <h3 className="text-lg font-bold text-white">Facturación Recurrente</h3>
             </CardHeader>
             <CardContent className="p-4 space-y-4">
-              {recurringInvoices.map((ri) => (
-                <div key={ri.id} className="p-3 bg-gray-800/50 rounded-lg border border-gray-700 space-y-2">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-sm font-bold text-white">{getClientName(ri.client_id)}</p>
-                      <p className="text-xs text-gray-500 capitalize">{ri.frequency}</p>
+              {recurringInvoices.length === 0 && (
+                <p className="text-sm text-gray-500">No tienes facturas recurrentes configuradas.</p>
+              )}
+              {recurringInvoices.map((ri) => {
+                const amountCents = (ri.items || []).reduce((sum, it) => sum + it.price_cents * it.quantity, 0);
+                const totalCents = Math.round(amountCents * (1 + (ri.tax_percent || 0) / 100));
+                return (
+                  <div key={ri.id} className="p-3 bg-gray-800/50 rounded-lg border border-gray-700 space-y-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-sm font-bold text-white">{getClientName(ri.client_id)}</p>
+                        <p className="text-xs text-gray-500">
+                          {ri.frequency === 'monthly' ? 'Mensual' : ri.frequency === 'yearly' ? 'Anual' : ri.frequency} · Próxima: {ri.next_date}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteRecurringInvoice(ri.id)}
+                        className="text-gray-500 hover:text-red-500 transition-colors"
+                      >
+                        <Trash className="w-4 h-4" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleDeleteRecurringInvoice(ri.id)}
-                      className="text-gray-500 hover:text-red-500 transition-colors"
-                    >
-                      <Trash className="w-4 h-4" />
-                    </button>
+                    <p className="text-sm text-white font-semibold">{formatCurrency(totalCents)} <span className="text-gray-500 font-normal">por emisión</span></p>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </CardContent>
           </Card>
         </div>
@@ -686,6 +697,11 @@ const handleSelectBudget = (budgetId: string) => {
           />
         );
       })()}
+
+      <CreateRecurringInvoiceModal
+        isOpen={isRecurringModalOpen}
+        onClose={() => setIsRecurringModalOpen(false)}
+      />
     </div>
   );
 };
