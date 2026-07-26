@@ -169,12 +169,22 @@ const ReportsPage: React.FC = () => {
     setAnalysis(null);
 
     try {
+      // Los campos deben terminar en "_cents": es la convención que usa
+      // normalizeCentsFields() en la Edge Function para convertir céntimos a
+      // euros antes de pasarlos a la IA. Sin el sufijo, la IA recibe el
+      // número crudo en céntimos y lo trata como si ya fueran euros (bug:
+      // -1.570,95 € reales aparecían como -157.095,00 €).
       const payload = {
         periodo: `${startDate} a ${endDate}`,
-        ingresos: reportKpis.totalIncome,
-        gastos: reportKpis.totalExpenses,
-        beneficio: reportKpis.netProfit,
-        clientes: reportKpis.clientProfitability,
+        ingresos_cents: reportKpis.totalIncome,
+        gastos_cents: reportKpis.totalExpenses,
+        beneficio_cents: reportKpis.netProfit,
+        clientes: reportKpis.clientProfitability.map(c => ({
+          name: c.name,
+          income_cents: c.income,
+          expenses_cents: c.expenses,
+          profit_cents: c.profit,
+        })),
       };
 
       const result = await analyzeProfitability(payload);

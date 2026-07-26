@@ -96,7 +96,22 @@ const ProfitabilityReportPage: React.FC = () => {
         setIsBuyCreditsOpen(true);
         return;
       }
-      const data = await analyzeProfitability(profitabilityData as unknown as Record<string, unknown>[]) as any;
+      // Los importes deben viajar en campos *_cents: es la convención que usa
+      // normalizeCentsFields() en la Edge Function para convertir céntimos a
+      // euros antes de pasarlos a la IA. Sin el sufijo, la IA recibe el
+      // número crudo en céntimos y lo trata como si ya fueran euros (cifras
+      // 100x más grandes de lo real en el diagnóstico).
+      const aiPayload = profitabilityData.map(p => ({
+        projectName: p.projectName,
+        clientName: p.clientName,
+        totalIncome_cents: p.totalIncome,
+        totalCosts_cents: p.totalCosts,
+        netProfit_cents: p.netProfit,
+        margin_percent: p.margin,
+        totalHours: p.totalHours,
+        effectiveHourlyRate_cents: p.effectiveHourlyRate,
+      }));
+      const data = await analyzeProfitability(aiPayload as unknown as Record<string, unknown>[]) as any;
       // Normalización de la respuesta para evitar fallos en la UI
       setAnalysis({
         summary: data.summary || 'No se pudo generar el resumen.',
