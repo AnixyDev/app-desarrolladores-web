@@ -5,12 +5,14 @@ import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { useAppStore } from '../../hooks/useAppStore';
 import { supabase } from '../../lib/supabaseClient';
+import { UserIcon, MailIcon, LockIcon, EyeIcon, EyeOffIcon, AlertTriangleIcon, CheckCircleIcon } from '../../components/icons/Icon';
 
 const RegisterPage: React.FC = () => {
     const register = useAppStore(state => state.register);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [infoMessage, setInfoMessage] = useState('');
     const [loading, setLoading] = useState(false);
@@ -59,61 +61,92 @@ const RegisterPage: React.FC = () => {
 
     return (
         <AuthCard>
-            <h2 className="text-2xl font-bold text-center text-white mb-6">Crear Cuenta</h2>
+            <div className="mb-6 text-center">
+                <h2 className="text-2xl font-black italic tracking-tight text-white">Crear cuenta</h2>
+                <p className="mt-1 text-sm text-gray-400">Empieza a gestionar tu negocio freelance</p>
+            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-                 <Input 
-                    label="Nombre Completo" 
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+                 <Input
+                    id="register-name"
+                    label="Nombre Completo"
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
+                    icon={<UserIcon className="h-4 w-4" />}
+                    autoComplete="name"
                     required
                 />
-                <Input 
-                    label="Email" 
-                    type="email" 
-                    placeholder="tu@email.com" 
+                <Input
+                    id="register-email"
+                    label="Email"
+                    type="email"
+                    placeholder="tu@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    icon={<MailIcon className="h-4 w-4" />}
+                    autoComplete="email"
                     required
                 />
-                <Input 
-                    label="Contraseña" 
-                    type="password" 
+                <Input
+                    id="register-password"
+                    label="Contraseña"
+                    type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    icon={<LockIcon className="h-4 w-4" />}
+                    autoComplete="new-password"
+                    rightElement={
+                        <button
+                            type="button"
+                            onClick={() => setShowPassword((v) => !v)}
+                            className="text-gray-500 hover:text-gray-300 focus:outline-none focus:text-primary-400"
+                            aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                            tabIndex={-1}
+                        >
+                            {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                        </button>
+                    }
                     required
                 />
-                {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                {infoMessage && <p className="text-green-400 text-sm text-center">{infoMessage}</p>}
-                <Button type="submit" className="w-full" disabled={loading}>
+                {error && (
+                    <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-400">
+                        <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{error}</span>
+                    </div>
+                )}
+                {infoMessage && (
+                    <div role="status" className="flex items-start gap-2 rounded-lg border border-green-500/40 bg-green-500/10 p-3 text-sm text-green-400">
+                        <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>{infoMessage}</span>
+                    </div>
+                )}
+                <Button type="submit" className="w-full py-3 mt-2" disabled={loading} isLoading={loading}>
                     {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
                 </Button>
             </form>
 
             <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-700" />
+                    <div className="w-full border-t border-gray-800" />
                 </div>
-                <div className="relative flex justify-center text-sm">
-                    <span className="px-2 bg-gray-900 text-gray-500">O regístrate con</span>
+                <div className="relative flex justify-center text-xs uppercase">
+                    <span className="px-2 bg-gray-900 text-gray-500 font-medium">O regístrate con</span>
                 </div>
             </div>
 
             {/* FIX: Botón simple en vez del componente GoogleLogin problemático */}
-            <div className='flex justify-center'>
-                <Button 
-                    type="button"
-                    variant="secondary"
-                    className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
-                    onClick={handleGoogleRegister}
-                >
-                    <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
-                    Continuar con Google
-                </Button>
-            </div>
+            <Button
+                type="button"
+                variant="secondary"
+                className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
+                onClick={handleGoogleRegister}
+            >
+                <img src="https://www.google.com/favicon.ico" alt="" className="w-4 h-4" />
+                Continuar con Google
+            </Button>
 
-            <p className="mt-6 text-center text-sm text-gray-400">
+            <p className="mt-8 text-center text-sm text-gray-500">
                 ¿Ya tienes cuenta?{' '}
                 <Link to="/auth/login" className="font-medium text-primary-400 hover:text-primary-300">
                     Inicia sesión

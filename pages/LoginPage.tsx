@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
-import { Logo } from '@/components/icons/Logo';
+import AuthCard from '@/components/auth/AuthCard';
+import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { supabase } from '@/lib/supabaseClient';
+import { MailIcon, LockIcon, EyeIcon, EyeOffIcon, AlertTriangleIcon } from '@/components/icons/Icon';
 
 // FIX: Se eliminó "import LoginPage from './pages/LoginPage'"
 // Ese import causaba "Identifier 'LoginPage' has already been declared":
@@ -17,6 +19,7 @@ import { supabase } from '@/lib/supabaseClient';
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,79 +62,93 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-6">
-      <div className="w-full max-w-md bg-gray-900 border border-gray-800 p-8 rounded-2xl shadow-2xl">
-        <div className="flex flex-col items-center mb-8">
-          <Logo className="h-12 w-12 text-primary-500 mb-4" />
-          <h1 className="text-2xl font-bold text-white italic">BIENVENIDO A DEVFREELANCER</h1>
-          <p className="text-gray-400 text-sm">Ingresa tus credenciales para continuar</p>
-        </div>
-
-        {error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-3 rounded-lg text-sm mb-6 text-center">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Email</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all"
-              placeholder="tu@email.com"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Contraseña</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-primary-500 outline-none transition-all"
-              placeholder="••••••••"
-              required
-            />
-          </div>
-          <Button type="submit" className="w-full py-3 mt-2" disabled={loading}>
-            {loading ? 'Cargando...' : 'Entrar'}
-          </Button>
-        </form>
-
-        <div className="mt-6">
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-800"></div>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-gray-900 px-2 text-gray-500 font-medium">O continúa con</span>
-            </div>
-          </div>
-
-          <div className="flex justify-center w-full">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleGoogleLogin}
-              className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
-            >
-              <img src="https://www.google.com/favicon.ico" alt="Google" className="w-4 h-4" />
-              Continuar con Google
-            </Button>
-          </div>
-        </div>
-
-        <p className="text-center text-gray-500 text-sm mt-8">
-          ¿No tienes cuenta?{' '}
-          <Link to="/auth/register" className="text-primary-400 hover:text-primary-300 font-medium">
-            Regístrate aquí
-          </Link>
-        </p>
+    <AuthCard>
+      <div className="mb-6 text-center">
+        <h1 className="text-2xl font-black italic tracking-tight text-white">
+          Bienvenido de vuelta
+        </h1>
+        <p className="mt-1 text-sm text-gray-400">Ingresa tus credenciales para continuar</p>
       </div>
-    </div>
+
+      {error && (
+        <div
+          role="alert"
+          className="mb-6 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-400"
+        >
+          <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleLogin} className="space-y-4" noValidate>
+        <Input
+          id="login-email"
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="tu@email.com"
+          autoComplete="email"
+          icon={<MailIcon className="h-4 w-4" />}
+          required
+        />
+
+        <Input
+          id="login-password"
+          label="Contraseña"
+          type={showPassword ? 'text' : 'password'}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="••••••••"
+          autoComplete="current-password"
+          icon={<LockIcon className="h-4 w-4" />}
+          rightElement={
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="text-gray-500 hover:text-gray-300 focus:outline-none focus:text-primary-400"
+              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+            </button>
+          }
+          required
+        />
+
+        <Button type="submit" className="w-full py-3 mt-2" disabled={loading} isLoading={loading}>
+          {loading ? 'Entrando...' : 'Entrar'}
+        </Button>
+      </form>
+
+      <div className="mt-6">
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-800"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-gray-900 px-2 text-gray-500 font-medium">O continúa con</span>
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={handleGoogleLogin}
+          className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
+        >
+          <img src="https://www.google.com/favicon.ico" alt="" className="w-4 h-4" />
+          Continuar con Google
+        </Button>
+      </div>
+
+      <p className="text-center text-gray-500 text-sm mt-8">
+        ¿No tienes cuenta?{' '}
+        <Link to="/auth/register" className="text-primary-400 hover:text-primary-300 font-medium">
+          Regístrate aquí
+        </Link>
+      </p>
+    </AuthCard>
   );
 };
 
