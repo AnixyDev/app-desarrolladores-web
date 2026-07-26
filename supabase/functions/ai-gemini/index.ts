@@ -26,8 +26,14 @@ Reglas para cifras monetarias (muy importante):
 - Formatea siempre el dinero al estilo espanol: punto como separador de miles, coma para los decimales, y el simbolo € al final. Ejemplo correcto: 2.740,00 €. Ejemplo incorrecto: 274000 o 2740.00.
 `.trim();
 
-const PRIMARY_MODEL = "gemini-2.5-flash";
-const FALLBACK_MODEL = "gemini-2.5-flash-lite";
+// FIX (26 jul 2026): Google retiró "gemini-2.5-flash" y "gemini-2.5-flash-lite"
+// el 9 de julio de 2026, antes de su fecha de baja anunciada (16 oct 2026) —
+// dejaron de responder con 404 sin aviso previo. Se actualiza a los modelos
+// vigentes. Se usa el alias "gemini-flash-latest" como primario porque Google
+// lo re-apunta automáticamente al modelo Flash más reciente, para que un
+// futuro retiro similar no vuelva a tumbar la IA sin que nadie lo note.
+const PRIMARY_MODEL = "gemini-flash-latest";
+const FALLBACK_MODEL = "gemini-3.1-flash-lite";
 
 /* =========================================================================
    OCR de gastos (ticket/factura de proveedor -> gasto estructurado)
