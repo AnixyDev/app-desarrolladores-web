@@ -1,11 +1,3 @@
-// NOTA: esta función conserva el nombre histórico "ai-gemini" para no tener
-// que actualizar todos los puntos del frontend que la invocan
-// (`supabase.functions.invoke('ai-gemini', ...)`), pero desde este cambio
-// llama a OpenRouter (https://openrouter.ai), no a la API de Google Gemini
-// directamente. Si en el futuro se quiere renombrar, hay que: desplegar una
-// función nueva con el nombre definitivo, actualizar todos los call sites en
-// el frontend, y borrar esta función vieja manualmente desde el Dashboard de
-// Supabase (no hay herramienta MCP para borrar Edge Functions).
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -34,22 +26,16 @@ Reglas para cifras monetarias (muy importante):
 - Formatea siempre el dinero al estilo espanol: punto como separador de miles, coma para los decimales, y el simbolo € al final. Ejemplo correcto: 2.740,00 €. Ejemplo incorrecto: 274000 o 2740.00.
 `.trim();
 
-const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
-
-// Modelos GRATUITOS de OpenRouter (catálogo de julio 2026). Este catálogo
-// rota con poco o ningún aviso — por eso cada llamada tiene primario +
-// fallback, y el fallback es de un proveedor distinto al primario para no
-// depender de un único punto de fallo. Si alguno deja de estar disponible,
-// hay que sustituirlo por otro ID de la lista "free" en openrouter.ai/models.
-const TEXT_PRIMARY_MODEL = "meta-llama/llama-3.3-70b-instruct:free";
-const TEXT_FALLBACK_MODEL = "google/gemma-4-31b-it:free";
-const VISION_PRIMARY_MODEL = "nvidia/nemotron-nano-12b-v2-vl:free";
-const VISION_FALLBACK_MODEL = "google/gemma-4-31b-it:free";
+const PRIMARY_MODEL = "gemini-2.5-flash";
+const FALLBACK_MODEL = "gemini-2.5-flash-lite";
 
 /* =========================================================================
    OCR de gastos (ticket/factura de proveedor -> gasto estructurado)
 ========================================================================= */
 
+// Lista cerrada de categorías: así el campo "category" que llega al
+// frontend siempre es uno de los valores que ya usa el resto de la app
+// (evita que la IA invente categorías nuevas en cada ticket).
 const EXPENSE_CATEGORIES = [
   "Software",
   "Hardware",
@@ -73,11 +59,16 @@ const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/heif",
 ]);
 
-// Límite conservador sobre el string base64 (no el binario).
+// Límite conservador sobre el string base64 (no el binario). Gemini admite
+// imágenes inline bastante más grandes, pero un ticket se lee perfectamente
+// muy por debajo de esto — limitarlo evita fotos gigantes sin comprimir y
+// protege el consumo de créditos/cuota de la API.
 const MAX_IMAGE_BASE64_LENGTH = 8 * 1024 * 1024; // ~6 MB de imagen real
 
-function translateAIError(rawMessage: string): string {
-  // Mensajes de validación propios — se devuelven tal cual.
+function translateGeminiError(rawMessage: string): string {
+  // Mensajes de validación propios (ya en español, ya pensados para el
+  // usuario final) — se devuelven tal cual, sin pasar por la traducción
+  // genérica de errores de la API de Gemini de más abajo.
   const OWN_VALIDATION_MESSAGES = [
     "Falta la imagen del ticket",
     "Formato de imagen no soportado",
@@ -90,20 +81,20 @@ function translateAIError(rawMessage: string): string {
 
   const msg = rawMessage.toLowerCase();
 
-  if (msg.includes("429") || msg.includes("rate limit") || msg.includes("rate-limited") || msg.includes("resource_exhausted") || msg.includes("quota")) {
-    return "El asistente de IA ha alcanzado el límite de peticiones gratuitas por ahora. Inténtalo de nuevo en unos minutos.";
+  if (msg.includes("resource_exhausted") || msg.includes("quota") || msg.includes("prepayment credits") || msg.includes("429")) {
+    return "El asistente de IA no está disponible ahora mismo (se ha alcanzado el límite de uso). Inténtalo de nuevo más tarde.";
   }
-  if (msg.includes("402") || msg.includes("insufficient credit") || msg.includes("insufficient_quota")) {
-    return "El asistente de IA no está disponible ahora mismo (créditos insuficientes). Nuestro equipo ya ha sido avisado.";
-  }
-  if (msg.includes("invalid api key") || msg.includes("no auth credentials") || msg.includes("error 401") || msg.includes("error 403") || msg.includes("unauthorized")) {
+  if (msg.includes("api key not valid") || msg.includes("api_key_invalid") || msg.includes("permission_denied") || msg.includes("401") || msg.includes("403")) {
     return "El asistente de IA no está disponible ahora mismo. Nuestro equipo ya ha sido avisado.";
   }
-  if (msg.includes("not found") || msg.includes("404") || msg.includes("empty openrouter response")) {
+  if (msg.includes("not found") || msg.includes("404") || msg.includes("empty gemini response")) {
     return "El asistente de IA no ha podido generar una respuesta esta vez. Inténtalo de nuevo en unos minutos.";
   }
-  if (msg.includes("missing openrouter_api_key")) {
+  if (msg.includes("missing gemini_api_key")) {
     return "El asistente de IA no está configurado correctamente. Nuestro equipo ya ha sido avisado.";
+  }
+  if (msg.includes("unauthorized")) {
+    return "Tu sesión ha caducado. Vuelve a iniciar sesión e inténtalo de nuevo.";
   }
 
   return "Ha ocurrido un error con el asistente de IA. Inténtalo de nuevo en unos minutos.";
@@ -112,84 +103,63 @@ function translateAIError(rawMessage: string): string {
 function isAuthError(rawMessage: string): boolean {
   const msg = rawMessage.toLowerCase();
   return (
-    msg.includes("invalid api key") ||
-    msg.includes("no auth credentials") ||
+    msg.includes("api key not valid") ||
+    msg.includes("api_key_invalid") ||
+    msg.includes("permission_denied") ||
     msg.includes("error 401") ||
-    msg.includes("error 403") ||
-    msg.includes("unauthorized")
+    msg.includes("error 403")
   );
 }
 
-/* Llamada genérica a la API de OpenRouter (compatible con el formato de
-   OpenAI: /chat/completions con array de "messages"). Sirve tanto para
-   texto puro como para prompts con imagen (content como array de bloques). */
-async function callOpenRouterWithModel(
-  apiKey: string,
-  model: string,
-  messages: unknown[],
-  jsonMode = false
-): Promise<string> {
-  const res = await fetch(OPENROUTER_ENDPOINT, {
+async function callGeminiWithModel(apiKey: string, model: string, fullPrompt: string): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      // Recomendados por OpenRouter para identificar la app (no obligatorios).
-      "HTTP-Referer": "https://devfreelancer.app",
-      "X-Title": "DevFreelancer",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model,
-      messages,
-      temperature: jsonMode ? 0.1 : 0.7,
-      ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+      contents: [{ parts: [{ text: fullPrompt }] }],
     }),
   });
 
   if (!res.ok) {
     const err = await res.text();
-    throw new Error(`OpenRouter API error ${res.status} (modelo ${model}): ${err}`);
+    throw new Error(`Gemini API error ${res.status} (modelo ${model}): ${err}`);
   }
 
   const json = await res.json();
-  const text = json?.choices?.[0]?.message?.content;
-  if (!text) throw new Error(`Empty OpenRouter response (modelo ${model})`);
+  const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error(`Empty Gemini response (modelo ${model})`);
   return text;
 }
 
-async function callOpenRouter(
+async function callGemini(
   ownApiKey: string,
   sharedApiKey: string,
   prompt: string,
   extraRules?: string
 ): Promise<string> {
   const rules = extraRules ? `${PLAIN_TEXT_RULES}\n\n${extraRules}` : PLAIN_TEXT_RULES;
-  const messages = [
-    { role: "system", content: rules },
-    { role: "user", content: prompt },
-  ];
+  const fullPrompt = `${prompt}\n\n${rules}`;
   const usingOwnKey = ownApiKey !== sharedApiKey;
 
   let text: string;
   try {
-    text = await callOpenRouterWithModel(ownApiKey, TEXT_PRIMARY_MODEL, messages);
+    text = await callGeminiWithModel(ownApiKey, PRIMARY_MODEL, fullPrompt);
   } catch (primaryError) {
     const primaryMsg = (primaryError as Error).message;
-    console.error(`[ai-gemini] Fallo el modelo principal (${TEXT_PRIMARY_MODEL}):`, primaryMsg);
+    console.error(`[ai-gemini] Fallo el modelo principal (${PRIMARY_MODEL}):`, primaryMsg);
 
-    // Si el usuario tiene su propia API key de OpenRouter y ha fallado por un
-    // motivo de autenticación, no dejamos caer toda la IA: reintentamos con
-    // la key compartida de la app, igual que si no hubiera key propia.
     if (usingOwnKey && isAuthError(primaryMsg)) {
       console.error("[ai-gemini] La API key propia del usuario ha fallado por autenticación, usando la key compartida como respaldo.");
       try {
-        text = await callOpenRouterWithModel(sharedApiKey, TEXT_PRIMARY_MODEL, messages);
+        text = await callGeminiWithModel(sharedApiKey, PRIMARY_MODEL, fullPrompt);
       } catch (sharedPrimaryError) {
-        console.error(`[ai-gemini] Fallo el modelo principal con la key compartida (${TEXT_PRIMARY_MODEL}):`, (sharedPrimaryError as Error).message);
-        text = await callOpenRouterWithModel(sharedApiKey, TEXT_FALLBACK_MODEL, messages);
+        console.error(`[ai-gemini] Fallo el modelo principal con la key compartida (${PRIMARY_MODEL}):`, (sharedPrimaryError as Error).message);
+        text = await callGeminiWithModel(sharedApiKey, FALLBACK_MODEL, fullPrompt);
       }
     } else {
-      text = await callOpenRouterWithModel(ownApiKey, TEXT_FALLBACK_MODEL, messages);
+      text = await callGeminiWithModel(ownApiKey, FALLBACK_MODEL, fullPrompt);
     }
   }
 
@@ -202,11 +172,53 @@ async function callOpenRouter(
     .trim();
 }
 
-/* Envía la foto de un ticket/factura a un modelo de visión de OpenRouter y
-   devuelve un gasto ya estructurado y saneado, listo para precargar el
-   formulario de "Añadir Gasto" del frontend (el usuario siempre revisa/edita
-   antes de guardar). */
-async function extractExpenseWithOpenRouter(
+/* Igual que callGeminiWithModel pero envía además una imagen inline (vision).
+   Se usa una función separada porque aquí NO queremos añadir PLAIN_TEXT_RULES
+   al prompt: la respuesta debe ser JSON puro, no texto plano para humanos. */
+async function callGeminiWithImage(
+  apiKey: string,
+  model: string,
+  prompt: string,
+  mimeType: string,
+  imageBase64: string
+): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: mimeType, data: imageBase64 } },
+          ],
+        },
+      ],
+      generationConfig: {
+        // Fuerza a Gemini a devolver JSON válido en vez de texto libre.
+        responseMimeType: "application/json",
+        temperature: 0.1,
+      },
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Gemini API error ${res.status} (modelo ${model}, vision): ${err}`);
+  }
+
+  const json = await res.json();
+  const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error(`Empty Gemini response (modelo ${model}, vision)`);
+  return text;
+}
+
+/* Envía la foto de un ticket/factura a Gemini y devuelve un gasto ya
+   estructurado y saneado, listo para precargar el formulario de "Añadir
+   Gasto" del frontend (el usuario siempre revisa/edita antes de guardar). */
+async function extractExpenseWithGemini(
   ownApiKey: string,
   sharedApiKey: string,
   mimeType: string,
@@ -231,33 +243,23 @@ Devuelve UNICAMENTE un objeto JSON (sin texto adicional, sin explicaciones, sin 
 
 Si la imagen no es un ticket o factura legible, devuelve igualmente el JSON con los campos que puedas rellenar y "confidence" en 0.`;
 
-  const messages = [
-    {
-      role: "user",
-      content: [
-        { type: "text", text: prompt },
-        { type: "image_url", image_url: { url: `data:${mimeType};base64,${imageBase64}` } },
-      ],
-    },
-  ];
-
   let text: string;
   try {
-    text = await callOpenRouterWithModel(ownApiKey, VISION_PRIMARY_MODEL, messages, true);
+    text = await callGeminiWithImage(ownApiKey, PRIMARY_MODEL, prompt, mimeType, imageBase64);
   } catch (primaryError) {
     const primaryMsg = (primaryError as Error).message;
-    console.error(`[ai-gemini] OCR: falló el modelo principal (${VISION_PRIMARY_MODEL}):`, primaryMsg);
+    console.error(`[ai-gemini] OCR: falló el modelo principal (${PRIMARY_MODEL}):`, primaryMsg);
 
     if (usingOwnKey && isAuthError(primaryMsg)) {
       console.error("[ai-gemini] OCR: la API key propia del usuario ha fallado por autenticación, usando la key compartida como respaldo.");
       try {
-        text = await callOpenRouterWithModel(sharedApiKey, VISION_PRIMARY_MODEL, messages, true);
+        text = await callGeminiWithImage(sharedApiKey, PRIMARY_MODEL, prompt, mimeType, imageBase64);
       } catch (sharedPrimaryError) {
-        console.error(`[ai-gemini] OCR: falló el modelo principal con la key compartida (${VISION_PRIMARY_MODEL}):`, (sharedPrimaryError as Error).message);
-        text = await callOpenRouterWithModel(sharedApiKey, VISION_FALLBACK_MODEL, messages, true);
+        console.error(`[ai-gemini] OCR: falló el modelo principal con la key compartida (${PRIMARY_MODEL}):`, (sharedPrimaryError as Error).message);
+        text = await callGeminiWithImage(sharedApiKey, FALLBACK_MODEL, prompt, mimeType, imageBase64);
       }
     } else {
-      text = await callOpenRouterWithModel(ownApiKey, VISION_FALLBACK_MODEL, messages, true);
+      text = await callGeminiWithImage(ownApiKey, FALLBACK_MODEL, prompt, mimeType, imageBase64);
     }
   }
 
@@ -267,7 +269,7 @@ Si la imagen no es un ticket o factura legible, devuelve igualmente el JSON con 
     const cleaned = text.trim().replace(/^```json\s*/i, "").replace(/```\s*$/i, "").trim();
     parsed = JSON.parse(cleaned);
   } catch {
-    console.error("[ai-gemini] OCR: la respuesta no es JSON valido:", text);
+    console.error("[ai-gemini] OCR: la respuesta de Gemini no es JSON valido:", text);
     throw new Error("No se ha podido leer los datos del ticket. Prueba con una foto más clara y con buena luz.");
   }
 
@@ -314,7 +316,7 @@ function normalizeCentsFields(value: any): any {
   return value;
 }
 
-async function decryptUserOpenRouterKey(encryptedBase64: string, encryptionKeyHex: string): Promise<string | null> {
+async function decryptUserGeminiKey(encryptedBase64: string, encryptionKeyHex: string): Promise<string | null> {
   try {
     const keyBytes = new Uint8Array(encryptionKeyHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
     const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["decrypt"]);
@@ -335,9 +337,9 @@ serve(async (req) => {
   }
 
   try {
-    const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
-    if (!OPENROUTER_API_KEY) {
-      throw new Error("Missing OPENROUTER_API_KEY environment variable");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
+      throw new Error("Missing GEMINI_API_KEY environment variable");
     }
 
     const supabase = createClient(
@@ -361,17 +363,17 @@ serve(async (req) => {
       });
     }
 
-    let effectiveApiKey = OPENROUTER_API_KEY;
+    let effectiveApiKey = GEMINI_API_KEY;
     const { data: userSecret } = await supabase
       .from("user_secrets")
-      .select("openrouter_api_key_encrypted")
+      .select("gemini_api_key_encrypted")
       .eq("user_id", user.id)
       .maybeSingle();
 
-    if (userSecret?.openrouter_api_key_encrypted) {
+    if (userSecret?.gemini_api_key_encrypted) {
       const encryptionKeyHex = Deno.env.get("APP_ENCRYPTION_KEY");
       if (encryptionKeyHex) {
-        const ownKey = await decryptUserOpenRouterKey(userSecret.openrouter_api_key_encrypted, encryptionKeyHex);
+        const ownKey = await decryptUserGeminiKey(userSecret.gemini_api_key_encrypted, encryptionKeyHex);
         if (ownKey) effectiveApiKey = ownKey;
       }
     }
@@ -381,7 +383,7 @@ serve(async (req) => {
     switch (action) {
       case "getAIResponse": {
         const { prompt } = payload;
-        const text = await callOpenRouter(effectiveApiKey, OPENROUTER_API_KEY, prompt);
+        const text = await callGemini(effectiveApiKey, GEMINI_API_KEY, prompt);
         return new Response(JSON.stringify({ text }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -389,9 +391,9 @@ serve(async (req) => {
 
       case "generateTimeEntryDescription": {
         const { projectName, projectDesc, keywords } = payload;
-        const text = await callOpenRouter(
+        const text = await callGemini(
           effectiveApiKey,
-          OPENROUTER_API_KEY,
+          GEMINI_API_KEY,
           `Redacta la descripcion de un parte de trabajo para un freelance.\n\nProyecto: ${projectName}\nContexto del proyecto: ${projectDesc}\nTareas realizadas hoy: ${keywords}\n\nDevuelve UNA sola frase profesional y concreta que describa el trabajo realizado, lista para aparecer tal cual en una factura o parte de horas. No añadas introducciones ni explicaciones, solo la frase.`
         );
         return new Response(JSON.stringify({ text }), {
@@ -401,9 +403,9 @@ serve(async (req) => {
 
       case "generateItemsForDocument": {
         const { prompt, hourlyRate } = payload;
-        const text = await callOpenRouter(
+        const text = await callGemini(
           effectiveApiKey,
-          OPENROUTER_API_KEY,
+          GEMINI_API_KEY,
           `Genera un unico concepto de factura, claro y profesional, para un desarrollador freelance.\n\nContexto del trabajo realizado:\n${prompt}\n\nTarifa base: ${hourlyRate / 100} euros/hora\n\nDevuelve solo la descripcion del concepto (una o dos frases), sin precio, sin cantidad, sin introducciones.`
         );
         return new Response(
@@ -416,9 +418,9 @@ serve(async (req) => {
 
       case "generateFinancialForecast": {
         const normalizedData = normalizeCentsFields(payload.data);
-        const text = await callOpenRouter(
+        const text = await callGemini(
           effectiveApiKey,
-          OPENROUTER_API_KEY,
+          GEMINI_API_KEY,
           `Eres un asesor financiero para freelancers. Analiza estos datos financieros (los importes ya estan en euros) y escribe un informe breve con tres partes claramente separadas por una linea en blanco:\n\n1. Un resumen de la situacion actual (2-3 frases).\n2. Los principales riesgos a vigilar (cada uno en su propia linea, empezando por "- ").\n3. Sugerencias practicas y accionables (cada una en su propia linea, empezando por "- ").\n\nDatos financieros (importes en euros):\n${JSON.stringify(normalizedData)}`,
           CURRENCY_RULES
         );
@@ -430,9 +432,9 @@ serve(async (req) => {
 
       case "analyzeProfitability": {
         const normalizedData = normalizeCentsFields(payload.data);
-        const text = await callOpenRouter(
+        const text = await callGemini(
           effectiveApiKey,
-          OPENROUTER_API_KEY,
+          GEMINI_API_KEY,
           `Eres un asesor de negocio para freelancers. Analiza la rentabilidad de estos proyectos (los importes ya estan en euros) y escribe un informe breve y directo (maximo 250 palabras) que cubra:\n\n1. Que proyectos son mas rentables y por que.\n2. Que proyectos estan generando perdidas o tienen datos incompletos.\n3. Dos o tres recomendaciones concretas y accionables.\n\nDatos de los proyectos (importes en euros):\n${JSON.stringify(normalizedData)}\n\nEscribelo en parrafos cortos y claros, nada de relleno ni frases motivacionales genericas.`,
           CURRENCY_RULES
         );
@@ -443,9 +445,9 @@ serve(async (req) => {
 
       case "generateProposalText": {
         const { title, context, profileSummary } = payload;
-        const text = await callOpenRouter(
+        const text = await callGemini(
           effectiveApiKey,
-          OPENROUTER_API_KEY,
+          GEMINI_API_KEY,
           `Redacta una propuesta comercial profesional y persuasiva para un cliente potencial.\n\nTitulo del proyecto: ${title}\n\nRequisitos del cliente:\n${context}\n\nPerfil del profesional que la envia:\n${profileSummary}\n\nEstructura la propuesta en 3-4 parrafos cortos: una introduccion que conecte con la necesidad del cliente, como se resolveria el proyecto, por que este profesional es la opcion adecuada, y un cierre con siguiente paso claro. Tono cercano y profesional, sin sonar generico ni a plantilla.`
         );
         return new Response(JSON.stringify({ text }), {
@@ -455,9 +457,9 @@ serve(async (req) => {
 
       case "summarizeApplicant": {
         const { jobDesc, applicantProfile, proposal } = payload;
-        const text = await callOpenRouter(
+        const text = await callGemini(
           effectiveApiKey,
-          OPENROUTER_API_KEY,
+          GEMINI_API_KEY,
           `Eres un asistente de contratacion. Evalua a este candidato para la oferta de empleo y escribe un analisis breve con tres partes separadas por una linea en blanco:\n\n1. Resumen del candidato (2-3 frases).\n2. Puntos fuertes respecto a la oferta (cada uno en su propia linea, empezando por "- ").\n3. Posibles riesgos o puntos a aclarar (cada uno en su propia linea, empezando por "- ").\n\nOferta de empleo:\n${jobDesc}\n\nPerfil del candidato:\n${applicantProfile}\n\nPropuesta enviada:\n${proposal}`
         );
         return new Response(JSON.stringify({ summary: text }), {
@@ -478,7 +480,7 @@ serve(async (req) => {
           throw new Error("La imagen es demasiado grande. Prueba con una foto de menor resolución.");
         }
 
-        const extracted = await extractExpenseWithOpenRouter(effectiveApiKey, OPENROUTER_API_KEY, String(mimeType), imageBase64);
+        const extracted = await extractExpenseWithGemini(effectiveApiKey, GEMINI_API_KEY, String(mimeType), imageBase64);
         return new Response(JSON.stringify({ extracted }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -495,7 +497,7 @@ serve(async (req) => {
     console.error("[ai-gemini] Error:", rawMessage);
 
     return new Response(
-      JSON.stringify({ error: translateAIError(rawMessage) }),
+      JSON.stringify({ error: translateGeminiError(rawMessage) }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

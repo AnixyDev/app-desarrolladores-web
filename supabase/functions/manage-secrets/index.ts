@@ -64,13 +64,13 @@ Deno.serve(async (req) => {
         case 'status': {
           const { data } = await supabaseAdmin
             .from('user_secrets')
-            .select('openrouter_api_key_encrypted, openrouter_api_key_updated_at, veri_factu_cert_storage_path, veri_factu_cert_uploaded_at, veri_factu_cert_expires_at, veri_factu_cert_subject, enablebanking_app_id, enablebanking_configured_at')
+            .select('gemini_api_key_encrypted, gemini_api_key_updated_at, veri_factu_cert_storage_path, veri_factu_cert_uploaded_at, veri_factu_cert_expires_at, veri_factu_cert_subject, enablebanking_app_id, enablebanking_configured_at')
             .eq('user_id', user.id)
             .maybeSingle();
 
           return jsonResponse({
-            openrouter_configured: !!data?.openrouter_api_key_encrypted,
-            openrouter_updated_at: data?.openrouter_api_key_updated_at ?? null,
+            gemini_configured: !!data?.gemini_api_key_encrypted,
+            gemini_updated_at: data?.gemini_api_key_updated_at ?? null,
             certificate_configured: !!data?.veri_factu_cert_storage_path,
             certificate_uploaded_at: data?.veri_factu_cert_uploaded_at ?? null,
             certificate_expires_at: data?.veri_factu_cert_expires_at ?? null,
@@ -106,28 +106,25 @@ Deno.serve(async (req) => {
           return jsonResponse({ success: true });
         }
 
-        case 'save_openrouter_key': {
+        case 'save_gemini_key': {
           const apiKey = String(payload?.api_key || '').trim();
           if (!apiKey) return jsonResponse({ error: 'Falta la API key.' }, 400);
-          if (!apiKey.startsWith('sk-or-')) {
-            return jsonResponse({ error: 'Esa no parece una API key de OpenRouter (deben empezar por "sk-or-"). Cópiala desde openrouter.ai/keys.' }, 400);
-          }
 
           const encrypted = await encryptString(apiKey, key);
           const { error } = await supabaseAdmin.from('user_secrets').upsert({
             user_id: user.id,
-            openrouter_api_key_encrypted: encrypted,
-            openrouter_api_key_updated_at: new Date().toISOString(),
+            gemini_api_key_encrypted: encrypted,
+            gemini_api_key_updated_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
           if (error) throw error;
           return jsonResponse({ success: true });
         }
 
-        case 'delete_openrouter_key': {
+        case 'delete_gemini_key': {
           const { error } = await supabaseAdmin
             .from('user_secrets')
-            .update({ openrouter_api_key_encrypted: null, openrouter_api_key_updated_at: null, updated_at: new Date().toISOString() })
+            .update({ gemini_api_key_encrypted: null, gemini_api_key_updated_at: null, updated_at: new Date().toISOString() })
             .eq('user_id', user.id);
           if (error) throw error;
           return jsonResponse({ success: true });

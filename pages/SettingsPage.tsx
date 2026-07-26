@@ -39,14 +39,14 @@ const SettingsPage: React.FC = () => {
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ valid: boolean; brokenAt?: string } | null>(null);
 
-  // --- Credenciales propias (API key de OpenRouter, certificado digital) ---
+  // --- Credenciales propias (API key de Gemini, certificado digital) ---
   const [secretsStatus, setSecretsStatus] = useState<{
-    openrouter_configured: boolean; openrouter_updated_at: string | null;
+    gemini_configured: boolean; gemini_updated_at: string | null;
     certificate_configured: boolean; certificate_uploaded_at: string | null;
   } | null>(null);
   const [loadingSecretsStatus, setLoadingSecretsStatus] = useState(true);
-  const [openrouterKeyInput, setOpenrouterKeyInput] = useState('');
-  const [savingOpenrouterKey, setSavingOpenrouterKey] = useState(false);
+  const [geminiKeyInput, setGeminiKeyInput] = useState('');
+  const [savingGeminiKey, setSavingGeminiKey] = useState(false);
   const [certFile, setCertFile] = useState<File | null>(null);
   const [certPassword, setCertPassword] = useState('');
   const [savingCert, setSavingCert] = useState(false);
@@ -81,27 +81,27 @@ const SettingsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  const handleSaveOpenrouterKey = async () => {
-    if (!openrouterKeyInput.trim()) {
-      addToast('Introduce tu API key de OpenRouter.', 'error');
+  const handleSaveGeminiKey = async () => {
+    if (!geminiKeyInput.trim()) {
+      addToast('Introduce tu API key de Gemini.', 'error');
       return;
     }
-    setSavingOpenrouterKey(true);
+    setSavingGeminiKey(true);
     try {
-      await callManageSecrets('save_openrouter_key', { api_key: openrouterKeyInput.trim() });
-      setOpenrouterKeyInput('');
+      await callManageSecrets('save_gemini_key', { api_key: geminiKeyInput.trim() });
+      setGeminiKeyInput('');
       addToast('API key guardada de forma cifrada.', 'success');
       fetchSecretsStatus();
     } catch (err) {
       addToast((err as Error).message || 'No se pudo guardar la API key.', 'error');
     } finally {
-      setSavingOpenrouterKey(false);
+      setSavingGeminiKey(false);
     }
   };
 
-  const handleDeleteOpenrouterKey = async () => {
+  const handleDeleteGeminiKey = async () => {
     try {
-      await callManageSecrets('delete_openrouter_key');
+      await callManageSecrets('delete_gemini_key');
       addToast('API key eliminada.', 'info');
       fetchSecretsStatus();
     } catch (err) {
@@ -567,21 +567,21 @@ const SettingsPage: React.FC = () => {
 
               <Card>
                 <CardHeader>
-                  <SectionTitle icon={Globe} title="Tu propia API key de OpenRouter" />
+                  <SectionTitle icon={Globe} title="Tu propia API key de Gemini" />
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <p className="text-sm text-gray-400">
                     Por defecto, el Asistente IA usa una cuenta compartida — si se agota su cuota,
                     la IA deja de funcionar para todo el mundo a la vez. Si añades tu propia API key
-                    (gratis en <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-primary-400 underline">OpenRouter</a>),
+                    (gratis en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="text-primary-400 underline">Google AI Studio</a>),
                     tus peticiones usan tu propia cuota, independiente de la de los demás.
                   </p>
                   {loadingSecretsStatus ? (
                     <p className="text-sm text-gray-500">Cargando...</p>
-                  ) : secretsStatus?.openrouter_configured ? (
+                  ) : secretsStatus?.gemini_configured ? (
                     <div className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
-                      <span className="text-sm text-green-400">✅ Configurada {secretsStatus.openrouter_updated_at && `(actualizada el ${new Date(secretsStatus.openrouter_updated_at).toLocaleDateString('es-ES')})`}</span>
-                      <Button size="sm" variant="danger" onClick={handleDeleteOpenrouterKey}>
+                      <span className="text-sm text-green-400">✅ Configurada {secretsStatus.gemini_updated_at && `(actualizada el ${new Date(secretsStatus.gemini_updated_at).toLocaleDateString('es-ES')})`}</span>
+                      <Button size="sm" variant="danger" onClick={handleDeleteGeminiKey}>
                         <TrashIcon className="w-4 h-4" />
                       </Button>
                     </div>
@@ -589,13 +589,13 @@ const SettingsPage: React.FC = () => {
                     <div className="flex gap-2">
                       <input
                         type="password"
-                        value={openrouterKeyInput}
-                        onChange={(e) => setOpenrouterKeyInput(e.target.value)}
-                        placeholder="sk-or-..."
+                        value={geminiKeyInput}
+                        onChange={(e) => setGeminiKeyInput(e.target.value)}
+                        placeholder="AIza..."
                         className="flex-1 p-2 bg-gray-800 text-white rounded-lg border border-gray-700 focus:border-primary-500 outline-none"
                       />
-                      <Button onClick={handleSaveOpenrouterKey} disabled={savingOpenrouterKey}>
-                        {savingOpenrouterKey ? 'Guardando...' : 'Guardar'}
+                      <Button onClick={handleSaveGeminiKey} disabled={savingGeminiKey}>
+                        {savingGeminiKey ? 'Guardando...' : 'Guardar'}
                       </Button>
                     </div>
                   )}
