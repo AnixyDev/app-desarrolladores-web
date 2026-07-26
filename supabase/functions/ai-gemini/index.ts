@@ -100,6 +100,17 @@ function translateGeminiError(rawMessage: string): string {
   return "Ha ocurrido un error con el asistente de IA. Inténtalo de nuevo en unos minutos.";
 }
 
+function isAuthError(rawMessage: string): boolean {
+  const msg = rawMessage.toLowerCase();
+  return (
+    msg.includes("api key not valid") ||
+    msg.includes("api_key_invalid") ||
+    msg.includes("permission_denied") ||
+    msg.includes("error 401") ||
+    msg.includes("error 403")
+  );
+}
+
 async function callGeminiWithModel(apiKey: string, model: string, fullPrompt: string): Promise<string> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
@@ -122,16 +133,38 @@ async function callGeminiWithModel(apiKey: string, model: string, fullPrompt: st
   return text;
 }
 
-async function callGemini(apiKey: string, prompt: string, extraRules?: string): Promise<string> {
+async function callGemini(
+  ownApiKey: string,
+  sharedApiKey: string,
+  prompt: string,
+  extraRules?: string
+): Promise<string> {
   const rules = extraRules ? `${PLAIN_TEXT_RULES}\n\n${extraRules}` : PLAIN_TEXT_RULES;
   const fullPrompt = `${prompt}\n\n${rules}`;
+  const usingOwnKey = ownApiKey !== sharedApiKey;
 
   let text: string;
   try {
-    text = await callGeminiWithModel(apiKey, PRIMARY_MODEL, fullPrompt);
+    text = await callGeminiWithModel(ownApiKey, PRIMARY_MODEL, fullPrompt);
   } catch (primaryError) {
-    console.error(`[ai-gemini] Fallo el modelo principal (${PRIMARY_MODEL}):`, (primaryError as Error).message);
-    text = await callGeminiWithModel(apiKey, FALLBACK_MODEL, fullPrompt);
+    const primaryMsg = (primaryError as Error).message;
+    console.error(`[ai-gemini] Fallo el modelo principal (${PRIMARY_MODEL}):`, primaryMsg);
+
+    // Si el usuario tiene su propia API key configurada y ha fallado por un
+    // motivo de autenticación (key invalida, revocada, sin facturacion...),
+    // no dejamos caer toda la IA: reintentamos con la key compartida de la
+    // app, igual que si no hubiera configurado ninguna key propia.
+    if (usingOwnKey && isAuthError(primaryMsg)) {
+      console.error("[ai-gemini] La API key propia del usuario ha fallado por autenticación, usando la key compartida como respaldo.");
+      try {
+        text = await callGeminiWithModel(sharedApiKey, PRIMARY_MODEL, fullPrompt);
+      } catch (sharedPrimaryError) {
+        console.error(`[ai-gemini] Fallo el modelo principal con la key compartida (${PRIMARY_MODEL}):`, (sharedPrimaryError as Error).message);
+        text = await callGeminiWithModel(sharedApiKey, FALLBACK_MODEL, fullPrompt);
+      }
+    } else {
+      text = await callGeminiWithModel(ownApiKey, FALLBACK_MODEL, fullPrompt);
+    }
   }
 
   return text
@@ -190,10 +223,12 @@ async function callGeminiWithImage(
    estructurado y saneado, listo para precargar el formulario de "Añadir
    Gasto" del frontend (el usuario siempre revisa/edita antes de guardar). */
 async function extractExpenseWithGemini(
-  apiKey: string,
+  ownApiKey: string,
+  sharedApiKey: string,
   mimeType: string,
   imageBase64: string
 ): Promise<Record<string, unknown>> {
+  const usingOwnKey = ownApiKey !== sharedApiKey;
   const prompt = `Eres un asistente experto en contabilidad para autonomos en España. Analiza la imagen adjunta de un ticket o factura de un proveedor y extrae sus datos.
 
 Categorias permitidas (elige la que mejor encaje, EXACTAMENTE una de esta lista, escrita tal cual):
@@ -214,10 +249,22 @@ Si la imagen no es un ticket o factura legible, devuelve igualmente el JSON con 
 
   let text: string;
   try {
-    text = await callGeminiWithImage(apiKey, PRIMARY_MODEL, prompt, mimeType, imageBase64);
+    text = await callGeminiWithImage(ownApiKey, PRIMARY_MODEL, prompt, mimeType, imageBase64);
   } catch (primaryError) {
-    console.error(`[ai-gemini] OCR: falló el modelo principal (${PRIMARY_MODEL}):`, (primaryError as Error).message);
-    text = await callGeminiWithImage(apiKey, FALLBACK_MODEL, prompt, mimeType, imageBase64);
+    const primaryMsg = (primaryError as Error).message;
+    console.error(`[ai-gemini] OCR: falló el modelo principal (${PRIMARY_MODEL}):`, primaryMsg);
+
+    if (usingOwnKey && isAuthError(primaryMsg)) {
+      console.error("[ai-gemini] OCR: la API key propia del usuario ha fallado por autenticación, usando la key compartida como respaldo.");
+      try {
+        text = await callGeminiWithImage(sharedApiKey, PRIMARY_MODEL, prompt, mimeType, imageBase64);
+      } catch (sharedPrimaryError) {
+        console.error(`[ai-gemini] OCR: falló el modelo principal con la key compartida (${PRIMARY_MODEL}):`, (sharedPrimaryError as Error).message);
+        text = await callGeminiWithImage(sharedApiKey, FALLBACK_MODEL, prompt, mimeType, imageBase64);
+      }
+    } else {
+      text = await callGeminiWithImage(ownApiKey, FALLBACK_MODEL, prompt, mimeType, imageBase64);
+    }
   }
 
   let parsed: Record<string, unknown>;
@@ -340,7 +387,7 @@ serve(async (req) => {
     switch (action) {
       case "getAIResponse": {
         const { prompt } = payload;
-        const text = await callGemini(effectiveApiKey, prompt);
+        const text = await callGemini(effectiveApiKey, GEMINI_API_KEY, prompt);
         return new Response(JSON.stringify({ text }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -350,6 +397,7 @@ serve(async (req) => {
         const { projectName, projectDesc, keywords } = payload;
         const text = await callGemini(
           effectiveApiKey,
+          GEMINI_API_KEY,
           `Redacta la descripcion de un parte de trabajo para un freelance.\n\nProyecto: ${projectName}\nContexto del proyecto: ${projectDesc}\nTareas realizadas hoy: ${keywords}\n\nDevuelve UNA sola frase profesional y concreta que describa el trabajo realizado, lista para aparecer tal cual en una factura o parte de horas. No añadas introducciones ni explicaciones, solo la frase.`
         );
         return new Response(JSON.stringify({ text }), {
@@ -361,6 +409,7 @@ serve(async (req) => {
         const { prompt, hourlyRate } = payload;
         const text = await callGemini(
           effectiveApiKey,
+          GEMINI_API_KEY,
           `Genera un unico concepto de factura, claro y profesional, para un desarrollador freelance.\n\nContexto del trabajo realizado:\n${prompt}\n\nTarifa base: ${hourlyRate / 100} euros/hora\n\nDevuelve solo la descripcion del concepto (una o dos frases), sin precio, sin cantidad, sin introducciones.`
         );
         return new Response(
@@ -375,6 +424,7 @@ serve(async (req) => {
         const normalizedData = normalizeCentsFields(payload.data);
         const text = await callGemini(
           effectiveApiKey,
+          GEMINI_API_KEY,
           `Eres un asesor financiero para freelancers. Analiza estos datos financieros (los importes ya estan en euros) y escribe un informe breve con tres partes claramente separadas por una linea en blanco:\n\n1. Un resumen de la situacion actual (2-3 frases).\n2. Los principales riesgos a vigilar (cada uno en su propia linea, empezando por "- ").\n3. Sugerencias practicas y accionables (cada una en su propia linea, empezando por "- ").\n\nDatos financieros (importes en euros):\n${JSON.stringify(normalizedData)}`,
           CURRENCY_RULES
         );
@@ -388,6 +438,7 @@ serve(async (req) => {
         const normalizedData = normalizeCentsFields(payload.data);
         const text = await callGemini(
           effectiveApiKey,
+          GEMINI_API_KEY,
           `Eres un asesor de negocio para freelancers. Analiza la rentabilidad de estos proyectos (los importes ya estan en euros) y escribe un informe breve y directo (maximo 250 palabras) que cubra:\n\n1. Que proyectos son mas rentables y por que.\n2. Que proyectos estan generando perdidas o tienen datos incompletos.\n3. Dos o tres recomendaciones concretas y accionables.\n\nDatos de los proyectos (importes en euros):\n${JSON.stringify(normalizedData)}\n\nEscribelo en parrafos cortos y claros, nada de relleno ni frases motivacionales genericas.`,
           CURRENCY_RULES
         );
@@ -400,6 +451,7 @@ serve(async (req) => {
         const { title, context, profileSummary } = payload;
         const text = await callGemini(
           effectiveApiKey,
+          GEMINI_API_KEY,
           `Redacta una propuesta comercial profesional y persuasiva para un cliente potencial.\n\nTitulo del proyecto: ${title}\n\nRequisitos del cliente:\n${context}\n\nPerfil del profesional que la envia:\n${profileSummary}\n\nEstructura la propuesta en 3-4 parrafos cortos: una introduccion que conecte con la necesidad del cliente, como se resolveria el proyecto, por que este profesional es la opcion adecuada, y un cierre con siguiente paso claro. Tono cercano y profesional, sin sonar generico ni a plantilla.`
         );
         return new Response(JSON.stringify({ text }), {
@@ -411,6 +463,7 @@ serve(async (req) => {
         const { jobDesc, applicantProfile, proposal } = payload;
         const text = await callGemini(
           effectiveApiKey,
+          GEMINI_API_KEY,
           `Eres un asistente de contratacion. Evalua a este candidato para la oferta de empleo y escribe un analisis breve con tres partes separadas por una linea en blanco:\n\n1. Resumen del candidato (2-3 frases).\n2. Puntos fuertes respecto a la oferta (cada uno en su propia linea, empezando por "- ").\n3. Posibles riesgos o puntos a aclarar (cada uno en su propia linea, empezando por "- ").\n\nOferta de empleo:\n${jobDesc}\n\nPerfil del candidato:\n${applicantProfile}\n\nPropuesta enviada:\n${proposal}`
         );
         return new Response(JSON.stringify({ summary: text }), {
@@ -431,7 +484,7 @@ serve(async (req) => {
           throw new Error("La imagen es demasiado grande. Prueba con una foto de menor resolución.");
         }
 
-        const extracted = await extractExpenseWithGemini(effectiveApiKey, String(mimeType), imageBase64);
+        const extracted = await extractExpenseWithGemini(effectiveApiKey, GEMINI_API_KEY, String(mimeType), imageBase64);
         return new Response(JSON.stringify({ extracted }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
