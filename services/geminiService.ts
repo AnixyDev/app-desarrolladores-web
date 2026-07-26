@@ -16,6 +16,7 @@ export const AI_CREDIT_COSTS = {
   generateQuiz: 5,
   generateForecast: 15,
   summarizeApplicant: 10,
+  extractExpenseFromImage: 6,
 } as const;
 
 /* =========================
@@ -166,6 +167,35 @@ export const rankArticlesByRelevance = async (
     prompt: `Consulta:\n${query}\n\nArtículos:\n${JSON.stringify(articles.slice(0, 10))}\n\nDevuelve los títulos más relevantes en texto.`,
   });
   return [res.text as string];
+};
+
+/* =========================
+   OCR de gastos
+========================= */
+
+export interface ExtractedExpenseData {
+  vendor_name: string;
+  description: string;
+  date: string; // YYYY-MM-DD
+  amount_cents: number;
+  tax_percent: number;
+  category: string;
+  confidence: number; // 0-1
+}
+
+/**
+ * Envía la foto de un ticket/factura de proveedor a Gemini y devuelve los
+ * datos ya estructurados y saneados (importe, IVA, fecha, categoría...).
+ * El resultado SIEMPRE se debe mostrar al usuario para revisión antes de
+ * guardarlo como gasto — la IA puede equivocarse, sobre todo con fotos
+ * borrosas o tickets térmicos desgastados.
+ */
+export const extractExpenseFromImage = async (
+  imageBase64: string,
+  mimeType: string
+): Promise<ExtractedExpenseData> => {
+  const res = await callAI('extractExpenseFromImage', { imageBase64, mimeType });
+  return res.extracted as unknown as ExtractedExpenseData;
 };
 
 /* =========================

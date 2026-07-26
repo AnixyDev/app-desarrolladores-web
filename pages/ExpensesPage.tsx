@@ -7,10 +7,12 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { Expense, RecurringExpense } from '@/types';
 import { formatCurrency } from '@/lib/utils';
-import { PlusIcon, TrashIcon, RepeatIcon } from '@/components/icons/Icon';
+import { PlusIcon, TrashIcon, RepeatIcon, SparklesIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
+import { ExtractedExpenseData } from '@/services/geminiService';
 
 const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
+const ExpenseOcrModal = lazy(() => import('@/components/modals/ExpenseOcrModal'));
 
 const ExpensesPage: React.FC = () => {
     const {
@@ -27,6 +29,7 @@ const ExpensesPage: React.FC = () => {
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [isOcrModalOpen, setIsOcrModalOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<{ id: string; type: 'single' | 'recurring' } | null>(null);
 
     const initialExpenseState: Omit<Expense, 'id' | 'user_id' | 'created_at'> & { description: string; tax_percent: number } = {
@@ -90,6 +93,21 @@ const ExpensesPage: React.FC = () => {
         }
     };
 
+    // El OCR solo rellena el formulario existente; el usuario siempre revisa
+    // y confirma manualmente pulsando "Guardar Gasto" (mismo flujo de
+    // validación y guardado que un gasto añadido a mano).
+    const handleOcrExtracted = (data: ExtractedExpenseData) => {
+        setNewExpense({
+            description: data.vendor_name ? `${data.description} — ${data.vendor_name}` : data.description,
+            amount_cents: data.amount_cents / 100,
+            tax_percent: data.tax_percent,
+            date: data.date,
+            category: data.category,
+            project_id: '',
+        });
+        setIsExpenseModalOpen(true);
+    };
+
     const handleDeleteClick = (id: string, type: 'single' | 'recurring') => {
         setItemToDelete({ id, type });
         setIsConfirmModalOpen(true);
@@ -116,6 +134,9 @@ const ExpensesPage: React.FC = () => {
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-semibold text-white">Gastos</h1>
                 <div className="flex gap-2">
+                    <Button onClick={() => setIsOcrModalOpen(true)} variant="secondary">
+                        <SparklesIcon className="w-4 h-4 mr-2" /> Escanear Ticket (IA)
+                    </Button>
                     <Button onClick={() => setIsRecurringModalOpen(true)} variant="secondary">
                         <RepeatIcon className="w-4 h-4 mr-2" /> Añadir Gasto Recurrente
                     </Button>
@@ -246,6 +267,13 @@ const ExpensesPage: React.FC = () => {
                         onConfirm={confirmDelete}
                         title="¿Eliminar Gasto?"
                         message="Esta acción eliminará el gasto de forma permanente. ¿Estás seguro de que quieres continuar?"
+                    />
+                )}
+                {isOcrModalOpen && (
+                    <ExpenseOcrModal
+                        isOpen={isOcrModalOpen}
+                        onClose={() => setIsOcrModalOpen(false)}
+                        onExtracted={handleOcrExtracted}
                     />
                 )}
             </Suspense>
