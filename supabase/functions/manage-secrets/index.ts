@@ -1,18 +1,11 @@
-// supabase/functions/bank-sync/index.ts
-//
-// Sincroniza movimientos bancarios (Enable Banking) y los coteja con
-// facturas pendientes. El cotejo es solo una SUGERENCIA — nunca marca
-// nada como cobrado sin que el usuario confirme (action=confirm_match).
-
+// supabase/functions/manage-secrets/index.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
-
-const EB_BASE_URL = 'https://api.enablebanking.com';
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -21,214 +14,188 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-async function getAesKey(rawHex: string): Promise<CryptoKey> {
+async function getKey(rawHex: string): Promise<CryptoKey> {
   const keyBytes = new Uint8Array(rawHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
   return crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
 }
 
-async function decryptFromBase64(b64: string, key: CryptoKey): Promise<string> {
-  const combined = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  const iv = combined.slice(0, 12);
-  const cipherBytes = combined.slice(12);
-  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBytes);
-  return new TextDecoder().decode(plainBuf);
+async function encryptToBase64(plainBytes: Uint8Array, key: CryptoKey): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const cipherBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plainBytes);
+  const combined = new Uint8Array(iv.length + cipherBuf.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(cipherBuf), iv.length);
+  return btoa(String.fromCharCode(...combined));
 }
 
-function base64url(input: ArrayBuffer | string): string {
-  const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : new Uint8Array(input);
-  let str = '';
-  for (const b of bytes) str += String.fromCharCode(b);
-  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-function pemToArrayBuffer(pem: string): ArrayBuffer {
-  const b64 = pem.replace(/-----BEGIN (.*)-----/, '').replace(/-----END (.*)-----/, '').replace(/\s+/g, '');
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes.buffer;
-}
-
-async function importEnableBankingPrivateKey(pem: string): Promise<CryptoKey> {
-  return crypto.subtle.importKey('pkcs8', pemToArrayBuffer(pem), { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
-}
-
-async function createEnableBankingJWT(appId: string, privateKeyPem: string): Promise<string> {
-  const key = await importEnableBankingPrivateKey(privateKeyPem);
-  const iat = Math.floor(Date.now() / 1000);
-  const header = { typ: 'JWT', alg: 'RS256', kid: appId };
-  const body = { iss: 'enablebanking.com', aud: 'api.enablebanking.com', iat, exp: iat + 3600 };
-  const signingInput = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(body))}`;
-  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(signingInput));
-  return `${signingInput}.${base64url(signature)}`;
-}
-
-function normalize(text: string): string {
-  return (text || '')
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+async function encryptString(plain: string, key: CryptoKey): Promise<string> {
+  return encryptToBase64(new TextEncoder().encode(plain), key);
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+    if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  try {
-    const encryptionKeyHex = Deno.env.get('APP_ENCRYPTION_KEY');
-    if (!encryptionKeyHex) throw new Error('Missing APP_ENCRYPTION_KEY secret.');
+    try {
+      const encryptionKeyHex = Deno.env.get('APP_ENCRYPTION_KEY');
+      if (!encryptionKeyHex) {
+        throw new Error('Missing APP_ENCRYPTION_KEY secret.');
+      }
 
-    const authHeader = req.headers.get('Authorization') || '';
-    const supabaseAuth = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      { global: { headers: { Authorization: authHeader } } }
-    );
-    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
-    if (authError || !user) return jsonResponse({ error: 'No autorizado' }, 401);
+      const authHeader = req.headers.get('Authorization') || '';
+      const supabaseAuth = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_ANON_KEY')!,
+        { global: { headers: { Authorization: authHeader } } }
+      );
+      const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+      if (authError || !user) {
+        return jsonResponse({ error: 'No autorizado' }, 401);
+      }
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
 
-    const { action, payload } = await req.json();
+      const key = await getKey(encryptionKeyHex);
+      const { action, payload } = await req.json();
 
-    if (action === 'confirm_match') {
-      const { transaction_id, invoice_id } = payload || {};
-      if (!transaction_id || !invoice_id) return jsonResponse({ error: 'Faltan datos.' }, 400);
-
-      const { data: tx, error: txError } = await supabaseAdmin
-        .from('bank_transactions').select('*').eq('id', transaction_id).eq('user_id', user.id).single();
-      if (txError || !tx) return jsonResponse({ error: 'Movimiento no encontrado.' }, 404);
-
-      const { error: paymentError } = await supabaseAdmin.from('payments').insert({
-        user_id: user.id,
-        invoice_id,
-        amount_cents: tx.amount_cents,
-        paid_at: tx.booking_date,
-        method: 'Transferencia bancaria',
-        notes: `Conciliado automáticamente con movimiento bancario: ${tx.description || tx.counterparty_name || ''}`.trim(),
-      });
-      if (paymentError) throw paymentError;
-
-      const { error: updateError } = await supabaseAdmin
-        .from('bank_transactions')
-        .update({ match_status: 'confirmed', matched_invoice_id: invoice_id })
-        .eq('id', transaction_id);
-      if (updateError) throw updateError;
-
-      return jsonResponse({ success: true });
-    }
-
-    if (action === 'ignore_match') {
-      const { transaction_id } = payload || {};
-      const { error } = await supabaseAdmin
-        .from('bank_transactions').update({ match_status: 'ignored' }).eq('id', transaction_id).eq('user_id', user.id);
-      if (error) throw error;
-      return jsonResponse({ success: true });
-    }
-
-    if (action !== 'sync') return jsonResponse({ error: 'Acción desconocida.' }, 400);
-
-    const { data: secrets } = await supabaseAdmin
-      .from('user_secrets')
-      .select('enablebanking_app_id, enablebanking_private_key_encrypted')
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!secrets?.enablebanking_app_id) {
-      return jsonResponse({ error: 'No has configurado tus credenciales de Enable Banking.' }, 400);
-    }
-
-    const aesKey = await getAesKey(encryptionKeyHex);
-    const privateKeyPem = await decryptFromBase64(secrets.enablebanking_private_key_encrypted, aesKey);
-    const jwt = await createEnableBankingJWT(secrets.enablebanking_app_id, privateKeyPem);
-    const ebHeaders = { Authorization: `Bearer ${jwt}` };
-
-    const { data: accounts } = await supabaseAdmin.from('bank_accounts').select('*').eq('user_id', user.id);
-
-    let newTransactions = 0;
-    let newSuggestions = 0;
-    const errors: string[] = [];
-
-    const { data: invoices } = await supabaseAdmin
-      .from('invoices')
-      .select('id, invoice_number, total_cents, paid, client_id, clients(name)')
-      .eq('user_id', user.id)
-      .eq('paid', false);
-
-    for (const account of accounts || []) {
-      try {
-        const res = await fetch(`${EB_BASE_URL}/accounts/${account.gocardless_account_id}/transactions`, { headers: ebHeaders });
-        if (!res.ok) {
-          errors.push(`${account.account_name}: ${res.status === 429 ? 'límite de peticiones del banco alcanzado hoy' : await res.text()}`);
-          continue;
-        }
-        const data = await res.json();
-        const txList = data?.transactions || [];
-
-        for (const t of txList) {
-          const amountCents = Math.round(parseFloat(t.transaction_amount?.amount || '0') * 100);
-          if (amountCents <= 0) continue; // solo ingresos
-
-          const ebTxId = t.entry_reference || t.transaction_id || `${t.booking_date}-${amountCents}-${t.remittance_information?.[0] || ''}`;
-          const counterpartyName = t.creditor?.name || t.debtor?.name || '';
-          const description = (t.remittance_information || []).join(' ');
-
-          const { data: inserted, error: insertError } = await supabaseAdmin
-            .from('bank_transactions')
-            .upsert({
-              user_id: user.id,
-              bank_account_id: account.id,
-              gocardless_transaction_id: ebTxId,
-              enablebanking_transaction_id: ebTxId,
-              amount_cents: amountCents,
-              booking_date: t.booking_date,
-              counterparty_name: counterpartyName,
-              description,
-              raw_data: t,
-            }, { onConflict: 'bank_account_id,gocardless_transaction_id', ignoreDuplicates: true })
-            .select()
+      switch (action) {
+        case 'status': {
+          const { data } = await supabaseAdmin
+            .from('user_secrets')
+            .select('openrouter_api_key_encrypted, openrouter_api_key_updated_at, veri_factu_cert_storage_path, veri_factu_cert_uploaded_at, veri_factu_cert_expires_at, veri_factu_cert_subject, enablebanking_app_id, enablebanking_configured_at')
+            .eq('user_id', user.id)
             .maybeSingle();
 
-          if (insertError) { errors.push(insertError.message); continue; }
-          if (!inserted) continue;
-          newTransactions++;
-
-          const candidates = (invoices || []).filter(inv => inv.total_cents === amountCents);
-          if (candidates.length === 0) continue;
-
-          let best = candidates[0];
-          let confidence = 0.6;
-          const normalizedText = normalize(`${counterpartyName} ${description}`);
-          if (candidates.length > 1) {
-            const withNameMatch = candidates.find(c => {
-              const clientName = normalize((c as any).clients?.name || '');
-              return clientName && normalizedText.includes(clientName);
-            });
-            if (withNameMatch) { best = withNameMatch; confidence = 0.9; }
-          } else {
-            const clientName = normalize((best as any).clients?.name || '');
-            if (clientName && normalizedText.includes(clientName)) confidence = 0.95;
-          }
-
-          await supabaseAdmin
-            .from('bank_transactions')
-            .update({ match_status: 'suggested', matched_invoice_id: best.id, match_confidence: confidence })
-            .eq('id', inserted.id);
-          newSuggestions++;
+          return jsonResponse({
+            openrouter_configured: !!data?.openrouter_api_key_encrypted,
+            openrouter_updated_at: data?.openrouter_api_key_updated_at ?? null,
+            certificate_configured: !!data?.veri_factu_cert_storage_path,
+            certificate_uploaded_at: data?.veri_factu_cert_uploaded_at ?? null,
+            certificate_expires_at: data?.veri_factu_cert_expires_at ?? null,
+            certificate_subject: data?.veri_factu_cert_subject ?? null,
+            enablebanking_configured: !!data?.enablebanking_app_id,
+            enablebanking_configured_at: data?.enablebanking_configured_at ?? null,
+          });
         }
 
-        await supabaseAdmin.from('bank_accounts').update({ last_synced_at: new Date().toISOString() }).eq('id', account.id);
-      } catch (e) {
-        errors.push(`${account.account_name}: ${(e as Error).message}`);
-      }
-    }
+        case 'save_enablebanking_credentials': {
+          const appId = String(payload?.app_id || '').trim();
+          const privateKeyPem = String(payload?.private_key_pem || '').trim();
+          if (!appId || !privateKeyPem) return jsonResponse({ error: 'Falta el ID de aplicación o la clave privada.' }, 400);
 
-    return jsonResponse({ success: true, new_transactions: newTransactions, new_suggestions: newSuggestions, errors });
-  } catch (e) {
-    console.error('[bank-sync] Error:', (e as Error)?.message ?? e);
-    return jsonResponse({ error: (e as Error)?.message || 'No se pudo sincronizar.' }, 500);
-  }
+          const encryptedKey = await encryptString(privateKeyPem, key);
+          const { error } = await supabaseAdmin.from('user_secrets').upsert({
+            user_id: user.id,
+            enablebanking_app_id: appId,
+            enablebanking_private_key_encrypted: encryptedKey,
+            enablebanking_configured_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+          if (error) throw error;
+          return jsonResponse({ success: true });
+        }
+
+        case 'delete_enablebanking_credentials': {
+          const { error } = await supabaseAdmin
+            .from('user_secrets')
+            .update({ enablebanking_app_id: null, enablebanking_private_key_encrypted: null, enablebanking_configured_at: null, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id);
+          if (error) throw error;
+          return jsonResponse({ success: true });
+        }
+
+        case 'save_openrouter_key': {
+          const apiKey = String(payload?.api_key || '').trim();
+          if (!apiKey) return jsonResponse({ error: 'Falta la API key.' }, 400);
+          if (!apiKey.startsWith('sk-or-')) {
+            return jsonResponse({ error: 'Esa no parece una API key de OpenRouter (deben empezar por "sk-or-"). Cópiala desde openrouter.ai/keys.' }, 400);
+          }
+
+          const encrypted = await encryptString(apiKey, key);
+          const { error } = await supabaseAdmin.from('user_secrets').upsert({
+            user_id: user.id,
+            openrouter_api_key_encrypted: encrypted,
+            openrouter_api_key_updated_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+          if (error) throw error;
+          return jsonResponse({ success: true });
+        }
+
+        case 'delete_openrouter_key': {
+          const { error } = await supabaseAdmin
+            .from('user_secrets')
+            .update({ openrouter_api_key_encrypted: null, openrouter_api_key_updated_at: null, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id);
+          if (error) throw error;
+          return jsonResponse({ success: true });
+        }
+
+        case 'save_certificate': {
+          const fileBase64 = String(payload?.file_base64 || '');
+          const password = String(payload?.password || '');
+          if (!fileBase64 || !password) {
+            return jsonResponse({ error: 'Falta el certificado o la contraseña.' }, 400);
+          }
+
+          const rawBytes = Uint8Array.from(atob(fileBase64), (c) => c.charCodeAt(0));
+          const encryptedFileBase64 = await encryptToBase64(rawBytes, key);
+          const encryptedPassword = await encryptString(password, key);
+
+          const storagePath = `${user.id}/certificado.p12.enc`;
+          const { error: uploadError } = await supabaseAdmin.storage
+            .from('fiscal-certificates')
+            .upload(storagePath, new TextEncoder().encode(encryptedFileBase64), {
+              contentType: 'text/plain',
+              upsert: true,
+            });
+          if (uploadError) throw uploadError;
+
+          const { error: dbError } = await supabaseAdmin.from('user_secrets').upsert({
+            user_id: user.id,
+            veri_factu_cert_storage_path: storagePath,
+            veri_factu_cert_password_encrypted: encryptedPassword,
+            veri_factu_cert_uploaded_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+          if (dbError) throw dbError;
+
+          return jsonResponse({ success: true });
+        }
+
+        case 'delete_certificate': {
+          const { data } = await supabaseAdmin
+            .from('user_secrets')
+            .select('veri_factu_cert_storage_path')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (data?.veri_factu_cert_storage_path) {
+            await supabaseAdmin.storage.from('fiscal-certificates').remove([data.veri_factu_cert_storage_path]);
+          }
+
+          const { error } = await supabaseAdmin
+            .from('user_secrets')
+            .update({
+              veri_factu_cert_storage_path: null,
+              veri_factu_cert_password_encrypted: null,
+              veri_factu_cert_uploaded_at: null,
+              veri_factu_cert_subject: null,
+              veri_factu_cert_expires_at: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', user.id);
+          if (error) throw error;
+          return jsonResponse({ success: true });
+        }
+
+        default:
+          return jsonResponse({ error: 'Acción desconocida.' }, 400);
+      }
+    } catch (e) {
+      console.error('[manage-secrets] Error:', (e as Error)?.message ?? e);
+      return jsonResponse({ error: 'No se pudo procesar la solicitud. Inténtalo de nuevo.' }, 500);
+    }
 });
