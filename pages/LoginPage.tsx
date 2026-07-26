@@ -6,6 +6,9 @@ import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { supabase } from '@/lib/supabaseClient';
 import { MailIcon, LockIcon, EyeIcon, EyeOffIcon, AlertTriangleIcon } from '@/components/icons/Icon';
+import { GoogleIcon } from '@/components/icons/GoogleIcon';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // FIX: Se eliminó "import LoginPage from './pages/LoginPage'"
 // Ese import causaba "Identifier 'LoginPage' has already been declared":
@@ -18,6 +21,7 @@ import { MailIcon, LockIcon, EyeIcon, EyeOffIcon, AlertTriangleIcon } from '@/co
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
+  const [emailTouched, setEmailTouched] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -26,8 +30,13 @@ const LoginPage: React.FC = () => {
   const { login } = useAppStore();
   const navigate = useNavigate();
 
+  const emailInvalid = emailTouched && email.length > 0 && !EMAIL_REGEX.test(email);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setEmailTouched(true);
+    if (!EMAIL_REGEX.test(email)) return;
+
     setLoading(true);
     setError(null);
 
@@ -81,17 +90,22 @@ const LoginPage: React.FC = () => {
       )}
 
       <form onSubmit={handleLogin} className="space-y-4" noValidate>
-        <Input
-          id="login-email"
-          label="Email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="tu@email.com"
-          autoComplete="email"
-          icon={<MailIcon className="h-4 w-4" />}
-          required
-        />
+        <div>
+          <Input
+            id="login-email"
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onBlur={() => setEmailTouched(true)}
+            placeholder="tu@email.com"
+            autoComplete="email"
+            autoFocus
+            icon={<MailIcon className="h-4 w-4" />}
+            required
+          />
+          {emailInvalid && <p className="mt-1 text-xs text-red-400">Introduce un email válido.</p>}
+        </div>
 
         <Input
           id="login-password"
@@ -116,6 +130,12 @@ const LoginPage: React.FC = () => {
           required
         />
 
+        <div className="text-right">
+          <Link to="/auth/forgot-password" className="text-xs font-medium text-primary-400 hover:text-primary-300">
+            ¿Olvidaste tu contraseña?
+          </Link>
+        </div>
+
         <Button type="submit" className="w-full py-3 mt-2" disabled={loading} isLoading={loading}>
           {loading ? 'Entrando...' : 'Entrar'}
         </Button>
@@ -137,7 +157,7 @@ const LoginPage: React.FC = () => {
           onClick={handleGoogleLogin}
           className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
         >
-          <img src="https://www.google.com/favicon.ico" alt="" className="w-4 h-4" />
+          <GoogleIcon className="w-[18px] h-[18px]" />
           Continuar con Google
         </Button>
       </div>

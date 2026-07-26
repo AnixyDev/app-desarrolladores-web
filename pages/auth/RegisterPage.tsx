@@ -3,24 +3,34 @@ import { Link } from 'react-router-dom';
 import AuthCard from '../../components/auth/AuthCard';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
+import PasswordStrengthMeter from '../../components/auth/PasswordStrengthMeter';
 import { useAppStore } from '../../hooks/useAppStore';
 import { supabase } from '../../lib/supabaseClient';
 import { UserIcon, MailIcon, LockIcon, EyeIcon, EyeOffIcon, AlertTriangleIcon, CheckCircleIcon } from '../../components/icons/Icon';
+import { GoogleIcon } from '../../components/icons/GoogleIcon';
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const RegisterPage: React.FC = () => {
     const register = useAppStore(state => state.register);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
+    const [emailTouched, setEmailTouched] = useState(false);
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [infoMessage, setInfoMessage] = useState('');
     const [loading, setLoading] = useState(false);
 
+    const emailInvalid = emailTouched && email.length > 0 && !EMAIL_REGEX.test(email);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setInfoMessage('');
+        setEmailTouched(true);
+        if (!EMAIL_REGEX.test(email)) return;
+
         setLoading(true);
         try {
             const result = await register(name, email, password);
@@ -75,40 +85,48 @@ const RegisterPage: React.FC = () => {
                     onChange={(e) => setName(e.target.value)}
                     icon={<UserIcon className="h-4 w-4" />}
                     autoComplete="name"
+                    autoFocus
                     required
                 />
-                <Input
-                    id="register-email"
-                    label="Email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    icon={<MailIcon className="h-4 w-4" />}
-                    autoComplete="email"
-                    required
-                />
-                <Input
-                    id="register-password"
-                    label="Contraseña"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    icon={<LockIcon className="h-4 w-4" />}
-                    autoComplete="new-password"
-                    rightElement={
-                        <button
-                            type="button"
-                            onClick={() => setShowPassword((v) => !v)}
-                            className="text-gray-500 hover:text-gray-300 focus:outline-none focus:text-primary-400"
-                            aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                            tabIndex={-1}
-                        >
-                            {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
-                        </button>
-                    }
-                    required
-                />
+                <div>
+                    <Input
+                        id="register-email"
+                        label="Email"
+                        type="email"
+                        placeholder="tu@email.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        onBlur={() => setEmailTouched(true)}
+                        icon={<MailIcon className="h-4 w-4" />}
+                        autoComplete="email"
+                        required
+                    />
+                    {emailInvalid && <p className="mt-1 text-xs text-red-400">Introduce un email válido.</p>}
+                </div>
+                <div>
+                    <Input
+                        id="register-password"
+                        label="Contraseña"
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        icon={<LockIcon className="h-4 w-4" />}
+                        autoComplete="new-password"
+                        rightElement={
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword((v) => !v)}
+                                className="text-gray-500 hover:text-gray-300 focus:outline-none focus:text-primary-400"
+                                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                                tabIndex={-1}
+                            >
+                                {showPassword ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                            </button>
+                        }
+                        required
+                    />
+                    <PasswordStrengthMeter password={password} />
+                </div>
                 {error && (
                     <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-400">
                         <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
@@ -142,7 +160,7 @@ const RegisterPage: React.FC = () => {
                 className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
                 onClick={handleGoogleRegister}
             >
-                <img src="https://www.google.com/favicon.ico" alt="" className="w-4 h-4" />
+                <GoogleIcon className="w-[18px] h-[18px]" />
                 Continuar con Google
             </Button>
 

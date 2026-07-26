@@ -253,4 +253,5 @@ export {
   Lock as LockIcon,
   Eye as EyeIcon,
   EyeOff as EyeOffIcon,
+  Receipt as ReceiptIcon,
 };
