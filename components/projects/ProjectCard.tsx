@@ -2,47 +2,38 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Project } from '@/types';
-import { formatCurrency } from '@/lib/utils';
 import { useAppStore } from '@/hooks/useAppStore';
-import { BriefcaseIcon, ClockIcon, TrashIcon } from '@/components/icons/Icon';
-import StatusChip from '@/components/ui/StatusChip';
-import { useToast } from '@/hooks/useToast';
+import { AlertTriangleIcon, ChevronRightIcon } from '@/components/icons/Icon';
 
 interface ProjectCardProps {
     project: Project;
     progress: number;
     clientName?: string;
-    compact?: boolean;
+    /** Se llama al tocar/hacer click en la tarjeta (no durante un arrastre). El padre decide la navegación. */
+    onOpen?: (projectId: string) => void;
 }
 
-export const ProjectCard: React.FC<ProjectCardProps> = ({ project, progress, clientName, compact }) => {
-    const { timeEntries, profile, deleteProject } = useAppStore();
-    const { addToast } = useToast();
+// Mismo color que la columna del Kanban a la que pertenece el estado — así
+// la tarjeta se identifica de un vistazo también en la vista de lista/grid,
+// donde no hay columnas que lo indiquen por posición.
+const STATUS_BORDER_COLOR: Record<Project['status'], string> = {
+    planning: 'border-l-blue-500',
+    'in-progress': 'border-l-primary-500',
+    'on-hold': 'border-l-orange-500',
+    completed: 'border-l-green-500',
+};
 
-    // FIX: no había ninguna forma de borrar un proyecto. El botón usa
-    // stopPropagation en pointerdown/click porque toda la tarjeta tiene
-    // los listeners de arrastre de dnd-kit — sin esto, pulsar "borrar"
-    // se interpretaría como el inicio de un arrastre.
-    const handleDelete = async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (window.confirm(`¿Eliminar el proyecto "${project.name}"? Se borrarán también sus tareas, registros de tiempo y contratos. Las facturas y gastos ya emitidos NO se borran, solo quedan sin proyecto asociado.`)) {
-            try {
-                await deleteProject(project.id);
-                addToast('Proyecto eliminado.', 'success');
-            } catch (error) {
-                addToast('No se pudo eliminar el proyecto.', 'error');
-            }
-        }
-    };
+export const ProjectCard: React.FC<ProjectCardProps> = ({ project, progress, clientName, onOpen }) => {
+    const { timeEntries, profile } = useAppStore();
 
-    // Lógica de Rentabilidad
+    // Rentabilidad: solo se usa para decidir si se muestra el aviso de "sobre presupuesto",
+    // ya no hay una caja de cifras en la tarjeta — los números completos viven en el detalle.
     const projectHours = timeEntries
         .filter(t => t.project_id === project.id)
         .reduce((acc, curr) => acc + (curr.duration_seconds / 3600), 0);
-    
     const costIncurredCents = Math.round(projectHours * (profile.hourly_rate_cents || 0));
     const budgetCents = project.budget_cents || 0;
-    const isProfitable = budgetCents === 0 || budgetCents > costIncurredCents;
+    const isOverBudget = budgetCents > 0 && costIncurredCents > budgetCents;
 
     // Configuración Drag & Drop
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -68,67 +59,38 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, progress, cli
     };
 
     return (
-        <div 
-            ref={setNodeRef} 
-            style={style} 
-            {...attributes} 
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...attributes}
             {...listeners}
-            className={`group bg-gray-900 border border-gray-800 p-4 rounded-2xl hover:border-primary-500/50 transition-all cursor-grab active:cursor-grabbing shadow-lg mb-4`}
+            onClick={() => onOpen?.(project.id)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') onOpen?.(project.id);
+            }}
+            className={`group flex items-center gap-2 bg-gray-900 border border-gray-800 border-l-4 ${STATUS_BORDER_COLOR[project.status]} pl-3 pr-2 py-3 rounded-xl hover:border-primary-500/50 hover:bg-gray-800/60 transition-all cursor-grab active:cursor-grabbing shadow-lg mb-3`}
         >
-            <div className="flex justify-between items-start mb-3">
-                <StatusChip type="project" status={project.status} />
+            <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
-                    {budgetCents > 0 && (
-                        <span className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${isProfitable ? 'text-primary-300 bg-primary-500/10 border-primary-500/20' : 'text-red-400 bg-red-500/10 border-red-500/20'}`}>
-                            {formatCurrency(budgetCents)}
-                        </span>
+                    <p className="text-white font-semibold text-sm line-clamp-1">{project.name}</p>
+                    {isOverBudget && (
+                        <AlertTriangleIcon
+                            className="w-3.5 h-3.5 text-red-400 shrink-0"
+                            aria-label="Proyecto por encima de presupuesto"
+                        />
                     )}
-                    <button
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={handleDelete}
-                        title="Eliminar proyecto"
-                        className="p-1 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                        <TrashIcon className="w-3.5 h-3.5" />
-                    </button>
                 </div>
-            </div>
-
-            <div className="text-white font-semibold text-sm line-clamp-1 mb-1">
-    {project.name}
-</div>
-            
-            <p className="text-gray-500 text-xs mb-3 flex items-center gap-1 font-medium">
-                <BriefcaseIcon className="w-3 h-3" /> {clientName || 'Sin cliente'}
-            </p>
-
-            <div className="grid grid-cols-2 gap-2 mb-4">
-                <div className="p-2 rounded-xl bg-gray-800/40 border border-gray-700/50">
-                    <p className="text-[9px] text-gray-500 uppercase font-bold">Invertido</p>
-                    <p className="text-xs font-bold text-gray-200 flex items-center gap-1">
-                        <ClockIcon className="w-3 h-3 text-primary-400" /> {projectHours.toFixed(1)}h
-                    </p>
-                </div>
-                <div className={`p-2 rounded-xl border ${isProfitable ? 'bg-green-500/5 border-green-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
-                    <p className="text-[9px] text-gray-500 uppercase font-bold">Estado Fin.</p>
-                    <p className={`text-xs font-bold ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
-                        {isProfitable ? 'En margen' : 'Excedido'}
-                    </p>
-                </div>
-            </div>
-
-            <div className="space-y-1.5">
-                <div className="flex justify-between text-[10px] font-bold uppercase text-gray-500">
-                    <span>Progreso</span>
-                    <span>{progress}%</span>
-                </div>
-                <div className="w-full bg-gray-800 h-1 rounded-full overflow-hidden">
-                    <div 
+                <p className="text-gray-500 text-xs truncate mt-0.5">{clientName || 'Sin cliente'}</p>
+                <div className="w-full bg-gray-800 h-1 rounded-full overflow-hidden mt-2">
+                    <div
                         className={`h-full transition-all duration-700 ${progress === 100 ? 'bg-green-500' : 'bg-primary-500'}`}
                         style={{ width: `${progress}%` }}
                     />
                 </div>
             </div>
+            <ChevronRightIcon className="w-4 h-4 text-gray-700 group-hover:text-gray-500 transition-colors shrink-0" />
         </div>
     );
 };

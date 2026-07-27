@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/utils';
 import { Project, Task, InvoiceItem } from '@/types';
 import { PlusIcon, TrashIcon, ClockIcon, FileTextIcon, MessageSquareIcon, DollarSignIcon } from '@/components/icons/Icon';
 import EmptyState from '@/components/ui/EmptyState';
+import { useToast } from '@/hooks/useToast';
 
 const ProjectChat = lazy(() => import('@/components/ProjectChat'));
 const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
@@ -17,6 +18,7 @@ const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationMod
 const ProjectDetailPage: React.FC = () => {
     const { projectId } = useParams<{ projectId: string }>();
     const navigate = useNavigate();
+    const { addToast } = useToast();
 
     const {
         getProjectById,
@@ -28,12 +30,19 @@ const ProjectDetailPage: React.FC = () => {
         addTask,
         toggleTask,
         deleteTask,
+        deleteProject,
         updateProjectStatus
     } = useAppStore();
 
     const [newTaskDescription, setNewTaskDescription] = useState('');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+    // FIX: al simplificar la tarjeta del Kanban para que sea más manejable en
+    // móvil, se quitó el botón de borrar de ahí (competía con el gesto de
+    // arrastre). Esta es ahora la única forma de borrar un proyecto — con
+    // confirmación, en vez de un icono suelto pegado al asa de arrastre.
+    const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
+    const [deletingProject, setDeletingProject] = useState(false);
 
     const project = projectId ? getProjectById(projectId) : undefined;
     const client = project ? getClientById(project.client_id) : undefined;
@@ -132,6 +141,18 @@ const ProjectDetailPage: React.FC = () => {
         }
     };
 
+    const handleDeleteProject = async () => {
+        setDeletingProject(true);
+        try {
+            await deleteProject(project.id);
+            navigate('/projects');
+        } catch (err) {
+            addToast('No se pudo eliminar el proyecto.', 'error');
+            setDeletingProject(false);
+            setIsDeleteProjectModalOpen(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -148,6 +169,14 @@ const ProjectDetailPage: React.FC = () => {
                             <DollarSignIcon className="w-4 h-4 mr-2"/> Facturar Presupuesto
                         </Button>
                     )}
+                    <Button
+                        variant="secondary"
+                        onClick={() => setIsDeleteProjectModalOpen(true)}
+                        className="text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                        aria-label="Eliminar proyecto"
+                    >
+                        <TrashIcon className="w-4 h-4" />
+                    </Button>
                 </div>
             </div>
 
@@ -310,6 +339,15 @@ const ProjectDetailPage: React.FC = () => {
                         onConfirm={confirmDelete}
                         title="¿Eliminar Tarea?"
                         message={`¿Estás seguro de que quieres eliminar la tarea: "${taskToDelete?.description}"?`}
+                    />
+                )}
+                {isDeleteProjectModalOpen && (
+                    <ConfirmationModal
+                        isOpen={isDeleteProjectModalOpen}
+                        onClose={() => setIsDeleteProjectModalOpen(false)}
+                        onConfirm={handleDeleteProject}
+                        title="¿Eliminar proyecto?"
+                        message={`Se eliminará "${project.name}" junto a sus tareas, registros de tiempo y contratos. Las facturas y gastos ya emitidos no se borran, solo quedan sin proyecto asociado. Esta acción no se puede deshacer.${deletingProject ? ' Eliminando…' : ''}`}
                     />
                 )}
             </Suspense>

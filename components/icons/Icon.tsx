@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   X,
   Menu,
   LogOut,
@@ -101,6 +102,7 @@ const ICON_MAP: Record<string, React.ComponentType<LucideProps>> = {
   LayoutDashboard,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   X,
   Menu,
   LogOut,
@@ -254,4 +256,5 @@ export {
   Eye as EyeIcon,
   EyeOff as EyeOffIcon,
   Receipt as ReceiptIcon,
+  ChevronRight as ChevronRightIcon,
 };

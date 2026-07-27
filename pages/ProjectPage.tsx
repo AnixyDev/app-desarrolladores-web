@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import { LayoutGrid, List, Plus as PlusIcon, Search as SearchIcon } from 'lucide-react';
 import { ProjectCard } from '@/components/projects/ProjectCard';
@@ -38,9 +39,10 @@ interface KanbanColumnProps {
     projects: Project[];
     getProjectProgress: (id: string) => number;
     getClientName: (clientId: string) => string | undefined;
+    onOpenProject: (id: string) => void;
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ id, label, color, projects, getProjectProgress, getClientName }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ id, label, color, projects, getProjectProgress, getClientName, onOpenProject }) => {
     const { setNodeRef, isOver } = useDroppable({ id });
 
     return (
@@ -68,6 +70,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ id, label, color, projects,
                             project={project}
                             progress={getProjectProgress(project.id)}
                             clientName={getClientName(project.client_id)}
+                            onOpen={onOpenProject}
                         />
                     ))}
                 </div>
@@ -79,6 +82,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ id, label, color, projects,
 const ProjectPage: React.FC = () => {
     const { projects, tasks, clients, getClientById, addProject, updateProject } = useAppStore();
     const { addToast } = useToast();
+    const navigate = useNavigate();
 
     const [viewMode, setViewMode] = useState<'grid' | 'kanban'>('kanban');
     const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
@@ -90,6 +94,18 @@ const ProjectPage: React.FC = () => {
     // Necesario porque con SortableContext separado por columna, dnd-kit no detecta bien
     // el destino solo con onDragEnd al cruzar entre contenedores distintos.
     const [activeDragStatus, setActiveDragStatus] = useState<Record<string, Project['status']>>({});
+
+    // FIX: tras soltar un arrastre real, el navegador puede disparar un
+    // "click" residual sobre la tarjeta bajo el puntero — sin esto, soltar
+    // una tarjeta te mandaría de golpe al detalle del proyecto. Solo se
+    // activa cuando hay un arrastre de verdad (con activationConstraint de
+    // 8px), nunca en un tap simple.
+    const suppressClickRef = useRef(false);
+
+    const handleOpenProject = (projectId: string) => {
+        if (suppressClickRef.current) return;
+        navigate(`/projects/${projectId}`);
+    };
 
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
@@ -149,6 +165,8 @@ const ProjectPage: React.FC = () => {
         }
 
         setActiveDragStatus({});
+        suppressClickRef.current = true;
+        window.setTimeout(() => { suppressClickRef.current = false; }, 150);
     };
 
     const filteredProjects = useMemo(() => {
@@ -247,6 +265,7 @@ const ProjectPage: React.FC = () => {
                                 projects={filteredProjects.filter(p => p.status === column.id)}
                                 getProjectProgress={getProjectProgress}
                                 getClientName={(clientId) => getClientById(clientId)?.name}
+                                onOpenProject={handleOpenProject}
                             />
                         ))}
                     </div>
@@ -258,6 +277,7 @@ const ProjectPage: React.FC = () => {
                                 project={project}
                                 progress={getProjectProgress(project.id)}
                                 clientName={getClientById(project.client_id)?.name}
+                                onOpen={handleOpenProject}
                             />
                         ))}
                     </div>
