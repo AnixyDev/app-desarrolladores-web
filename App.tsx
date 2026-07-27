@@ -4,6 +4,7 @@ import { useAppStore } from './hooks/useAppStore';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import MobileBottomNav from './components/layout/MobileBottomNav';
+import GlobalTimerWidget from './components/timer/GlobalTimerWidget';
 import ToastContainer from './components/ui/Toast';
 import CookieBanner from './components/ui/CookieBanner';
 
@@ -91,19 +92,24 @@ const LoadingFallback = () => (
 // Layout principal de la aplicación (sidebar + header + contenido)
 const MainLayout = () => {
     const [sidebarOpen, setSidebarOpen] = React.useState(false);
+    // Con el cronómetro activo, en móvil aparece además la barra tipo
+    // "mini-player" justo encima del menú inferior — hace falta más espacio
+    // al fondo del contenido para que no quede tapado por las dos barras.
+    const hasActiveTimer = useAppStore(state => !!state.activeTimer);
     return (
         <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden font-sans selection:bg-primary-500/30">
     <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
     <div className="flex-1 flex flex-col min-w-0">
     <Header onMenuClick={() => setSidebarOpen(true)} />
 
-    <main className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 pb-24 md:pb-8 animate-fade-in">
+    <main className={`flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 md:pb-8 animate-fade-in ${hasActiveTimer ? 'pb-40' : 'pb-24'}`}>
                     <Suspense fallback={<div className="flex justify-center py-10"><div className="w-8 h-8 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin"></div></div>}>
                         <Outlet />
                     </Suspense>
                 </main>
             </div>
             <MobileBottomNav onMoreClick={() => setSidebarOpen(true)} />
+            <GlobalTimerWidget />
         </div>
     );
 };

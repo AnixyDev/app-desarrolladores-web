@@ -1,5 +1,14 @@
 // lib/utils.ts
 
+// Usado tanto por /my-timesheet como por el widget global del cronómetro,
+// para que el formato HH:MM:SS sea idéntico se muestre donde se muestre.
+export const formatDuration = (totalSeconds: number): string => {
+  const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
+  const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return `${hours}:${minutes}:${seconds}`;
+};
+
 export const formatCurrency = (cents: number): string => {
     if (typeof cents !== 'number') {
         console.warn('formatCurrency received a non-number value:', cents);

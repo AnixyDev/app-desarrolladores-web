@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Clock, CheckCircle, ListTodo, Calendar, Pause, Play, Plus, GitBranch } from 'lucide-react';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';
+import { useElapsedTime } from '@/hooks/useElapsedTime';
+import { formatDuration } from '@/lib/utils';
 import { Task } from '@/types';
 
 
@@ -17,22 +19,11 @@ const MyTeamTimesheet: React.FC = () => {
   const { tasks, projects, timeEntries, addTimeEntry, toggleTask, teamMembership, activeTimer, startTimer, stopTimer } = useAppStore();
   const { addToast } = useToast();
 
-  // NUEVO: el cronómetro ya no vive aquí — vive en el store global
-  // (activeTimer), basado en un timestamp de inicio. Esta variable local
-  // solo sirve para refrescar la pantalla cada segundo mientras se está en
-  // esta página; el tiempo real siempre se recalcula desde activeTimer.startedAt,
-  // así que sigue contando aunque se navegue a otra página y se vuelva.
-  const [displayTick, setDisplayTick] = useState(0);
-
-  useEffect(() => {
-    if (!activeTimer) return;
-    const interval = window.setInterval(() => setDisplayTick(t => t + 1), 1000);
-    return () => clearInterval(interval);
-  }, [activeTimer]);
-
-  const elapsedTime = activeTimer ? Math.floor((Date.now() - activeTimer.startedAt) / 1000) : 0;
-  // displayTick solo se usa para forzar el re-render cada segundo (arriba); no se lee directamente.
-  void displayTick;
+  // El cronómetro vive en el store global (activeTimer, con un timestamp de
+  // inicio) — useElapsedTime solo se encarga de refrescar la pantalla cada
+  // segundo mientras esta página está montada. Sigue contando aunque se
+  // navegue a otra página y se vuelva.
+  const elapsedTime = useElapsedTime(activeTimer);
 
   // FIX: antes se mostraban TODAS las tareas/proyectos visibles por RLS
   // (propios + del equipo mezclados), sin distinguir de qué workspace son.
@@ -64,13 +55,6 @@ const MyTeamTimesheet: React.FC = () => {
     if (!teamMembership) return tasks;
     return tasks.filter(t => scopedProjectIds.has(t.project_id));
   }, [tasks, teamMembership, scopedProjectIds]);
-
-  const formatTime = (totalSeconds: number) => {
-    const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
-    const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
-    const seconds = String(totalSeconds % 60).padStart(2, '0');
-    return `${hours}:${minutes}:${seconds}`;
-  };
 
   const handleStart = (task: Task) => {
     if (activeTimer) return; // ya hay uno en marcha
@@ -177,7 +161,7 @@ const MyTeamTimesheet: React.FC = () => {
           <div className="flex flex-col sm:flex-row justify-between items-center">
             <div className="mb-4 sm:mb-0">
               <p className="text-sm uppercase tracking-wider text-fuchsia-500 font-bold">Temporizador Global</p>
-              <h2 className="text-4xl font-extrabold text-white mt-1">{formatTime(elapsedTime)}</h2>
+              <h2 className="text-4xl font-extrabold text-white mt-1">{formatDuration(elapsedTime)}</h2>
               <p className="text-gray-400 text-sm mt-1">
                 {activeTimer ? `Trabajando en: ${activeTimer.description}` : 'Selecciona una tarea para iniciar el tiempo.'}
               </p>
