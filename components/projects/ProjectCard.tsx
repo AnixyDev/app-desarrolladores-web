@@ -50,11 +50,21 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project, progress, cli
         data: { status: project.status }
     });
 
-    const style = {
+    const style: React.CSSProperties = {
         transform: CSS.Translate.toString(transform),
         transition,
         opacity: isDragging ? 0.5 : 1,
         zIndex: isDragging ? 50 : 1,
+        // FIX: sin esto, en móvil el navegador interpreta el gesto de
+        // "mantener pulsado y arrastrar" como una selección de texto nativa
+        // (aparece el menú de copiar/compartir) en vez de dejar que dnd-kit
+        // lo capture como drag. touchAction:'none' evita que el navegador se
+        // adelante; WebkitUserSelect/WebkitTouchCallout quitan el menú
+        // contextual de iOS al mantener pulsado.
+        touchAction: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
+        userSelect: 'none',
     };
 
     return (
