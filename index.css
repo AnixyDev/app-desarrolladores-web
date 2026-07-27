@@ -7,6 +7,10 @@
   color-scheme: dark;
 }
 
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -17,6 +21,11 @@ body {
   background-color: #030712;
   color: #f1f5f9;
   min-height: 100vh;
+  /* Red de seguridad: con 90+ páginas es fácil que algún elemento puntual
+     (un ancho fijo, una tabla sin wrapper, un badge muy largo) se escape del
+     viewport en móvil. Esto no arregla el elemento en cuestión, pero evita
+     que arrastre a toda la página a un scroll horizontal indeseado. */
+  overflow-x: hidden;
 }
 
 #root {

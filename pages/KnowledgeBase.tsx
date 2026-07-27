@@ -156,7 +156,7 @@ const KnowledgeBase: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 className="text-2xl font-semibold text-white flex items-center gap-2"><BookIcon/> Knowledge Base del Equipo</h1>
                     {teamMembership && (
@@ -165,7 +165,7 @@ const KnowledgeBase: React.FC = () => {
                         </p>
                     )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <Button onClick={() => setIsGeneratorModalOpen(true)} variant="secondary"><FileSignatureIcon className="w-4 h-4 mr-2"/>Generar Documento con IA</Button>
                     <Button onClick={() => openModal()}><PlusIcon className="w-4 h-4 mr-2"/>Nuevo Artículo</Button>
                 </div>

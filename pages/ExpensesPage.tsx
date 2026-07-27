@@ -131,9 +131,9 @@ const ExpensesPage: React.FC = () => {
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
                 <h1 className="text-2xl font-semibold text-white">Gastos</h1>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <Button onClick={() => setIsOcrModalOpen(true)} variant="secondary">
                         <SparklesIcon className="w-4 h-4 mr-2" /> Escanear Ticket (IA)
                     </Button>
@@ -220,7 +220,7 @@ const ExpensesPage: React.FC = () => {
             <Modal isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} title="Añadir Nuevo Gasto">
                 <form onSubmit={handleExpenseSubmit} className="space-y-4">
                     <Input name="description" label="Descripción" value={newExpense.description} onChange={handleExpenseChange} required />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Input name="amount_cents" label="Importe (€)" type="number" step="0.01" value={newExpense.amount_cents} onChange={handleExpenseChange} required />
                         <Input name="tax_percent" label="IVA Soportado (%)" type="number" value={newExpense.tax_percent} onChange={handleExpenseChange} />
                     </div>

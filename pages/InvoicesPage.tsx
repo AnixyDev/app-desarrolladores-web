@@ -655,7 +655,7 @@ const handleSelectBudget = (budgetId: string) => {
           </div>
 
           {/* IVA / IRPF */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">IVA (%)</label>
               <input

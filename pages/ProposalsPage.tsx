@@ -389,7 +389,7 @@ const ProposalsPage: React.FC = () => {
             <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Título del Proyecto</label>
             <input type="text" name="title" value={form.title} onChange={handleChange} placeholder="Ej: Desarrollo de App Móvil" required className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white focus:border-primary-500 outline-none" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1">Presupuesto (€)</label>
               <input type="number" name="amount_cents" value={form.amount_cents} onChange={handleChange} min={0} step={0.01} placeholder="0.00" required className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white focus:border-primary-500 outline-none" />

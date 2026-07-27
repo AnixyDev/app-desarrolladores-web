@@ -197,9 +197,9 @@ const CreateInvoicePage: React.FC = () => {
     <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto pb-20">
 
       {/* Cabecera */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-white">Nueva Factura</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="button" variant="secondary" onClick={() => navigate('/invoices')}>
             Descartar
           </Button>
