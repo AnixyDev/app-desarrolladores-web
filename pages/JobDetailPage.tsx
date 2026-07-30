@@ -1,6 +1,7 @@
 // pages/JobDetailPage.tsx
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -23,8 +24,16 @@ const JobDetailPage: React.FC = () => {
     useEffect(() => {
         if (job) {
             import('marked').then(markedModule => {
-                const html = markedModule.marked.parse(job.descripcionLarga || job.descripcionCorta || '') as string;
-                setDescriptionHtml(html);
+                const rawHtml = markedModule.marked.parse(job.descripcionLarga || job.descripcionCorta || '') as string;
+                // Sanitiza SIEMPRE contenido generado por usuarios antes de inyectarlo en el DOM.
+                // La descripción de la oferta la escribe el cliente que la publica: sin esto,
+                // cualquiera podría meter <script>/onerror y ejecutar código en el navegador
+                // de quien vea la oferta (XSS almacenado).
+                const cleanHtml = DOMPurify.sanitize(rawHtml, {
+                    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'a', 'h1', 'h2', 'h3', 'h4', 'blockquote', 'code', 'pre'],
+                    ALLOWED_ATTR: ['href', 'target', 'rel'],
+                });
+                setDescriptionHtml(cleanHtml);
             });
         }
     }, [job]);
