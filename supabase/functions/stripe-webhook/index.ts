@@ -24,12 +24,23 @@ const TEAMS_PLAN_WELCOME_CREDITS = 200
 // creditos en vez de los 200 prometidos en /billing. Estos sets mapean los
 // price_id reales de Stripe (ver STRIPE_ITEMS en services/stripeService.ts)
 // al plan correcto.
+// CAMBIO (subida de precios, ago 2026): se AÑADEN los price_id nuevos sin
+// quitar los antiguos. Los suscriptores que ya estaban en 3,95€/35,95€/295€
+// siguen pagando esos importes y sus webhooks de renovación siguen
+// trayendo esos price_id de siempre — si los quitáramos de estos sets,
+// resolvePlanFromPriceId() devolvería null en su próxima renovación y
+// perderían el plan reconocido. Solo se AÑADEN los nuevos para que los
+// suscriptores nuevos (9,95€/99,95€/45,95€/395€) también resuelvan bien.
 const PRO_PRICE_IDS = new Set([
-  'price_1SOgUF8oC5awQy15dOEM5jGS', // Pro Plan (mensual)
+  'price_1SOgUF8oC5awQy15dOEM5jGS', // Pro Plan (mensual, legado 3,95€ — suscriptores antiguos)
+  'price_1U0juK8oC5awQy15YPiUjnn2', // Pro Plan (mensual, 9,95€)
+  'price_1U0juP8oC5awQy15fzLhBWOd', // Pro Plan (anual, 99,95€ — nuevo)
 ])
 const TEAMS_PRICE_IDS = new Set([
-  'price_1SOggV8oC5awQy15YW1wAgcg', // Plan de equipos (mensual)
-  'price_1TqEIe8oC5awQy15hnNqSypf', // Plan de equipos (anual)
+  'price_1SOggV8oC5awQy15YW1wAgcg', // Plan de equipos (mensual, legado 35,95€ — suscriptores antiguos)
+  'price_1TqEIe8oC5awQy15hnNqSypf', // Plan de equipos (anual, legado 295€ — suscriptores antiguos)
+  'price_1U0juV8oC5awQy15ATm0EYe4', // Plan de equipos (mensual, 45,95€)
+  'price_1U0jub8oC5awQy15QXzf5Vgp', // Plan de equipos (anual, 395€)
 ])
 
 function resolvePlanFromPriceId(priceId: string | undefined | null): 'Pro' | 'Teams' | null {

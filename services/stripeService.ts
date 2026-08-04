@@ -60,20 +60,31 @@ export const getStripe = () => {
    Catálogo de productos
 -------------------------- */
 
+// CAMBIO (subida de precios, ago 2026): priceId de proPlan y teamsPlan
+// actualizados a los nuevos importes (9,95€/mes y 45,95€/mes). Se añade
+// proPlanYearly, que antes no existía. teamsPlanYearly actualizado a 395€.
+// Los price_id ANTIGUOS se desactivaron en Stripe (ya no admiten checkouts
+// nuevos), pero los suscriptores que ya los tenían contratados siguen
+// pagando su importe de siempre — no se les ha tocado nada.
 export const STRIPE_ITEMS = {
   proPlan: {
-    priceId: 'price_1SOgUF8oC5awQy15dOEM5jGS',
+    priceId: 'price_1U0juK8oC5awQy15YPiUjnn2', // 9,95€/mes
     mode: 'subscription' as const,
     name: 'Pro Plan',
   },
+  proPlanYearly: {
+    priceId: 'price_1U0juP8oC5awQy15fzLhBWOd', // 99,95€/año — nuevo, antes no existía
+    mode: 'subscription' as const,
+    name: 'Pro Plan (Anual)',
+  },
   teamsPlan: {
-    priceId: 'price_1SOggV8oC5awQy15YW1wAgcg',
+    priceId: 'price_1U0juV8oC5awQy15ATm0EYe4', // 45,95€/mes
     mode: 'subscription' as const,
     name: 'Plan de equipos (Mensual)',
   },
   teamsPlanYearly: {
-    priceId: 'price_1TqEIe8oC5awQy15hnNqSypf', // 🆕 Price recurrente anual real (antes era one_time)
-    mode: 'subscription' as const,               // 🔧 antes: 'payment' — bug corregido
+    priceId: 'price_1U0jub8oC5awQy15QXzf5Vgp', // 395€/año
+    mode: 'subscription' as const,
     name: 'Plan de equipos (Anual)',
 },
   aiCredits100: {

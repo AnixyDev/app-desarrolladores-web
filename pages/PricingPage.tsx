@@ -9,6 +9,10 @@
 // comprobaciones que evitan volver a desincronizarse: los límites del plan
 // Free que se muestran aquí son los que de verdad aplica el código (1
 // cliente — no "3 proyectos", que nunca estuvo implementado).
+//
+// CAMBIO (subida de precios, ago 2026): Freelancer Pro 3,95€→9,95€/mes,
+// nueva opción anual 99,95€ (antes no existía, se quitó el aviso de "solo
+// mensual"). Studio Team 35,95€→45,95€/mes, 295€→395€/año.
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Logo } from '@/components/icons/Logo';
@@ -104,9 +108,8 @@ const PricingPage: React.FC = () => {
           />
           <PlanCard
             title="Freelancer Pro"
-            price="3,95€"
-            period="mes"
-            priceNote={billingCycle === 'yearly' ? 'Este plan solo está disponible con facturación mensual.' : undefined}
+            price={billingCycle === 'monthly' ? '9,95€' : '99,95€'}
+            period={billingCycle === 'monthly' ? 'mes' : 'año'}
             description="Todo lo que necesitas para escalar tu negocio."
             features={["Proyectos e Hitos ilimitados", "Facturación AEAT (TicketBAI ready)", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
             ctaLabel="Empezar con Pro"
@@ -115,7 +118,7 @@ const PricingPage: React.FC = () => {
           />
           <PlanCard
             title="Studio Team"
-            price={billingCycle === 'monthly' ? '35,95€' : '295€'}
+            price={billingCycle === 'monthly' ? '45,95€' : '395€'}
             period={billingCycle === 'monthly' ? 'mes' : 'año'}
             recommended
             description="Para equipos y agencias en crecimiento."
