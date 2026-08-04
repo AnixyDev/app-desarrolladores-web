@@ -24,6 +24,7 @@ export const SIDEBAR_STRUCTURE: SidebarItem[] = [
   { type: 'link', href: '/', label: 'Dashboard', icon: 'LayoutDashboard' },
   { type: 'link', href: '/clients', label: 'Clientes', icon: 'Users' },
   { type: 'link', href: '/projects', label: 'Proyectos', icon: 'Briefcase' },
+  { type: 'link', href: 'https://captacion.devfreelancer.app/dashboard', label: 'Lead Hunter PRO', icon: 'Radar' },
   { type: 'link', href: '/time-tracking', label: 'Time Tracking', icon: 'Clock' },
 
   {
