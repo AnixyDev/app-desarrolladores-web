@@ -28,10 +28,6 @@ const BillingPage: React.FC = () => {
 
         if (paymentStatus === 'success') {
             addToast('¡Pago completado con éxito!', 'success');
-            // El webhook de Stripe es la fuente de verdad (puede tardar
-            // unos segundos en procesarse); refrescamos perfil (plan/
-            // créditos) y ofertas (por si fue para destacar un job post)
-            // para reflejarlo en cuanto esté disponible.
             refreshProfile();
             fetchJobs();
         } else if (paymentStatus === 'cancelled') {
@@ -67,6 +63,15 @@ const BillingPage: React.FC = () => {
     const isPro = profile.plan === 'Pro';
     const isTeams = profile.plan === 'Teams';
 
+    // CAMBIO: profiles.plan solo guarda 'Pro' | 'Teams', sin distinguir
+    // mensual de anual. Antes, si ya eras Pro (mensual) y cambiabas el
+    // toggle a "Anual", el botón se quedaba deshabilitado sin ninguna
+    // acción posible. Además, aunque se hubiera "desbloqueado" a las
+    // bravas, pulsar "Seleccionar Plan" habría creado una SEGUNDA
+    // suscripción en Stripe en vez de modificar la existente (doble
+    // cobro). La forma correcta de cambiar de ciclo (o cancelar) en una
+    // suscripción ya activa es el Customer Portal de Stripe — así que
+    // cuando la tarjeta es "isCurrent", el botón ahora abre el portal.
     const SubscriptionCard = ({ plan, title, price, period, features, isCurrent, itemKey, icon: Icon, recommended, priceNote }: any) => (
         <div className={`relative flex flex-col p-6 sm:p-8 bg-gray-900 rounded-3xl border transition-all duration-300 ${isCurrent ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-gray-800 hover:border-gray-700 hover:shadow-2xl shadow-black'}`}>
             {recommended && (
@@ -93,12 +98,16 @@ const BillingPage: React.FC = () => {
                     </li>
                 ))}
             </ul>
-            <Button 
-                onClick={() => handlePurchase(itemKey)} 
-                disabled={!!isLoadingAction || isCurrent} 
-                className={`w-full h-12 rounded-xl text-sm font-bold transition-all ${isCurrent ? 'bg-gray-800 text-gray-500 cursor-default opacity-50' : recommended ? '!bg-white !text-black hover:scale-[1.02] active:scale-[0.98]' : 'bg-gray-800 hover:bg-gray-700'}`}
+            <Button
+                onClick={() => isCurrent ? handleOpenPortal() : handlePurchase(itemKey)}
+                disabled={!!isLoadingAction || (isCurrent && isPortalLoading)}
+                className={`w-full h-12 rounded-xl text-sm font-bold transition-all ${isCurrent ? 'bg-gray-800 border border-primary-500/40 text-primary-300 hover:bg-gray-700' : recommended ? '!bg-white !text-black hover:scale-[1.02] active:scale-[0.98]' : 'bg-gray-800 hover:bg-gray-700'}`}
             >
-                {isLoadingAction === itemKey ? <RefreshCwIcon className="w-5 h-5 animate-spin mx-auto"/> : isCurrent ? 'Plan Actual' : 'Seleccionar Plan'}
+                {isLoadingAction === itemKey
+                    ? <RefreshCwIcon className="w-5 h-5 animate-spin mx-auto"/>
+                    : isCurrent
+                        ? (isPortalLoading ? <RefreshCwIcon className="w-5 h-5 animate-spin mx-auto"/> : 'Gestionar en el portal')
+                        : 'Seleccionar Plan'}
             </Button>
         </div>
     );
@@ -134,16 +143,20 @@ const BillingPage: React.FC = () => {
                 ) : (
                     <>
                         <SubscriptionCard
-                            plan="Pro" title="Freelancer Pro" price="3,95€" period="mes"
-                            priceNote={billingCycle === 'yearly' ? 'Este plan solo está disponible con facturación mensual.' : undefined}
+                            plan="Pro" title="Freelancer Pro"
+                            price={billingCycle === 'monthly' ? '9,95€' : '99,95€'}
+                            period={billingCycle === 'monthly' ? 'mes' : 'año'}
+                            priceNote={isPro ? 'Ya tienes este plan. Cambia el ciclo de facturación desde el portal.' : undefined}
                             features={["Proyectos e Hitos ilimitados", "Facturación AEAT (TicketBAI ready)", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
-                            isCurrent={isPro} itemKey="proPlan" icon={CreditCard}
+                            isCurrent={isPro}
+                            itemKey={billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly'}
+                            icon={CreditCard}
                         />
                         <SubscriptionCard
                             plan="Teams" title="Studio Team" recommended={true}
-                            // CORRECCIÓN: Mostramos el precio real que espera Stripe para evitar el error 400
-                            price={billingCycle === 'monthly' ? "35,95€" : "295€"}
+                            price={billingCycle === 'monthly' ? "45,95€" : "395€"}
                             period={billingCycle === 'monthly' ? "mes" : "año"}
+                            priceNote={isTeams ? 'Ya tienes este plan. Cambia el ciclo de facturación desde el portal.' : undefined}
                             features={["Hasta 5 miembros de equipo", "Roles y permisos avanzados", "Integraciones con Slack y Webhooks", "200 Créditos IA compartidos"]}
                             isCurrent={isTeams} itemKey={billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly'} icon={Users}
                         />
