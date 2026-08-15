@@ -53,14 +53,25 @@ async function buildInvoiceQrDataUrl(profile: Profile, invoice: Invoice): Promis
   return QRCode.toDataURL(qrUrl, { errorCorrectionLevel: 'M', margin: 2, width: 300 });
 }
 
-export const generateInvoicePdf = async (invoice: Invoice, client: Client, profile: Profile, fiscalData?: FiscalPdfData | null) => {
+// CAMBIO: se extrae TODO el dibujo del PDF de factura a esta función interna,
+// que devuelve el objeto `jsPDF` sin guardarlo/descargarlo. Antes esta lógica
+// vivía directamente dentro de `generateInvoicePdf` y terminaba siempre en
+// `doc.save(...)`, lo que hacía imposible obtener los bytes para adjuntar en
+// un email real (mailto: nunca pudo adjuntar archivos — limitación del
+// navegador/SO, no del código, como ya se documentó aquí antes).
+async function buildInvoicePdfDocument(
+    invoice: Invoice,
+    client: Client,
+    profile: Profile,
+    fiscalData?: FiscalPdfData | null
+): Promise<jsPDF> {
     const autoTable = resolveAutoTable();
     const doc = new jsPDF();
-    
+
     // Cálculos dinámicos basados en los items reales
     const totals = calculateInvoiceTotals(
-        invoice.items, 
-        invoice.tax_percent || 0, 
+        invoice.items,
+        invoice.tax_percent || 0,
         invoice.irpf_percent || 0
     );
 
@@ -90,7 +101,7 @@ export const generateInvoicePdf = async (invoice: Invoice, client: Client, profi
     doc.setFontSize(22);
     doc.setFont('helvetica', 'bold');
     doc.text(profile.business_name || profile.full_name, headerLeftX, 22);
-    
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(profile.full_name, headerLeftX, 30);
@@ -101,7 +112,7 @@ export const generateInvoicePdf = async (invoice: Invoice, client: Client, profi
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.text(fiscalData?.modalidad === 'verifactu' ? 'FACTURA (VERI*FACTU)' : 'FACTURA', 200, 22, { align: 'right' });
-    
+
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(`Nº: ${invoice.invoice_number}`, 200, 30, { align: 'right' });
@@ -146,9 +157,9 @@ export const generateInvoicePdf = async (invoice: Invoice, client: Client, profi
 
     doc.text(`IVA (${invoice.tax_percent}%):`, labelX, finalY + 7, { align: 'right' });
     doc.text(formatCurrency(totals.taxAmount), valueX, finalY + 7, { align: 'right' });
-    
+
     let currentY = finalY + 14;
-    
+
     if (totals.irpfAmount > 0) {
         doc.text(`IRPF (-${invoice.irpf_percent}%):`, labelX, currentY, { align: 'right' });
         doc.text(`-${formatCurrency(totals.irpfAmount)}`, valueX, currentY, { align: 'right' });
@@ -159,7 +170,7 @@ export const generateInvoicePdf = async (invoice: Invoice, client: Client, profi
     doc.setFontSize(12);
     doc.text('TOTAL:', labelX, currentY, { align: 'right' });
     doc.text(formatCurrency(totals.total), valueX, currentY, { align: 'right' });
-    
+
     // --- Footer ---
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
@@ -168,8 +179,31 @@ export const generateInvoicePdf = async (invoice: Invoice, client: Client, profi
         doc.setFontSize(6);
         doc.text(`Huella: ${fiscalData.hash}`, 14, 290);
     }
-    
+
+    return doc;
+}
+
+// Comportamiento IDÉNTICO al de antes: genera y fuerza la descarga del PDF.
+// Usado por el botón "Descargar PDF" — sin cambios funcionales, solo delega
+// el dibujo a buildInvoicePdfDocument().
+export const generateInvoicePdf = async (invoice: Invoice, client: Client, profile: Profile, fiscalData?: FiscalPdfData | null) => {
+    const doc = await buildInvoicePdfDocument(invoice, client, profile, fiscalData);
     doc.save(`Factura-${invoice.invoice_number}.pdf`);
+};
+
+// CAMBIO: NUEVO. Genera el mismo PDF pero devuelve el contenido en base64
+// (sin el prefijo `data:application/pdf;base64,`) listo para mandarlo como
+// adjunto a la Edge Function `send-document-email`. No descarga nada ni
+// toca el DOM — solo genera bytes en memoria.
+export const generateInvoicePdfBase64 = async (
+    invoice: Invoice,
+    client: Client,
+    profile: Profile,
+    fiscalData?: FiscalPdfData | null
+): Promise<string> => {
+    const doc = await buildInvoicePdfDocument(invoice, client, profile, fiscalData);
+    const dataUri = doc.output('datauristring'); // "data:application/pdf;base64,JVBERi0xLjMK..."
+    return dataUri.split(',')[1];
 };
 
 // NUEVO: recibo de pago suelto (no ligado a una factura formal). Pensado

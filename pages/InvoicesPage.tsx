@@ -11,8 +11,8 @@ import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIco
 import { useToast } from '@/hooks/useToast';
 import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal';
 import CreateRecurringInvoiceModal from '@/components/modals/CreateRecurringInvoiceModal';
-import { generateInvoicePdf } from '@/services/pdfService';
-import { sendEmail } from '@/services/emailService';
+import { generateInvoicePdf, generateInvoicePdfBase64 } from '@/services/pdfService';
+import { sendEmail, sendDocumentEmail } from '@/services/emailService';
 
 interface PaymentSummary {
   paidCents: number;
@@ -254,8 +254,9 @@ const handleSelectBudget = (budgetId: string) => {
       return;
     }
 
+    let pdfBase64: string;
     try {
-      await generateInvoicePdf(invoice, client, profile, getFiscalDataForInvoice(invoice.id));
+      pdfBase64 = await generateInvoicePdfBase64(invoice, client, profile, getFiscalDataForInvoice(invoice.id));
     } catch (error) {
       console.error('Error generando el PDF:', error);
       addToast('No se pudo generar el PDF de la factura.', 'error');
@@ -263,9 +264,21 @@ const handleSelectBudget = (budgetId: string) => {
     }
 
     const subject = `Factura ${invoice.invoice_number}`;
-    const body = `Hola ${client.name},\n\nTe envío la factura ${invoice.invoice_number} por un importe de ${formatCurrency(invoice.total_cents)}. Adjunto el PDF a este email.\n\nUn saludo.`;
-    sendEmail(client.email, subject, body);
-    addToast('PDF descargado y borrador de email abierto. Adjunta el PDF descargado antes de enviarlo.', 'success');
+    const html = `<p>Hola ${client.name},</p><p>Te envío la factura ${invoice.invoice_number} por un importe de ${formatCurrency(invoice.total_cents)}. La encontrarás adjunta en este email.</p><p>Un saludo.</p>`;
+
+    try {
+      await sendDocumentEmail({
+        to: client.email,
+        subject,
+        html,
+        pdfBase64,
+        filename: `Factura-${invoice.invoice_number}.pdf`,
+      });
+      addToast('Email enviado con la factura adjunta.', 'success');
+    } catch (error) {
+      console.error('Error enviando el email:', error);
+      addToast('No se pudo enviar el email. Inténtalo de nuevo.', 'error');
+    }
   };
 
   const handleDeleteInvoice = async (id: string) => {
