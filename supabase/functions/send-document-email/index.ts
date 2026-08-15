@@ -11,7 +11,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
-const FROM_ADDRESS = 'facturas@devfreelancer.app'; // CONFIRMAR: ¿es esta la dirección que quieres usar como remitente?
+// CAMBIO: ya no hay remitente/reply-to fijos — se resuelven por usuario más
+// abajo, leyendo su fila de `profiles`. `from` sigue obligado a usar el
+// dominio verificado en Resend (devfreelancer.app), pero el nombre visible
+// y el reply_to sí son por usuario.
+const FROM_DOMAIN_ADDRESS = 'facturas@devfreelancer.app';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,6 +60,27 @@ Deno.serve(async (req) => {
       });
     }
 
+    // CAMBIO: resolver remitente visible y reply-to por usuario. `invoice_reply_to_email`
+    // es opcional (configurable en Ajustes) — si el usuario no lo ha rellenado,
+    // se cae al email de su cuenta, que siempre existe.
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('business_name, full_name, email, invoice_reply_to_email')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      console.error('No se pudo cargar el perfil del usuario:', profileError);
+      return new Response(JSON.stringify({ error: 'No se pudo cargar tu perfil' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const displayName = profile.business_name || profile.full_name || 'Devfreelancer';
+    const fromAddress = `${displayName} <${FROM_DOMAIN_ADDRESS}>`;
+    const replyToAddress = profile.invoice_reply_to_email || profile.email;
+
     // 2. Validar payload
     const payload: SendDocumentEmailPayload = await req.json();
     const { to, subject, html, attachmentBase64, attachmentFilename } = payload;
@@ -85,7 +110,8 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: FROM_ADDRESS,
+        from: fromAddress,
+        reply_to: replyToAddress,
         to: [to],
         subject,
         html,
