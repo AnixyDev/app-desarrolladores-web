@@ -13,6 +13,9 @@ export interface Profile {
   email: string;
   business_name: string;
   tax_id: string;
+  // NUEVO: reply-to configurable para emails de facturas/propuestas/presupuestos.
+  // Si es undefined/vacío, el backend usa 'email' como fallback.
+  invoice_reply_to_email?: string;
   address?: string;
   // NUEVO: domicilio fiscal completo — 'address' nunca llegó a
   // implementarse en la base de datos pese a estar en el tipo; estos

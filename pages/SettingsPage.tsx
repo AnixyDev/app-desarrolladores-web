@@ -26,6 +26,7 @@ const SettingsPage: React.FC = () => {
     fiscal_postal_code: profile?.fiscal_postal_code || '',
     fiscal_city: profile?.fiscal_city || '',
     fiscal_province: profile?.fiscal_province || '',
+    invoice_reply_to_email: profile?.invoice_reply_to_email || '',
   });
 
   const [notifData, setNotifData] = useState({
@@ -278,6 +279,18 @@ const SettingsPage: React.FC = () => {
                         value={formData.tax_id}
                         onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
                       />
+                    </div>
+                    <div className="grid grid-cols-1 gap-4">
+                      <Input
+                        label="Responder-a para facturas y propuestas"
+                        type="email"
+                        placeholder={profile?.email || 'tu@email.com'}
+                        value={formData.invoice_reply_to_email}
+                        onChange={(e) => setFormData({ ...formData, invoice_reply_to_email: e.target.value })}
+                      />
+                      <p className="text-xs text-gray-500 -mt-2">
+                        Si lo dejas vacío, se usará tu email de cuenta ({profile?.email}).
+                      </p>
                     </div>
 
                     <div className="pt-2 border-t border-gray-800">
