@@ -1,5 +1,5 @@
 // pages/ContractsPage.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -17,8 +17,15 @@ const ContractsPage: React.FC = () => {
   const {
     profile, contracts, clients, projects,
     addContract, updateContract, deleteContract, sendContract,
-    getClientById, getProjectById,
+    getClientById, getProjectById, subscribeToContractsRealtime,
   } = useAppStore();
+  // CAMBIO: NUEVO. Activa la suscripción de Realtime al montar la página,
+  // y la limpia al desmontar — así el estado "Firmado" aparece al instante
+  // cuando el cliente firma desde el portal, sin recargar manualmente.
+  useEffect(() => {
+    const unsubscribe = subscribeToContractsRealtime();
+    return () => unsubscribe();
+  }, [subscribeToContractsRealtime]);
   const { addToast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);

@@ -70,6 +70,7 @@ export interface FinanceSlice {
   deleteContract: (id: string) => Promise<void>;
   sendContract: (id: string) => Promise<void>;
   signContract: (id: string, signerName: string) => Promise<void>;
+  subscribeToContractsRealtime: () => () => void;
 
   // Recibos: cobros sueltos no ligados a una factura formal (trabajos
   // informales, arreglos puntuales) — el cliente se queda con el PDF como
@@ -499,6 +500,49 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
           : c
       ),
     }));
+  },
+  // CAMBIO: NUEVO. Suscripción de Realtime a la tabla contracts, para que
+  // cuando el cliente firme desde el portal (sesión de navegador distinta a
+  // la del freelancer) el cambio se refleje al instante en ContractsPage sin
+  // necesidad de recargar la página a mano. Requiere que la tabla esté
+  // añadida a la publicación supabase_realtime (ya aplicado por migración).
+  subscribeToContractsRealtime: () => {
+    const userId = get().profile?.id;
+    if (!userId) {
+      return () => {};
+    }
+
+    const channel = supabase
+      .channel(`contracts-changes-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'contracts', filter: `user_id=eq.${userId}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newContract = payload.new as Contract;
+            set(state =>
+              state.contracts.some(c => c.id === newContract.id)
+                ? state
+                : { contracts: [newContract, ...state.contracts] }
+            );
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = payload.new as Contract;
+            set(state => ({
+              contracts: state.contracts.map(c => (c.id === updated.id ? { ...c, ...updated } : c)),
+            }));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as { id: string }).id;
+            set(state => ({
+              contracts: state.contracts.filter(c => c.id !== deletedId),
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   },
 
   addReceipt: async (receiptData) => {
