@@ -26,8 +26,8 @@ interface SendDocumentEmailPayload {
   to: string;
   subject: string;
   html: string;
-  attachmentBase64: string; // PDF sin el prefijo data:application/pdf;base64,
-  attachmentFilename: string;
+  attachmentBase64?: string; // opcional — PDF sin el prefijo data:application/pdf;base64,
+  attachmentFilename?: string;
 }
 
 Deno.serve(async (req) => {
@@ -85,8 +85,14 @@ Deno.serve(async (req) => {
     const payload: SendDocumentEmailPayload = await req.json();
     const { to, subject, html, attachmentBase64, attachmentFilename } = payload;
 
-    if (!to || !subject || !attachmentBase64 || !attachmentFilename) {
+    if (!to || !subject) {
       return new Response(JSON.stringify({ error: 'Faltan campos obligatorios' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    if ((attachmentBase64 && !attachmentFilename) || (!attachmentBase64 && attachmentFilename)) {
+      return new Response(JSON.stringify({ error: 'Adjunto incompleto: faltan datos o nombre de archivo' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -103,25 +109,30 @@ Deno.serve(async (req) => {
       });
     }
 
+    const resendBody: Record<string, unknown> = {
+      from: fromAddress,
+      reply_to: replyToAddress,
+      to: [to],
+      subject,
+      html,
+    };
+
+    if (attachmentBase64 && attachmentFilename) {
+      resendBody.attachments = [
+        {
+          filename: attachmentFilename,
+          content: attachmentBase64,
+        },
+      ];
+    }
+
     const resendResponse = await fetch(RESEND_API_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${resendApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        from: fromAddress,
-        reply_to: replyToAddress,
-        to: [to],
-        subject,
-        html,
-        attachments: [
-          {
-            filename: attachmentFilename,
-            content: attachmentBase64,
-          },
-        ],
-      }),
+      body: JSON.stringify(resendBody),
     });
 
     const resendData = await resendResponse.json();

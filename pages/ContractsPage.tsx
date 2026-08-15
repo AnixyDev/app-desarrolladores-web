@@ -6,6 +6,8 @@ import Button from '@/components/ui/Button';
 import StatusChip from '@/components/ui/StatusChip';
 import { Contract } from '@/types';
 import { useToast } from '@/hooks/useToast';
+import { generateContractPdf, generateContractPdfBase64 } from '@/services/pdfService';
+import { sendDocumentEmail } from '@/services/emailService';
 
 import ContractFormModal from '@/components/contracts/ContractFormModal';
 import ContractSignModal from '@/components/contracts/ContractSignModal';
@@ -77,6 +79,10 @@ const ContractsPage: React.FC = () => {
     }
   };
 
+  // CAMBIO: ya no abre mailto: — actualiza el estado, genera el PDF del
+  // contrato en memoria (pdfService.ts) y lo envía por email real (con el
+  // link de firma en el cuerpo Y el PDF adjunto) vía la Edge Function
+  // send-document-email.
   const handleSend = async (contract: Contract) => {
     const client = getClientById(contract.client_id);
     const project = getProjectById(contract.project_id);
@@ -90,24 +96,31 @@ const ContractsPage: React.FC = () => {
       addToast((err as Error).message || 'No se pudo actualizar el estado del contrato.', 'error');
       return;
     }
-    addToast('Estado actualizado a Enviado.', 'success');
+
     const portalLink = `${window.location.origin}/portal/contracts/${contract.id}`;
     const subject = `Contrato para el proyecto "${project.name}"`;
-    const body = `Hola ${client.name},\n\nTe envío el contrato para nuestro proyecto "${project.name}".\n\nPuedes revisarlo y firmarlo digitalmente aquí:\n${portalLink}\n\nSaludos,\n${profile.full_name}`;
-    window.open(`mailto:${client.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, '_blank');
-  };
+    const html = `<p>Hola ${client.name},</p><p>Te envío el contrato para nuestro proyecto "${project.name}".</p><p>Puedes revisarlo y firmarlo digitalmente aquí:<br/><a href="${portalLink}">${portalLink}</a></p><p>Encontrarás también el PDF adjunto para tu archivo.</p><p>Saludos,<br/>${profile.full_name}</p>`;
 
+    try {
+      const pdfBase64 = generateContractPdfBase64(contract);
+      await sendDocumentEmail({
+        to: client.email,
+        subject,
+        html,
+        pdfBase64,
+        filename: `Contrato_${project.name}.pdf`,
+      });
+      addToast('Estado actualizado a Enviado y email enviado con el contrato adjunto.', 'success');
+    } catch (error) {
+      console.error('Error enviando el contrato por email:', error);
+      addToast('El estado se actualizó a Enviado, pero el email no pudo enviarse. Inténtalo de nuevo.', 'error');
+    }
+  };
+  // CAMBIO: usa pdfService.ts (import estático ya cargado en el bundle)
+  // en vez de un import('jspdf') dinámico dentro del propio componente.
   const handleDownload = (contract: Contract) => {
     const project = getProjectById(contract.project_id);
-    import('jspdf').then(({ default: jsPDF }) => {
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const margin = 15;
-      doc.setFontSize(10);
-      const splitText = doc.splitTextToSize(contract.content, pageWidth - margin * 2);
-      doc.text(splitText, margin, 20);
-      doc.save(`Contrato_${project?.name || 'Servicios'}.pdf`);
-    });
+    generateContractPdf(contract, project?.name);
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────

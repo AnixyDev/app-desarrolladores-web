@@ -1,5 +1,5 @@
 // services/pdfService.ts
-import type { Invoice, Client, Profile, Receipt } from '@/types';
+import type { Invoice, Client, Profile, Receipt, Contract } from '@/types';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import * as autoTableNamespace from 'jspdf-autotable';
@@ -203,6 +203,33 @@ export const generateInvoicePdfBase64 = async (
 ): Promise<string> => {
     const doc = await buildInvoicePdfDocument(invoice, client, profile, fiscalData);
     const dataUri = doc.output('datauristring'); // "data:application/pdf;base64,JVBERi0xLjMK..."
+    return dataUri.split(',')[1];
+};
+
+// CAMBIO: extraído de ContractsPage.tsx (handleDownload), que antes hacía un
+// `import('jspdf')` dinámico dentro del propio componente. Se centraliza aquí
+// para poder reutilizar el mismo dibujo tanto al descargar como al adjuntar
+// en el email de "Enviar contrato" (que antes solo mandaba el link, sin PDF).
+function buildContractPdfDocument(contract: Contract): jsPDF {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    doc.setFontSize(10);
+    const splitText = doc.splitTextToSize(contract.content, pageWidth - margin * 2);
+    doc.text(splitText, margin, 20);
+    return doc;
+}
+
+// Comportamiento idéntico al handleDownload original: descarga el PDF.
+export const generateContractPdf = (contract: Contract, projectName?: string) => {
+    const doc = buildContractPdfDocument(contract);
+    doc.save(`Contrato_${projectName || 'Servicios'}.pdf`);
+};
+
+// NUEVO: devuelve el PDF en base64 para adjuntarlo al email de envío del contrato.
+export const generateContractPdfBase64 = (contract: Contract): string => {
+    const doc = buildContractPdfDocument(contract);
+    const dataUri = doc.output('datauristring');
     return dataUri.split(',')[1];
 };
 
