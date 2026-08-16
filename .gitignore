@@ -28,3 +28,4 @@ dist-ssr
 .env.*
 metadata.json
 supabase/.temp/
+bundle-analysis.html
