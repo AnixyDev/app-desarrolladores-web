@@ -24,7 +24,16 @@ const NotificationIcon = ({ link }: { link: string }) => {
 };
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
-  const { profile, logout, notifications, markAllAsRead, markAsRead } = useAppStore();
+  // FIX (mismo patrón que App.tsx): antes `useAppStore()` sin selector suscribía
+  // a Header al store COMBINADO completo, re-renderizando en cascada con cada
+  // fetch en segundo plano (clients, projects, jobs...) aunque Header solo
+  // necesite profile/notifications/logout. Selectores individuales limitan
+  // el re-render a cuando ESE campo concreto cambia.
+  const profile = useAppStore(state => state.profile);
+  const notifications = useAppStore(state => state.notifications);
+  const logout = useAppStore(state => state.logout);
+  const markAllAsRead = useAppStore(state => state.markAllAsRead);
+  const markAsRead = useAppStore(state => state.markAsRead);
   const navigate = useNavigate(); // Hook para redirección
 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
