@@ -115,21 +115,36 @@ const MainLayout = () => {
 };
 
 function App() {
-    const { initializeAuth, isAuthenticated, isProfileLoading } = useAppStore();
-    
-    // FIX CRÍTICO: Solo inicializar UNA VEZ cuando la app arranca
+    // FIX CRÍTICO (re-renders x12): antes se hacía `useAppStore()` sin selector,
+    // lo que suscribía a App.tsx al store COMBINADO completo (auth + clients +
+    // projects + finance + team + notifications + jobs + portal + inbox).
+    // Cualquier set() en cualquier slice —incluidos los ~14 fetch en cascada
+    // que dispara initializeAuth() al arrancar (fetchClients, fetchJobs,
+    // fetchProjects, fetchFinanceData, etc.)— forzaba un re-render de App,
+    // aunque App solo lee 3 campos del slice de auth.
+    //
+    // Usar selectores individuales hace que Zustand solo notifique a este
+    // componente cuando ESE valor concreto cambia (comparación por referencia
+    // en cada campo primitivo), en vez de ante cualquier cambio del store.
+    const initializeAuth = useAppStore(state => state.initializeAuth);
+    const isAuthenticated = useAppStore(state => state.isAuthenticated);
+    const isProfileLoading = useAppStore(state => state.isProfileLoading);
+
+    // initializeAuth es estable (definida una sola vez al crear el slice),
+    // así que este efecto se ejecuta una única vez por montaje de App.
     useEffect(() => {
-        console.log("🎬 App.tsx: Inicializando autenticación...");
+        if (import.meta.env.DEV) console.log("🎬 App.tsx: Inicializando autenticación...");
         initializeAuth();
     }, [initializeAuth]);
 
     // Mostrar spinner mientras se verifica si hay sesión
     if (isProfileLoading) {
-        console.log("⏳ App.tsx: Cargando perfil...");
         return <LoadingFallback />;
     }
 
-    console.log("✅ App.tsx: Renderizando rutas. isAuthenticated =", isAuthenticated);
+    if (import.meta.env.DEV) {
+        console.log("✅ App.tsx: Renderizando rutas. isAuthenticated =", isAuthenticated);
+    }
 
     return (
             <>
