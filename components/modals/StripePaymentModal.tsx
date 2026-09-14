@@ -70,23 +70,23 @@ const CheckoutForm: React.FC<{ amount: number; onSuccess: () => void }> = ({ amo
 const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ isOpen, onClose, amountCents, description, itemKey = 'invoicePayment', metadata, onPaymentSuccess }) => {
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [initError, setInitError] = useState<string | null>(null);
+    // NUEVO: profile puede no existir — esta ventana también se usa desde
+    // la página pública de pago de facturas (/pay/:invoiceId), donde el
+    // cliente no tiene ninguna sesión de DevFreelancer. Antes esto
+    // bloqueaba el pago con "Debes iniciar sesión", lo cual no tenía
+    // sentido para un cliente que ni siquiera debería tener cuenta aquí.
     const { profile } = useAppStore();
 
     useEffect(() => {
         if (isOpen && amountCents > 0) {
             const initializePayment = async () => {
-                if (!profile?.id) {
-                    setInitError("Debes iniciar sesión para realizar un pago.");
-                    return;
-                }
-
                 try {
                     setInitError(null);
                     setClientSecret(null);
                     
                     const secret = await createPaymentIntent(
                         amountCents, 
-                        profile.id, 
+                        profile?.id ?? null, 
                         itemKey, 
                         metadata || {}
                     );
