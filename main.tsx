@@ -23,3 +23,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <App />
   </BrowserRouter>
 );
+
+// NUEVO: registro del Service Worker (ver public/sw.js) — necesario tanto
+// para que el navegador ofrezca "Instalar app" (PWA) como para que
+// funcione el botón "Detener" de la notificación del cronómetro (ítem 7
+// del roadmap). Se registra al arrancar, no al iniciar un fichaje, para
+// que esté listo (`navigator.serviceWorker.ready`) desde el primer uso.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => {
+      console.error('No se pudo registrar el Service Worker:', err);
+    });
+  });
+}
