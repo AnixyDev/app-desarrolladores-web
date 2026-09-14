@@ -337,7 +337,7 @@ const handleSelectBudget = (budgetId: string) => {
       return;
     }
 
-    const paymentLink = `${window.location.origin}/portal/invoices/${invoice.id}`;
+    const paymentLink = `${window.location.origin}/pay/${invoice.id}`;
     const subject = `Factura ${invoice.invoice_number}`;
     const html = `<p>Hola ${client.name},</p><p>Te envío la factura ${invoice.invoice_number} por un importe de ${formatCurrency(invoice.total_cents)}. La encontrarás adjunta en este email.</p><p>Puedes pagarla online con tarjeta desde este enlace: <a href="${paymentLink}">${paymentLink}</a></p><p>Un saludo.</p>`;
 
@@ -361,8 +361,12 @@ const handleSelectBudget = (budgetId: string) => {
   // había manera de coger ese enlace suelto (para WhatsApp, un chat, etc.)
   // sin pasar por el email. Copia directamente la URL de la factura en el
   // portal, donde ya está montado el cobro con tarjeta vía Stripe Connect.
+  // CAMBIO: antes apuntaba a /portal/invoices/:id, que exige que el
+  // cliente tenga cuenta y sesión iniciada en el portal. DevFreelancer es
+  // una app para freelancers, no para sus clientes — ahora apunta a la
+  // página pública de pago, sin login (ver PublicInvoicePayPage.tsx).
   const getPaymentLink = (invoice: typeof invoices[number]) =>
-    `${window.location.origin}/portal/invoices/${invoice.id}`;
+    `${window.location.origin}/pay/${invoice.id}`;
 
   const handleCopyPaymentLink = async (invoice: typeof invoices[number]) => {
     try {
