@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
-import { Clock, CheckCircle, ListTodo, Calendar, Pause, Play, Plus, GitBranch } from 'lucide-react';
+import { Clock, CheckCircle, ListTodo, Calendar, Pause, Play, Plus, GitBranch, Bell } from 'lucide-react';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';
 import { useElapsedTime } from '@/hooks/useElapsedTime';
 import { formatDuration } from '@/lib/utils';
 import { Task } from '@/types';
+import { requestTimerNotificationPermission, isTimerNotificationSupported } from '@/services/timerNotifications';
 
 
 interface ManualEntry {
@@ -50,6 +51,21 @@ const MyTeamTimesheet: React.FC = () => {
       billable: true
   };
   const [manualEntry, setManualEntry] = useState<ManualEntry>(initialManualEntry);
+  // NUEVO (ítem 7 del roadmap): permiso de notificaciones del cronómetro.
+  // Se pide solo con este botón explícito, nunca automáticamente.
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+  );
+
+  const handleEnableTimerNotifications = async () => {
+    const result = await requestTimerNotificationPermission();
+    setNotificationPermission(result);
+    if (result === 'granted') {
+      addToast('Avisos de fichaje activados.', 'success');
+    } else if (result === 'denied') {
+      addToast('Notificaciones bloqueadas. Actívalas en los ajustes del navegador si cambias de opinión.', 'error');
+    }
+  };
 
   const relevantTasks = useMemo(() => {
     if (!teamMembership) return tasks;
@@ -145,16 +161,27 @@ const MyTeamTimesheet: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-950 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto">
-        <header className="mb-8 border-b border-gray-800 pb-4">
-          <h1 className="text-3xl font-bold text-white flex items-center">
-            <Clock className="w-7 h-7 text-fuchsia-500 mr-3" />
-            Mi Tiempo y Tareas
-          </h1>
-          <p className="text-gray-400">
-            {teamMembership
-              ? `Registrando horas en el equipo de ${teamMembership.ownerBusinessName || teamMembership.ownerFullName || 'tu equipo'}.`
-              : 'Tu centro de productividad como miembro del equipo.'}
-          </p>
+        <header className="mb-8 border-b border-gray-800 pb-4 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-white flex items-center">
+              <Clock className="w-7 h-7 text-fuchsia-500 mr-3" />
+              Mi Tiempo y Tareas
+            </h1>
+            <p className="text-gray-400">
+              {teamMembership
+                ? `Registrando horas en el equipo de ${teamMembership.ownerBusinessName || teamMembership.ownerFullName || 'tu equipo'}.`
+                : 'Tu centro de productividad como miembro del equipo.'}
+            </p>
+          </div>
+          {isTimerNotificationSupported() && notificationPermission !== 'granted' && (
+            <button
+              onClick={handleEnableTimerNotifications}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-300 hover:border-fuchsia-500/50 transition-colors shrink-0"
+            >
+              <Bell className="w-4 h-4 text-fuchsia-400" />
+              Activar avisos de fichaje
+            </button>
+          )}
         </header>
 
         <div className="bg-gray-900 p-6 rounded-xl shadow-2xl mb-8 border border-gray-800">
