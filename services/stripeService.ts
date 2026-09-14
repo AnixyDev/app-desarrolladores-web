@@ -166,19 +166,23 @@ export const redirectToCheckout = async (
 
 export const createPaymentIntent = async (
   amountCents: number,
-  userId: string,
+  userId: string | null,
   itemKey: string,
   metadata: Record<string, any> = {}
 ) => {
-  if (!userId) throw new Error('Sesión de usuario requerida.');
-
+  // NUEVO: userId ya no es obligatorio. Un cliente que paga desde la
+  // página pública de factura (/pay/:invoiceId) no tiene sesión de
+  // DevFreelancer — ni falta que le hace, esta app es de los freelancers,
+  // no de sus clientes. payment-sheet ya resuelve todo lo necesario
+  // (comisión de Stripe Connect, etc.) a partir de metadata.invoice_id,
+  // sin depender de quién esté logueado.
   const { data, error } = await supabase.functions.invoke(
     'payment-sheet',
     {
       body: {
         amount: Math.round(amountCents),
         description: `Pago ${itemKey}`,
-        metadata: { ...metadata, userId, itemKey },
+        metadata: { ...metadata, ...(userId ? { userId } : {}), itemKey },
       },
       headers: { 'Content-Type': 'application/json' }
     }
