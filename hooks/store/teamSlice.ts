@@ -71,7 +71,8 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
                 role,
                 status,
                 invitedOn:invited_on,
-                hourly_rate_cents
+                hourly_rate_cents,
+                accepted_user_id
             `)
             .order('created_at', { ascending: true });
 
