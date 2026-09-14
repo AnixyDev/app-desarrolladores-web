@@ -73,6 +73,7 @@ export const SIDEBAR_STRUCTURE: SidebarItem[] = [
       { href: '/my-applications', label: 'Mis Postulaciones', icon: 'Send' },
       { href: '/post-job', label: 'Publicar Oferta', icon: 'Plus' },
       { href: '/my-job-posts', label: 'Mis Ofertas', icon: 'Building' },
+      { href: '/template-marketplace', label: 'Marketplace de Plantillas', icon: 'Store' },
     ],
   },
 
@@ -86,7 +87,11 @@ export const SIDEBAR_STRUCTURE: SidebarItem[] = [
       { href: '/team', label: 'Gestionar Equipo', icon: 'Users' },
       { href: '/roles', label: 'Roles y Permisos', icon: 'Shield' },
       { href: '/knowledge-base', label: 'Knowledge Base', icon: 'BrainCircuit' },
-      { href: '/my-timesheet', label: 'Mi Hoja de Horas', icon: 'Clock' },
+      // CAMBIO: /my-timesheet se eliminó (era una ruta duplicada — el
+      // cronómetro en vivo se movió a /time-tracking, ver
+      // TimeTrackingPage.tsx). Este enlace apuntaba ahí y se habría
+      // quedado roto (404) si no se actualizaba también aquí.
+      { href: '/time-tracking', label: 'Mi Hoja de Horas', icon: 'Clock' },
     ],
   },
 
