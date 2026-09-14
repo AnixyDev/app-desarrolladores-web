@@ -33,6 +33,12 @@ serve(async (req) => {
     )
 
     const { amount, description, metadata } = await req.json()
+    // IMPORTANTE: para compras de plantillas del marketplace, 'amount' del
+    // cliente NUNCA se usa tal cual para cobrar — se sobreescribe más abajo
+    // con el precio real guardado en la BD. Si no, cualquiera podría
+    // manipular el importe antes de pagar. finalAmount es lo único que se
+    // usa realmente al crear el PaymentIntent.
+    let finalAmount = Number(amount)
 
     // Optional: Get user to attach to customer, or create guest customer
     const { data: { user } } = await supabaseClient.auth.getUser()
@@ -90,8 +96,64 @@ serve(async (req) => {
       }
     }
 
+    // NUEVO (ítem 8 del roadmap): compra de plantillas del marketplace
+    // entre freelancers. Mismo patrón de destination charge que las
+    // facturas — el vendedor de la plantilla necesita su cuenta de
+    // Stripe Connect verificada para recibir el dinero. Si no la tiene,
+    // NO se completa la compra (a diferencia de las facturas, aquí no
+    // tiene sentido cobrar y que el vendedor no pueda cobrar su parte).
+    if (metadata?.template_type && metadata?.template_id) {
+      const supabaseAdmin = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      )
+
+      const templateTable = `${metadata.template_type}_templates`
+      const { data: template } = await supabaseAdmin
+        .from(templateTable)
+        .select('user_id, price_cents, is_public')
+        .eq('id', metadata.template_id)
+        .maybeSingle()
+
+      if (!template || !template.is_public) {
+        return new Response(
+          JSON.stringify({ error: 'Esta plantilla ya no está disponible en el marketplace.' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+
+      const { data: sellerProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('stripe_account_id, stripe_onboarding_complete')
+        .eq('id', template.user_id)
+        .maybeSingle()
+
+      if (!sellerProfile?.stripe_account_id || !sellerProfile.stripe_onboarding_complete) {
+        return new Response(
+          JSON.stringify({ error: 'El vendedor de esta plantilla todavía no ha verificado su cuenta de cobro.' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+
+      if (!template.price_cents || template.price_cents <= 0) {
+        return new Response(
+          JSON.stringify({ error: 'Esta plantilla no tiene un precio válido.' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+
+      finalAmount = template.price_cents
+
+      connectParams = {
+        application_fee_amount: Math.round(finalAmount * (PLATFORM_FEE_PERCENT / 100)),
+        transfer_data: {
+          destination: sellerProfile.stripe_account_id,
+        },
+      }
+    }
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount,
+      amount: finalAmount,
       currency: 'eur',
       description: description,
       customer: customerId,
