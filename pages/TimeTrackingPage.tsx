@@ -4,10 +4,13 @@ import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Modal from '@/components/ui/Modal';
-import { ClockIcon, PlusIcon, SparklesIcon, RefreshCwIcon, EditIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon } from '@/components/icons/Icon';
+import { ClockIcon, PlusIcon, SparklesIcon, RefreshCwIcon, EditIcon, TrashIcon, ChevronDownIcon, ChevronUpIcon, BellIcon, Play, Pause } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
+import { useElapsedTime } from '@/hooks/useElapsedTime';
 import { generateTimeEntryDescription, AI_CREDIT_COSTS } from '@/services/geminiService';
 import { TimeEntry } from '@/types';
+import { requestTimerNotificationPermission, isTimerNotificationSupported } from '@/services/timerNotifications';
+import { formatDuration } from '@/lib/utils';
 
 const TimeDistributionChart = lazy(() => import('@/components/charts/TimeDistributionChart'));
 const WeeklyHoursChart = lazy(() => import('@/components/charts/WeeklyHoursChart'));
@@ -39,13 +42,47 @@ const formatHoursMinutes = (totalSeconds: number): string => {
 };
 
 const TimeTrackingPage: React.FC = () => {
-    const { timeEntries, projects, getProjectById, addTimeEntry, updateTimeEntry, deleteTimeEntry, profile, consumeCredits } = useAppStore();
+    const { timeEntries, projects, tasks, getProjectById, addTimeEntry, updateTimeEntry, deleteTimeEntry, profile, consumeCredits, activeTimer, startTimer, stopTimer } = useAppStore();
     const { addToast } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
     const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
     const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({});
+
+    // NUEVO (ítem 7 del roadmap): cronómetro en vivo, movido aquí desde
+    // /my-timesheet (una ruta huérfana que no estaba enlazada en ningún
+    // menú — nadie llegaba a usarla). El cronómetro en sí sigue viviendo
+    // en el store global (activeTimer), esto solo añade la UI para
+    // iniciarlo/pararlo y el aviso por notificación desde esta página.
+    const elapsedTime = useElapsedTime(activeTimer);
+    const [selectedTaskId, setSelectedTaskId] = useState('');
+    const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(
+        typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+    );
+    const pendingTasks = useMemo(
+        () => tasks.filter(t => t.status !== 'done' && t.status !== 'completed'),
+        [tasks]
+    );
+
+    const handleEnableTimerNotifications = async () => {
+        const result = await requestTimerNotificationPermission();
+        setNotificationPermission(result);
+        if (result === 'granted') addToast('Avisos de fichaje activados.', 'success');
+        else if (result === 'denied') addToast('Notificaciones bloqueadas. Actívalas en los ajustes del navegador si cambias de opinión.', 'error');
+    };
+
+    const handleStartTimer = () => {
+        const task = tasks.find(t => t.id === selectedTaskId);
+        if (!task) { addToast('Selecciona una tarea para empezar a fichar.', 'error'); return; }
+        startTimer(task);
+    };
+
+    const handleStopTimer = async () => {
+        const result = await stopTimer();
+        if (result.success) addToast('Tiempo registrado correctamente.', 'success');
+        else addToast(result.message || 'No se pudo registrar el tiempo.', 'error');
+    };
 
     const [formState, setFormState] = useState<ManualEntryForm>(initialFormState(projects[0]?.id || ''));
 
@@ -256,6 +293,57 @@ const TimeTrackingPage: React.FC = () => {
                 </div>
                 <Button onClick={openModal}><PlusIcon className="w-4 h-4 mr-2" />Añadir Entrada Manual</Button>
             </div>
+
+            {/* NUEVO: cronómetro en vivo (ítem 7 del roadmap) */}
+            <Card>
+                <CardContent className="p-4">
+                    {activeTimer ? (
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-400 opacity-75" />
+                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary-500" />
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="text-white text-sm truncate">{activeTimer.description}</p>
+                                    <p className="font-mono text-lg font-bold tabular-nums text-primary-400">{formatDuration(elapsedTime)}</p>
+                                </div>
+                            </div>
+                            <Button onClick={handleStopTimer} variant="secondary" className="shrink-0">
+                                <Pause className="w-4 h-4 mr-2" /> Detener
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <select
+                                value={selectedTaskId}
+                                onChange={(e) => setSelectedTaskId(e.target.value)}
+                                className="flex-1 px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white"
+                            >
+                                <option value="">
+                                    {pendingTasks.length > 0 ? 'Selecciona una tarea para fichar...' : 'No tienes tareas pendientes — crea una desde un proyecto'}
+                                </option>
+                                {pendingTasks.map(t => (
+                                    <option key={t.id} value={t.id}>{t.description}</option>
+                                ))}
+                            </select>
+                            <Button onClick={handleStartTimer} disabled={!selectedTaskId} className="shrink-0">
+                                <Play className="w-4 h-4 mr-2" /> Iniciar Tiempo
+                            </Button>
+                            {isTimerNotificationSupported() && notificationPermission !== 'granted' && (
+                                <button
+                                    onClick={handleEnableTimerNotifications}
+                                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-300 hover:border-primary-500/50 transition-colors shrink-0"
+                                    title="Recibe un aviso con botón de Detener mientras el cronómetro esté en marcha"
+                                >
+                                    <BellIcon className="w-4 h-4 text-primary-400" />
+                                    Activar avisos
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
