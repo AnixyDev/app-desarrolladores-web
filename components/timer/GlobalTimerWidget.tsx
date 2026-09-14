@@ -8,7 +8,10 @@ import { formatDuration } from '@/lib/utils';
 
 // Página donde el cronómetro ya se muestra en grande, in-context — mostrar
 // también el widget flotante ahí sería un duplicado sin sentido.
-const TIMER_HOME_ROUTE = '/my-timesheet';
+// CAMBIO: el cronómetro en vivo ahora vive en /time-tracking (se movió
+// ahí desde /my-timesheet, una ruta que nunca estuvo enlazada en el menú
+// — ver TimeTrackingPage.tsx).
+const TIMER_HOME_ROUTE = '/time-tracking';
 
 const PulsingDot: React.FC = () => (
   <span className="relative flex h-2.5 w-2.5 shrink-0">
