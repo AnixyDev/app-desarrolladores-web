@@ -18,6 +18,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsOfService from './pages/TermsOfService';
 import PricingPage from './pages/PricingPage';
+import PublicInvoicePayPage from './pages/PublicInvoicePayPage';
 
 // FIX: Carga segura de componentes lazy con recarga en caso de error
 const safeLazy = (importFn: () => Promise<any>) => {
@@ -160,6 +161,9 @@ function App() {
                     <Route path="/privacy" element={<PrivacyPolicyPage />} />
                     <Route path="/terms" element={<TermsOfService />} />
                     <Route path="/pricing" element={<PricingPage />} />
+                    {/* NUEVO: pago de facturas sin login del cliente — ver
+                        PublicInvoicePayPage.tsx para el porqué. */}
+                    <Route path="/pay/:invoiceId" element={<PublicInvoicePayPage />} />
                     
                     {/* FIX: Rutas protegidas - solo accesibles si estás autenticado */}
                     <Route 
