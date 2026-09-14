@@ -74,6 +74,7 @@ const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 // Legal / Público
 const LandingPage = lazy(() => import('./pages/LandingPage'));
 const PricingPage = lazy(() => import('./pages/PricingPage'));
+const PublicInvoicePayPage = lazy(() => import('./pages/PublicInvoicePayPage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 
@@ -93,6 +94,7 @@ const AppRoutes: React.FC = () => {
         {/* Rutas públicas */}
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/pay/:invoiceId" element={<PublicInvoicePayPage />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/terms" element={<TermsOfService />} />
 
