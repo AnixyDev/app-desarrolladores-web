@@ -270,7 +270,7 @@ export interface Referral {
 }
 
 // Added missing types
-export interface UserData { id: string; name: string; email: string; role: 'Admin' | 'Manager' | 'Developer'; status: 'Activo' | 'Inactivo' | 'Pendiente'; hourly_rate_cents: number; invitedOn?: string; }
+export interface UserData { id: string; name: string; email: string; role: 'Admin' | 'Manager' | 'Developer'; status: 'Activo' | 'Inactivo' | 'Pendiente'; hourly_rate_cents: number; invitedOn?: string; accepted_user_id?: string | null; }
 export interface Job {
   id: string;
   postedByUserId: string;
@@ -297,7 +297,7 @@ export interface Expense { id: string; user_id: string; amount_cents: number; ca
 export interface RecurringExpense { id: string; user_id: string; amount_cents: number; category: string; frequency: string; start_date: string; next_date: string; description: string; project_id?: string | null; }
 export interface RecurringInvoice { id: string; user_id: string; client_id: string; project_id?: string | null; items: InvoiceItem[]; tax_percent: number; frequency: string; start_date: string; next_due_date: string; }
 export interface NewProject { name: string; client_id: string; status: string; description?: string; start_date?: string; due_date?: string; budget_cents?: number; category?: string; priority?: ProjectPriority; }
-export interface TimeEntry { id: string; user_id: string; project_id: string; task_id?: string; description?: string; duration_seconds: number; start_time: string; end_time?: string; invoice_id?: string | null; }
+export interface TimeEntry { id: string; user_id: string; project_id: string; task_id?: string; description?: string; duration_seconds: number; start_time: string; end_time?: string; invoice_id?: string | null; logged_by?: string | null; }
 export interface NewTimeEntry { project_id: string; task_id?: string; description?: string; duration_seconds: number; start_time: string; end_time?: string; invoice_id?: string | null; }
 export interface ProjectMessage { id: string; project_id: string; user_id: string; user_name: string; text: string; timestamp: string; }
 export interface Notification { id: string; message: string; link?: string; isRead: boolean; createdAt: string; }
