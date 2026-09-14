@@ -105,6 +105,26 @@ export const STRIPE_ITEMS = {
     name: '1000 Créditos de IA',
     credits: 1000,
   },
+  // Ítem 5 del roadmap — paquetes de firma electrónica. Creados en Stripe
+  // el 14/09, pago único (no suscripción).
+  signatureCredits5: {
+    priceId: 'price_1UFXFl8oC5awQy15P41Fag3Q',
+    mode: 'payment' as const,
+    name: '5 Créditos de Firma',
+    credits: 5,
+  },
+  signatureCredits10: {
+    priceId: 'price_1UFXHB8oC5awQy15XZrgT22B',
+    mode: 'payment' as const,
+    name: '10 Créditos de Firma',
+    credits: 10,
+  },
+  signatureCredits25: {
+    priceId: 'price_1UFXIH8oC5awQy15crrwynWT',
+    mode: 'payment' as const,
+    name: '25 Créditos de Firma',
+    credits: 25,
+  },
   featuredJobPost: {
     priceId: 'price_1SOlOv8oC5awQy15Q2aXoEg7',
     mode: 'payment' as const,
@@ -143,7 +163,17 @@ export const redirectToCheckout = async (
         productName: `Factura ${extraParams.invoice_number}` 
     }),
     client_reference_id: extraParams.client_reference_id,
-    metadata: { ...extraParams, itemKey, origin: window.location.origin },
+    // FIX: 'credits' (definido en STRIPE_ITEMS para aiCredits*/signatureCredits*)
+    // nunca llegaba al metadata de la sesión de Stripe. El webhook lee
+    // session.metadata.credits para saber cuántos créditos conceder — sin
+    // esto, SIEMPRE resolvía a 0 y la compra se cobraba sin dar nada a
+    // cambio. Se incluye aquí solo si el item lo define.
+    metadata: {
+      ...extraParams,
+      itemKey,
+      origin: window.location.origin,
+      ...('credits' in item ? { credits: String(item.credits) } : {}),
+    },
   };
 
   const { data, error } = await supabase.functions.invoke('create-checkout-session', {
