@@ -131,6 +131,15 @@ serve(async (req) => {
             if (profile) {
               await supabase.from('profiles').update({ ai_credits: (profile.ai_credits || 0) + creditsToAdd }).eq('id', userId)
             }
+          } else if (itemKey?.startsWith('signatureCredits')) {
+            // Ítem 5 del roadmap — paquetes de firma electrónica, mismo
+            // patrón que aiCredits: se compran aparte, no caducan, y se
+            // consumen uno a uno al enviar un documento a firmar.
+            const creditsToAdd = parseInt(session.metadata?.credits || '0')
+            const { data: profile } = await supabase.from('profiles').select('signature_credits').eq('id', userId).single()
+            if (profile) {
+              await supabase.from('profiles').update({ signature_credits: (profile.signature_credits || 0) + creditsToAdd }).eq('id', userId)
+            }
           } else if (itemKey === 'featuredJobPost') {
             // FIX: no existía. JobPostForm.tsx llamaba a este checkout sin
             // pasar ningún dato de la oferta y Stripe redirigía a /billing
