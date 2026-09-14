@@ -8,7 +8,7 @@ import Input from '@/components/ui/Input';
 import { UserIcon as User, BellIcon as Bell, ShieldIcon as Shield, CreditCard, Globe, RefreshCwIcon, ShieldCheckIcon, TrashIcon, UploadIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 
-type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal';
+type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal' | 'connect';
 
 const SettingsPage: React.FC = () => {
   const { profile, updateProfile, logout, updateVeriFactuSettings, verifyFiscalChain } = useAppStore();
@@ -16,6 +16,7 @@ const SettingsPage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [connectLoading, setConnectLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
 
   const [formData, setFormData] = useState({
@@ -210,6 +211,36 @@ const SettingsPage: React.FC = () => {
     }
   };
 
+  // Ítem 4 del roadmap (Fase 1) — crea/reanuda el onboarding de la cuenta
+  // conectada de Stripe (Connect Express) del freelancer, para que más
+  // adelante pueda cobrar a sus propios clientes desde la plataforma.
+  const handleConnectOnboarding = async () => {
+    setConnectLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Debes iniciar sesión de nuevo.');
+
+      const { data, error } = await supabase.functions.invoke('create-connect-account', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+
+      if (error) {
+        let detail = error.message;
+        try {
+          const body = await error.context?.json?.();
+          if (body?.error) detail = body.error;
+        } catch { /* noop */ }
+        throw new Error(detail);
+      }
+      if (!data?.url) throw new Error('No se pudo generar el enlace de verificación.');
+
+      window.location.href = data.url;
+    } catch (error: any) {
+      addToast(error.message || 'Error al iniciar la conexión con Stripe', 'error');
+      setConnectLoading(false);
+    }
+  };
+
   const SectionTitle = ({ icon: Icon, title }: { icon: any; title: string }) => (
     <h3 className="text-lg font-bold text-white flex items-center mb-4">
       <Icon className="w-5 h-5 mr-2 text-primary-400" />
@@ -244,6 +275,7 @@ const SettingsPage: React.FC = () => {
           <TabButton tab="notifications" icon={Bell} label="Notificaciones" />
           <TabButton tab="security" icon={Shield} label="Seguridad" />
           <TabButton tab="billing" icon={CreditCard} label="Facturación" />
+          <TabButton tab="connect" icon={Globe} label="Cobros a clientes" />
           <TabButton tab="fiscal" icon={ShieldCheckIcon} label="Cumplimiento Fiscal" />
         </aside>
 
@@ -450,6 +482,57 @@ const SettingsPage: React.FC = () => {
                     </p>
                     <Button onClick={() => navigate('/billing')}>
                       Ver planes
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {activeTab === 'connect' && (
+            <Card>
+              <CardHeader>
+                <SectionTitle icon={Globe} title="Cobros a clientes" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {profile?.plan === 'Free' ? (
+                  <div className="relative">
+                    <div className="pointer-events-none select-none blur-sm opacity-40">
+                      <div className="h-24 bg-gray-800 rounded-xl" />
+                    </div>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+                      <div className="bg-gray-950/90 border border-gray-800 rounded-2xl p-8 max-w-md">
+                        <h3 className="text-lg font-bold text-white mb-2">Cobros a clientes — función Pro</h3>
+                        <p className="text-gray-400 text-sm mb-6">
+                          Conecta una cuenta de Stripe para cobrar tus facturas directamente a tus clientes desde la plataforma.
+                        </p>
+                        <Button onClick={() => navigate('/billing')} className="w-full">Actualizar a Pro</Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : profile?.stripe_onboarding_complete ? (
+                  <div className="flex items-center gap-3 bg-green-900/20 border border-green-800 p-4 rounded-lg">
+                    <ShieldCheckIcon className="w-6 h-6 text-green-400 shrink-0" />
+                    <div>
+                      <p className="text-white font-semibold">Cuenta verificada</p>
+                      <p className="text-sm text-gray-400">
+                        Tu cuenta de Stripe está lista para recibir cobros. El cobro de facturas a clientes desde aquí llega en una próxima actualización.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-gray-400">
+                      Conecta tu cuenta de Stripe para poder cobrar tus facturas directamente a tus clientes desde DevFreelancer, en vez de gestionarlo aparte. Stripe te pedirá tus datos fiscales y bancarios para verificarte (KYC) — es su propio formulario seguro, DevFreelancer nunca ve ni guarda esos datos.
+                    </p>
+                    {profile?.stripe_account_id && (
+                      <p className="text-xs text-yellow-400">
+                        Ya empezaste la verificación pero no se completó — continúa donde lo dejaste.
+                      </p>
+                    )}
+                    <Button onClick={handleConnectOnboarding} isLoading={connectLoading}>
+                      {connectLoading ? <RefreshCwIcon className="w-4 h-4 animate-spin mr-2" /> : null}
+                      {profile?.stripe_account_id ? 'Continuar verificación' : 'Conectar cuenta de Stripe'}
                     </Button>
                   </>
                 )}
