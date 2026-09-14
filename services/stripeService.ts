@@ -218,7 +218,21 @@ export const createPaymentIntent = async (
     }
   );
 
-  if (error) throw new Error(error.message || 'Error al procesar el intento de pago.');
+  if (error) {
+    // FIX: 'error.message' del SDK de Supabase para Edge Functions es
+    // genérico ("Edge Function returned a non-2xx status code") y no dice
+    // nada del motivo real — el cuerpo JSON de verdad (con el mensaje que
+    // sí escribimos en payment-sheet) viene en error.context, y había que
+    // leerlo explícitamente para verlo.
+    let detail = error.message;
+    try {
+      const body = await (error as any).context?.json?.();
+      if (body?.error) detail = body.error;
+    } catch {
+      // El cuerpo no era JSON legible — nos quedamos con el mensaje genérico.
+    }
+    throw new Error(detail || 'Error al procesar el intento de pago.');
+  }
 
   return data.paymentIntentClientSecret;
 };
