@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { Project, NewProject, Task, TimeEntry, NewTimeEntry } from '@/types';
 import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
+import { notifyTimerStarted, notifyTimerStopped } from '@/services/timerNotifications';
 
 // NUEVO: el cronómetro vivía en useState local de MyTeamTimesheet.tsx —
 // se paraba (y se perdía el tiempo acumulado) en cuanto se navegaba a
@@ -15,6 +16,36 @@ export interface ActiveTimer {
   projectId: string;
   description: string;
   startedAt: number;
+}
+
+// NUEVO: el cronómetro vivía solo en memoria (Zustand) — cerrar la pestaña
+// o la app (muy normal en móvil) perdía el tiempo que llevaba corriendo
+// sin ningún aviso. Se persiste en localStorage como red de seguridad;
+// startedAt sigue siendo la única fuente de verdad del tiempo transcurrido,
+// esto solo evita perderlo si se cierra la app entre medias.
+const ACTIVE_TIMER_STORAGE_KEY = 'devfreelancer_active_timer';
+
+function loadPersistedActiveTimer(): ActiveTimer | null {
+  try {
+    const raw = localStorage.getItem(ACTIVE_TIMER_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as ActiveTimer) : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistActiveTimer(timer: ActiveTimer | null) {
+  try {
+    if (timer) {
+      localStorage.setItem(ACTIVE_TIMER_STORAGE_KEY, JSON.stringify(timer));
+    } else {
+      localStorage.removeItem(ACTIVE_TIMER_STORAGE_KEY);
+    }
+  } catch {
+    // localStorage no disponible (modo privado, cuota llena...) — el
+    // cronómetro sigue funcionando en memoria, solo se pierde la
+    // persistencia entre sesiones.
+  }
 }
 
 export interface ProjectSlice {
@@ -48,7 +79,7 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     projects: [],
     tasks: [],
     timeEntries: [],
-    activeTimer: null,
+    activeTimer: loadPersistedActiveTimer(),
 
     fetchProjects: async () => {
         const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
@@ -187,14 +218,15 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     // desmonte (cambiar de página) y se vuelva a montar después.
     startTimer: (task) => {
         if (get().activeTimer) return; // ya hay uno corriendo, no pisar
-        set({
-            activeTimer: {
-                taskId: task.id,
-                projectId: task.project_id,
-                description: task.description,
-                startedAt: Date.now(),
-            },
-        });
+        const timer: ActiveTimer = {
+            taskId: task.id,
+            projectId: task.project_id,
+            description: task.description,
+            startedAt: Date.now(),
+        };
+        set({ activeTimer: timer });
+        persistActiveTimer(timer);
+        notifyTimerStarted(timer);
     },
 
     // Detiene el cronómetro y registra el parte de horas correspondiente.
@@ -219,6 +251,8 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
                 invoice_id: null,
             });
             set({ activeTimer: null });
+            persistActiveTimer(null);
+            notifyTimerStopped();
             return { success: true };
         } catch (err) {
             return { success: false, message: (err as Error).message || 'No se pudo registrar el tiempo.' };
@@ -227,7 +261,11 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
 
     // Descarta el cronómetro en marcha sin registrar nada (p. ej. si el
     // usuario se equivocó de tarea).
-    cancelTimer: () => set({ activeTimer: null }),
+    cancelTimer: () => {
+        set({ activeTimer: null });
+        persistActiveTimer(null);
+        notifyTimerStopped();
+    },
 
     // FIX: no existía forma de editar ni borrar un registro de tiempo ya creado.
     updateTimeEntry: async (id, updates) => {
