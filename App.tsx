@@ -49,6 +49,7 @@ const ExpensesPage = safeLazy(() => import('./pages/ExpensesPage'));
 const BudgetsPage = safeLazy(() => import('./pages/BudgetsPage'));
 const ProposalsPage = safeLazy(() => import('./pages/ProposalsPage'));
 const ContractsPage = safeLazy(() => import('./pages/ContractsPage'));
+const TemplateMarketplacePage = safeLazy(() => import('./pages/TemplateMarketplacePage'));
 const TimeTrackingPage = safeLazy(() => import('./pages/TimeTrackingPage'));
 const ReportsPage = safeLazy(() => import('./pages/ReportsPage'));
 const ProfitabilityReportPage = safeLazy(() => import('./pages/ProfitabilityReportPage'));
@@ -210,6 +211,7 @@ function App() {
                         <Route path="budgets" element={<BudgetsPage />} />
                         <Route path="proposals" element={<ProposalsPage />} />
                         <Route path="contracts" element={<ContractsPage />} />
+                        <Route path="template-marketplace" element={<TemplateMarketplacePage />} />
                         <Route path="time-tracking" element={<TimeTrackingPage />} />
                         <Route path="reports" element={<ReportsPage />} />
                         <Route path="reports/profitability" element={<ProfitabilityReportPage />} />
