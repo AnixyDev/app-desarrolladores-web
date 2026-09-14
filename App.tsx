@@ -64,7 +64,6 @@ const PublicProfilePage = safeLazy(() => import('./pages/PublicProfilePage'));
 const MyApplicationsPage = safeLazy(() => import('./pages/MyApplicationsPage'));
 const SavedJobsPage = safeLazy(() => import('./pages/SavedJobsPage'));
 const TeamManagementDashboard = safeLazy(() => import('./pages/TeamManagementDashboard'));
-const MyTeamTimesheet = safeLazy(() => import('./pages/MyTeamTimesheet'));
 const KnowledgeBase = safeLazy(() => import('./pages/KnowledgeBase'));
 const InboxPage = safeLazy(() => import('./pages/InboxPage'));
 const RoleManagement = safeLazy(() => import('./pages/RoleManagement'));
@@ -226,7 +225,6 @@ function App() {
                         <Route path="my-applications" element={<MyApplicationsPage />} />
                         <Route path="saved-jobs" element={<SavedJobsPage />} />
                         <Route path="team" element={<TeamManagementDashboard />} />
-                        <Route path="my-timesheet" element={<MyTeamTimesheet />} />
                         <Route path="knowledge-base" element={<KnowledgeBase />} />
                         <Route path="inbox" element={<InboxPage />} />
                         <Route path="roles" element={<RoleManagement />} />
