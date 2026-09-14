@@ -290,6 +290,85 @@ serve(async (req) => {
             }).eq('id', invoiceId)
           }
         }
+
+        // NUEVO (ítem 8 del roadmap): compra de plantilla del marketplace.
+        // El contenido real NUNCA se entrega hasta aquí — es la única
+        // ruta que copia content_template/title_template/items al
+        // comprador, y solo se ejecuta tras confirmar el cobro con
+        // Stripe (nunca a petición directa del navegador).
+        const templateType = paymentIntent.metadata?.template_type
+        const templateId = paymentIntent.metadata?.template_id
+        const buyerId = paymentIntent.metadata?.supabase_user_id
+
+        if (templateType && templateId && buyerId) {
+          const templateTable = `${templateType}_templates`
+
+          // Idempotencia: si ya existe una compra para este PaymentIntent,
+          // no se duplica la copia (reintentos del webhook).
+          const { data: existingPurchase } = await supabase
+            .from('template_purchases')
+            .select('id')
+            .eq('stripe_payment_intent_id', paymentIntent.id)
+            .maybeSingle()
+
+          if (!existingPurchase) {
+            const { data: original, error: originalError } = await supabase
+              .from(templateTable)
+              .select('*')
+              .eq('id', templateId)
+              .maybeSingle()
+
+            if (originalError || !original) {
+              console.error(`⚠️ payment_intent.succeeded: plantilla ${templateType}/${templateId} no encontrada`, originalError?.message)
+            } else {
+              // Copia para el comprador: mismo contenido, nuevo dueño,
+              // nunca pública por defecto (que decida él si la revende).
+              const { id: _oldId, user_id: _oldOwner, is_public: _oldPublic,
+                       downloads_count: _oldDownloads, created_at: _oldCreatedAt,
+                       ...contentFields } = original as any
+
+              const { data: copy, error: copyError } = await supabase
+                .from(templateTable)
+                .insert({ ...contentFields, user_id: buyerId, is_public: false, downloads_count: 0 })
+                .select('id')
+                .single()
+
+              if (copyError || !copy) {
+                console.error(`⚠️ payment_intent.succeeded: no se pudo copiar la plantilla al comprador`, copyError?.message)
+              } else {
+                await supabase.from('template_purchases').insert({
+                  buyer_id: buyerId,
+                  seller_id: original.user_id,
+                  template_type: templateType,
+                  original_template_id: templateId,
+                  copied_template_id: copy.id,
+                  price_cents: paymentIntent.amount_received,
+                  stripe_payment_intent_id: paymentIntent.id,
+                })
+
+                await supabase
+                  .from(templateTable)
+                  .update({ downloads_count: (original.downloads_count || 0) + 1 })
+                  .eq('id', templateId)
+              }
+            }
+          }
+        }
+        break;
+      }
+
+      case 'account.updated': {
+        // Ítem 4 del roadmap — Fase 1 (Stripe Connect). Stripe notifica cada
+        // vez que cambia el estado de verificación (KYC) de una cuenta
+        // conectada. Marcamos onboarding_complete cuando ya puede cobrar Y
+        // recibir transferencias — antes de eso, sigue en revisión.
+        const account = event.data.object as Stripe.Account
+        const onboardingComplete = !!(account.charges_enabled && account.payouts_enabled)
+
+        await supabase
+          .from('profiles')
+          .update({ stripe_onboarding_complete: onboardingComplete })
+          .eq('stripe_account_id', account.id)
         break;
       }
     }
