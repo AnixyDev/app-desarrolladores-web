@@ -43,7 +43,7 @@ self.addEventListener('notificationclick', (event) => {
         // la propia app lee al arrancar para parar el cronómetro
         // automáticamente (ver App.tsx) — el cronómetro en sí ya
         // sobrevivió el cierre porque se persiste en localStorage.
-        await self.clients.openWindow('/my-timesheet?stopTimer=1');
+        await self.clients.openWindow('/time-tracking?stopTimer=1');
       }
     })()
   );
