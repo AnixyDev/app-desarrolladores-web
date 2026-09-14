@@ -29,6 +29,7 @@ export interface Profile {
   plan: 'Free' | 'Pro' | 'Teams';
   role: 'Admin' | 'Developer' | 'Manager' | string;
   ai_credits: number;
+  signature_credits: number;
   hourly_rate_cents: number;
   pdf_color: string;
   portal_logo_url?: string;
