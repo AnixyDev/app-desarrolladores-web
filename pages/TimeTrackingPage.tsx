@@ -1,4 +1,4 @@
-import React, { useState, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -42,13 +42,42 @@ const formatHoursMinutes = (totalSeconds: number): string => {
 };
 
 const TimeTrackingPage: React.FC = () => {
-    const { timeEntries, projects, tasks, getProjectById, addTimeEntry, updateTimeEntry, deleteTimeEntry, profile, consumeCredits, activeTimer, startTimer, stopTimer } = useAppStore();
+    const { timeEntries, projects, tasks, getProjectById, addTimeEntry, updateTimeEntry, deleteTimeEntry, profile, consumeCredits, activeTimer, startTimer, stopTimer, users, fetchUsers } = useAppStore();
     const { addToast } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
     const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
     const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({});
+
+    // NUEVO: filtro "Todo el equipo / Solo mis horas". Antes esta página
+    // mezclaba siempre las horas de todo el negocio (tuyas + equipo) sin
+    // forma de separarlas — había que sumarlo a mano. time_entries.logged_by
+    // ya existía en la base de datos (se usa en RLS) pero el frontend nunca
+    // lo leía ni lo mostraba.
+    const [scope, setScope] = useState<'all' | 'mine'>('all');
+
+    useEffect(() => {
+        fetchUsers();
+    }, [fetchUsers]);
+
+    // Mapa logged_by (uuid) -> nombre del miembro del equipo, para mostrar
+    // "por: Nombre" en cada registro cuando se ve "Todo el equipo".
+    const memberNameById = useMemo(() => {
+        const map: Record<string, string> = {};
+        users.forEach(u => {
+            if (u.accepted_user_id) map[u.accepted_user_id] = u.name;
+        });
+        return map;
+    }, [users]);
+
+    const scopedEntries = useMemo(() => {
+        if (scope === 'all') return timeEntries;
+        // "Solo mis horas": lo que YO he fichado. logged_by puede venir
+        // vacío en registros antiguos (de antes de que existiera el
+        // fichaje en equipo) — esos se cuentan como propios.
+        return timeEntries.filter(e => !e.logged_by || e.logged_by === profile?.id);
+    }, [timeEntries, scope, profile?.id]);
 
     // NUEVO (ítem 7 del roadmap): cronómetro en vivo, movido aquí desde
     // /my-timesheet (una ruta huérfana que no estaba enlazada en ningún
@@ -88,7 +117,7 @@ const TimeTrackingPage: React.FC = () => {
 
     const timeByProject = useMemo(() => {
         const data: { [key: string]: number } = {};
-        timeEntries.forEach(entry => {
+        scopedEntries.forEach(entry => {
             const project = getProjectById(entry.project_id);
             if (project) {
                 if (!data[project.name]) {
@@ -98,7 +127,7 @@ const TimeTrackingPage: React.FC = () => {
             }
         });
         return Object.entries(data).map(([name, value]) => ({ name, value }));
-    }, [timeEntries, getProjectById]);
+    }, [scopedEntries, getProjectById]);
 
     const timeByWeek = useMemo(() => {
         const data: { [key: string]: number } = { 'Dom': 0, 'Lun': 0, 'Mar': 0, 'Mié': 0, 'Jue': 0, 'Vie': 0, 'Sáb': 0 };
@@ -108,7 +137,7 @@ const TimeTrackingPage: React.FC = () => {
         const endOfWeek = new Date(startOfWeek);
         endOfWeek.setDate(endOfWeek.getDate() + 6);
 
-        timeEntries.forEach(entry => {
+        scopedEntries.forEach(entry => {
             const entryDate = new Date(entry.start_time);
             if (entryDate >= startOfWeek && entryDate <= endOfWeek) {
                 const dayName = dayNames[entryDate.getDay()];
@@ -116,7 +145,7 @@ const TimeTrackingPage: React.FC = () => {
             }
         });
         return Object.entries(data).map(([name, hours]) => ({ name, hours }));
-    }, [timeEntries]);
+    }, [scopedEntries]);
 
     // FIX: petición explícita — "que cada proyecto se unifique, si hay varios
     // tiempos introducidos que se sumen y salga el total". Antes era una
@@ -124,7 +153,7 @@ const TimeTrackingPage: React.FC = () => {
     const groupedByProject = useMemo(() => {
         const groups: Record<string, { projectId: string; projectName: string; entries: TimeEntry[]; totalSeconds: number }> = {};
 
-        timeEntries.forEach(entry => {
+        scopedEntries.forEach(entry => {
             const key = entry.project_id || 'sin-proyecto';
             if (!groups[key]) {
                 groups[key] = {
@@ -144,11 +173,11 @@ const TimeTrackingPage: React.FC = () => {
                 entries: g.entries.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()),
             }))
             .sort((a, b) => b.totalSeconds - a.totalSeconds);
-    }, [timeEntries, getProjectById]);
+    }, [scopedEntries, getProjectById]);
 
     const totalTrackedSeconds = useMemo(
-        () => timeEntries.reduce((acc, e) => acc + e.duration_seconds, 0),
-        [timeEntries]
+        () => scopedEntries.reduce((acc, e) => acc + e.duration_seconds, 0),
+        [scopedEntries]
     );
 
     const toggleProjectCollapse = (projectKey: string) => {
@@ -285,13 +314,31 @@ const TimeTrackingPage: React.FC = () => {
                     <h1 className="text-2xl font-semibold text-white flex items-center gap-2">
                         <ClockIcon className="w-6 h-6" /> Time Tracking
                     </h1>
-                    {timeEntries.length > 0 && (
+                    {scopedEntries.length > 0 && (
                         <p className="text-sm text-gray-500 mt-1">
                             Total registrado: <span className="text-primary-400 font-semibold">{formatHoursMinutes(totalTrackedSeconds)}</span> en {groupedByProject.length} proyecto{groupedByProject.length !== 1 ? 's' : ''}
                         </p>
                     )}
                 </div>
-                <Button onClick={openModal}><PlusIcon className="w-4 h-4 mr-2" />Añadir Entrada Manual</Button>
+                <div className="flex items-center gap-3">
+                    {users.length > 0 && (
+                        <div className="flex items-center bg-gray-800 border border-gray-700 rounded-lg p-1 text-sm">
+                            <button
+                                onClick={() => setScope('all')}
+                                className={`px-3 py-1.5 rounded-md transition-colors ${scope === 'all' ? 'bg-primary-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                Todo el equipo
+                            </button>
+                            <button
+                                onClick={() => setScope('mine')}
+                                className={`px-3 py-1.5 rounded-md transition-colors ${scope === 'mine' ? 'bg-primary-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                Solo mis horas
+                            </button>
+                        </div>
+                    )}
+                    <Button onClick={openModal}><PlusIcon className="w-4 h-4 mr-2" />Añadir Entrada Manual</Button>
+                </div>
             </div>
 
             {/* NUEVO: cronómetro en vivo (ítem 7 del roadmap) */}
@@ -393,7 +440,12 @@ const TimeTrackingPage: React.FC = () => {
                                             <div key={entry.id} className="flex items-center justify-between gap-3 p-4 pl-10">
                                                 <div className="min-w-0">
                                                     <p className="text-white text-sm truncate">{entry.description || <span className="text-gray-600 italic">Sin descripción</span>}</p>
-                                                    <p className="text-xs text-gray-500">{new Date(entry.start_time).toLocaleDateString()}</p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {new Date(entry.start_time).toLocaleDateString()}
+                                                        {scope === 'all' && entry.logged_by && entry.logged_by !== profile?.id && (
+                                                            <span className="text-gray-600"> · por {memberNameById[entry.logged_by] || 'Miembro del equipo'}</span>
+                                                        )}
+                                                    </p>
                                                 </div>
                                                 <div className="flex items-center gap-3 shrink-0">
                                                     <span className="text-sm font-semibold text-gray-300">{formatHoursMinutes(entry.duration_seconds)}</span>
