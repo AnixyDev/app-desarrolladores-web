@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 // FIX: Add .tsx extension to Icon import
 import { ZapIcon, TrashIcon, SettingsIcon, PlusIcon, RefreshCwIcon, CheckCircleIcon, XCircleIcon } from '../components/icons/Icon';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/useToast';
+import { useAppStore } from '@/hooks/useAppStore';
 
 // --- TYPES ---
 interface Integration {
@@ -143,11 +145,21 @@ const AddIntegrationForm: React.FC<{ onClose: () => void; onSave: (integration: 
 // metía el objeto en memoria, así que al refrescar la página siempre volvía
 // a estar vacía. Ahora persiste de verdad en la tabla `integrations`.
 const IntegrationsManager: React.FC = () => {
+  const { profile } = useAppStore();
   const { addToast } = useToast();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
+
+  // NUEVO: item 10 del roadmap de monetización — "Integraciones con Slack y
+  // Webhooks" ya se anuncia como beneficio exclusivo del plan Teams en
+  // PricingPage/BillingPage, pero esta página no comprobaba el plan y
+  // cualquier usuario Free/Pro podía usarla igualmente. Se aplica el mismo
+  // patrón de bloqueo con blur + CTA que TaxLedgerPage/PortalBrandingPage.
+  // No se toca la carga de datos (fetchIntegrations) para usuarios sin
+  // acceso: si nunca se ejecuta, no hay nada que mostrar de todos modos.
+  const hasAccess = profile?.plan === 'Teams';
 
   const fetchIntegrations = async () => {
     const { data, error } = await supabase
@@ -164,9 +176,13 @@ const IntegrationsManager: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!hasAccess) {
+      setIsLoading(false);
+      return;
+    }
     fetchIntegrations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [hasAccess]);
 
   const handleSaveIntegration = async (newIntegration: Omit<Integration, 'id' | 'lastTest'>) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -243,6 +259,38 @@ const IntegrationsManager: React.FC = () => {
       setTestingId(null);
     }
   };
+
+  if (!hasAccess) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-semibold text-white flex items-center gap-2"><SettingsIcon/> Gestor de Automatización</h1>
+        <div className="relative">
+          <div className="pointer-events-none select-none blur-sm opacity-40">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="bg-gray-800 p-5 rounded-xl border border-gray-700 h-48" />
+              <div className="bg-gray-800 p-5 rounded-xl border border-gray-700 h-48" />
+              <div className="bg-gray-800 p-5 rounded-xl border border-gray-700 h-48" />
+            </div>
+          </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6">
+            <div className="bg-gray-950/90 border border-gray-800 rounded-2xl p-8 max-w-md">
+              <ZapIcon className="w-10 h-10 text-yellow-400 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-white mb-2">Automatización — función Teams</h3>
+              <p className="text-gray-400 text-sm mb-6">
+                Conecta Slack, Zapier o cualquier servicio externo vía webhooks cuando ocurran eventos en tu equipo (tarea completada, documento nuevo, horas registradas). Disponible en el plan Teams.
+              </p>
+              <Link
+                to="/billing"
+                className={`${buttonStyle} bg-fuchsia-600 text-black hover:bg-fuchsia-700 w-full`}
+              >
+                Actualizar a Teams
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
