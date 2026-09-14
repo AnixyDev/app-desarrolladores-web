@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -25,6 +26,79 @@ interface InvoiceItemDraft {
   price_cents: number;
 }
 
+// NUEVO: menú de "enlace de pago" (Copiar / Enviar / Abrir) para cada
+// factura. Va con su propio position:fixed + createPortal a document.body
+// en vez de un simple `absolute` — la tabla de facturas tiene scroll
+// horizontal y una columna "sticky", y un menú `absolute` normal quedaba
+// recortado/tapado por esa columna sticky de la fila siguiente por mucho
+// z-index que tuviera. Con el portal, el menú vive fuera de la tabla y se
+// posiciona con las coordenadas reales del botón que lo abrió.
+const PaymentLinkMenuButton: React.FC<{
+  onCopy: () => void;
+  onEmail: () => void;
+  onOpen: () => void;
+}> = ({ onCopy, onEmail, onOpen }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  const handleToggle = () => {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      const MENU_WIDTH = 192; // w-48
+      setCoords({
+        top: rect.bottom + 4,
+        // Evita que el menú se salga por la derecha de la pantalla si el
+        // botón está muy pegado al borde.
+        left: Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8),
+      });
+    }
+    setIsOpen(prev => !prev);
+  };
+
+  return (
+    <div className="relative">
+      <button
+        ref={buttonRef}
+        onClick={handleToggle}
+        className="p-2 text-gray-400 hover:text-primary-400 transition-colors"
+        title="Enlace de pago (Stripe)"
+      >
+        <LinkIcon className="w-4 h-4" />
+      </button>
+      {isOpen && coords && createPortal(
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div
+            className="fixed w-48 bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-50"
+            style={{ top: coords.top, left: coords.left }}
+          >
+            <button
+              onClick={() => { setIsOpen(false); onCopy(); }}
+              className="w-full text-left flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800"
+            >
+              <LinkIcon className="w-4 h-4 mr-3" /> Copiar enlace
+            </button>
+            <button
+              onClick={() => { setIsOpen(false); onEmail(); }}
+              className="w-full text-left flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800"
+            >
+              <Send className="w-4 h-4 mr-3" /> Enviar por email
+            </button>
+            <button
+              onClick={() => { setIsOpen(false); onOpen(); }}
+              className="w-full text-left flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800"
+            >
+              <ExternalLinkIcon className="w-4 h-4 mr-3" /> Abrir enlace
+            </button>
+          </div>
+        </>,
+        document.body
+      )}
+    </div>
+  );
+};
+
 const InvoicesPage: React.FC = () => {
   const {
     invoices,
@@ -50,7 +124,6 @@ const { budgets, contracts } = useAppStore(); // añade budgets y contracts a la
   // Estado de pagos: mapa invoice_id -> { paidCents, count }
   const [paymentsByInvoice, setPaymentsByInvoice] = useState<Record<string, PaymentSummary>>({});
   const [paymentModalInvoiceId, setPaymentModalInvoiceId] = useState<string | null>(null);
-  const [paymentLinkMenuInvoiceId, setPaymentLinkMenuInvoiceId] = useState<string | null>(null);
 
   const initialInvoiceState: NewInvoice = {
     client_id: '',
@@ -441,40 +514,11 @@ const handleSelectBudget = (budgetId: string) => {
                                   >
                                     <DollarSignIcon className="w-4 h-4" />
                                   </button>
-                                  <div className="relative">
-                                    <button
-                                      onClick={() => setPaymentLinkMenuInvoiceId(paymentLinkMenuInvoiceId === inv.id ? null : inv.id)}
-                                      className="p-2 text-gray-400 hover:text-primary-400 transition-colors"
-                                      title="Enlace de pago (Stripe)"
-                                    >
-                                      <LinkIcon className="w-4 h-4" />
-                                    </button>
-                                    {paymentLinkMenuInvoiceId === inv.id && (
-                                      <>
-                                        <div className="fixed inset-0 z-40" onClick={() => setPaymentLinkMenuInvoiceId(null)} />
-                                        <div className="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-50">
-                                          <button
-                                            onClick={() => handleCopyPaymentLink(inv)}
-                                            className="w-full text-left flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800"
-                                          >
-                                            <LinkIcon className="w-4 h-4 mr-3" /> Copiar enlace
-                                          </button>
-                                          <button
-                                            onClick={() => { setPaymentLinkMenuInvoiceId(null); handleSendEmailInvoice(inv); }}
-                                            className="w-full text-left flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800"
-                                          >
-                                            <Send className="w-4 h-4 mr-3" /> Enviar por email
-                                          </button>
-                                          <button
-                                            onClick={() => handleOpenPaymentLink(inv)}
-                                            className="w-full text-left flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800"
-                                          >
-                                            <ExternalLinkIcon className="w-4 h-4 mr-3" /> Abrir enlace
-                                          </button>
-                                        </div>
-                                      </>
-                                    )}
-                                  </div>
+                                  <PaymentLinkMenuButton
+                                    onCopy={() => handleCopyPaymentLink(inv)}
+                                    onEmail={() => handleSendEmailInvoice(inv)}
+                                    onOpen={() => handleOpenPaymentLink(inv)}
+                                  />
                                 </>
                               )}
                               <button
@@ -558,31 +602,11 @@ const handleSelectBudget = (budgetId: string) => {
                               <button onClick={() => setPaymentModalInvoiceId(inv.id)} className="p-2 text-gray-400 hover:text-green-400 transition-colors" title="Registrar pago">
                                 <DollarSignIcon className="w-4 h-4" />
                               </button>
-                              <div className="relative">
-                                <button
-                                  onClick={() => setPaymentLinkMenuInvoiceId(paymentLinkMenuInvoiceId === inv.id ? null : inv.id)}
-                                  className="p-2 text-gray-400 hover:text-primary-400 transition-colors"
-                                  title="Enlace de pago (Stripe)"
-                                >
-                                  <LinkIcon className="w-4 h-4" />
-                                </button>
-                                {paymentLinkMenuInvoiceId === inv.id && (
-                                  <>
-                                    <div className="fixed inset-0 z-40" onClick={() => setPaymentLinkMenuInvoiceId(null)} />
-                                    <div className="absolute right-0 mt-1 w-48 bg-gray-900 border border-gray-700 rounded-xl shadow-xl overflow-hidden z-50">
-                                      <button onClick={() => handleCopyPaymentLink(inv)} className="w-full text-left flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800">
-                                        <LinkIcon className="w-4 h-4 mr-3" /> Copiar enlace
-                                      </button>
-                                      <button onClick={() => { setPaymentLinkMenuInvoiceId(null); handleSendEmailInvoice(inv); }} className="w-full text-left flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800">
-                                        <Send className="w-4 h-4 mr-3" /> Enviar por email
-                                      </button>
-                                      <button onClick={() => handleOpenPaymentLink(inv)} className="w-full text-left flex items-center px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800">
-                                        <ExternalLinkIcon className="w-4 h-4 mr-3" /> Abrir enlace
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
+                              <PaymentLinkMenuButton
+                                onCopy={() => handleCopyPaymentLink(inv)}
+                                onEmail={() => handleSendEmailInvoice(inv)}
+                                onOpen={() => handleOpenPaymentLink(inv)}
+                              />
                             </>
                           )}
                           <button onClick={() => handleDownloadPdf(inv)} className="p-2 text-gray-400 hover:text-white transition-colors" title="Descargar PDF">
