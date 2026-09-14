@@ -1,168 +1,249 @@
-import React, { Suspense, lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, lazy, Suspense } from 'react';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { useAppStore } from './hooks/useAppStore';
+import Sidebar from './components/layout/Sidebar';
+import Header from './components/layout/Header';
+import MobileBottomNav from './components/layout/MobileBottomNav';
+import GlobalTimerWidget from './components/timer/GlobalTimerWidget';
+import ToastContainer from './components/ui/Toast';
+import CookieBanner from './components/ui/CookieBanner';
 
-// Layouts (no lazy - necesarios inmediatamente)
-import { AppLayout } from './components/layout/AppLayout';
+// Auth & Public
 import AuthLayout from './pages/auth/AuthLayout';
-import PortalLayout from './pages/portal/PortalLayout';
+import LoginPage from './pages/LoginPage';
+import LandingPage from './pages/LandingPage';
+import RegisterPage from './pages/auth/RegisterPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfService from './pages/TermsOfService';
+import PricingPage from './pages/PricingPage';
+import PublicInvoicePayPage from './pages/PublicInvoicePayPage';
 
-// Spinner de carga
-const PageLoader = () => (
-  <div className="flex items-center justify-center h-screen w-full bg-gray-950">
-    <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-indigo-500"></div>
-  </div>
-);
-
-// Auth
-const LoginPage = lazy(() => import('./pages/LoginPage'));
-const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
-
-// App core
-const DashboardPage = lazy(() => import('./pages/DashboardPage'));
-const ProjectPage = lazy(() => import('./pages/ProjectPage'));
-const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
-const ClientsPage = lazy(() => import('./pages/ClientsPage'));
-const ClientDetailPage = lazy(() => import('./pages/ClientDetailPage'));
-
-// Finanzas
-const InvoicesPage = lazy(() => import('./pages/InvoicesPage'));
-const CreateInvoicePage = lazy(() => import('./pages/CreateInvoicePage'));
-const ExpensesPage = lazy(() => import('./pages/ExpensesPage'));
-const TaxLedgerPage = lazy(() => import('./pages/TaxLedgerPage'));
-const InboxPage = lazy(() => import('./pages/InboxPage'));
-// Ventas
-const BudgetsPage = lazy(() => import('./pages/BudgetsPage'));
-const ProposalsPage = lazy(() => import('./pages/ProposalsPage'));
-const ContractsPage = lazy(() => import('./pages/ContractsPage'));
-
-// Tiempo
-const TimeTrackingPage = lazy(() => import('./pages/TimeTrackingPage'));
-
-// Análisis y Reportes
-const ReportsPage = lazy(() => import('./pages/ReportsPage'));
-const ProfitabilityReportPage = lazy(() => import('./pages/ProfitabilityReportPage'));
-const ForecastingPage = lazy(() => import('./pages/ForecastingPage'));
-
-// Marketplace
-const JobMarketDashboard = lazy(() => import('./pages/JobMarketDashboard'));
-const JobDetailPage = lazy(() => import('./pages/JobDetailPage'));
-const JobPostForm = lazy(() => import('./pages/JobPostForm'));
-const JobApplicantsPage = lazy(() => import('./pages/JobApplicantsPage'));
-const SavedJobsPage = lazy(() => import('./pages/SavedJobsPage'));
-const MyApplicationsPage = lazy(() => import('./pages/MyApplicationsPage'));
-const MyJobPostsPage = lazy(() => import('./pages/MyJobPostsPage'));
-
-// IA
-const AIAssistantPage = lazy(() => import('./pages/AIAssistantPage'));
-
-// Equipo
-const TeamManagementDashboard = lazy(() => import('./pages/TeamManagementDashboard'));
-const RoleManagement = lazy(() => import('./pages/RoleManagement'));
-const KnowledgeBase = lazy(() => import('./pages/KnowledgeBase'));
-const MyTeamTimesheet = lazy(() => import('./pages/MyTeamTimesheet'));
-
-// Configuración
-const SettingsPage = lazy(() => import('./pages/SettingsPage'));
-const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage'));
-const BillingPage = lazy(() => import('./pages/BillingPage'));
-const IntegrationsManager = lazy(() => import('./pages/IntegrationsManager'));
-const AffiliateProgramPage = lazy(() => import('./pages/AffiliateProgramPage'));
-
-// Admin
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
-
-// Legal / Público
-const LandingPage = lazy(() => import('./pages/LandingPage'));
-const PricingPage = lazy(() => import('./pages/PricingPage'));
-const PublicInvoicePayPage = lazy(() => import('./pages/PublicInvoicePayPage'));
-const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
-const TermsOfService = lazy(() => import('./pages/TermsOfService'));
-
-// Portal de cliente
-const PortalLoginPage = lazy(() => import('./pages/portal/PortalLoginPage'));
-const PortalDashboardPage = lazy(() => import('./pages/portal/PortalDashboardPage'));
-const PortalInvoiceViewPage = lazy(() => import('./pages/portal/PortalInvoiceViewPage'));
-const PortalBudgetViewPage = lazy(() => import('./pages/portal/PortalBudgetViewPage'));
-const PortalContractViewPage = lazy(() => import('./pages/portal/PortalContractViewPage'));
-const PortalProposalViewPage = lazy(() => import('./pages/portal/PortalProposalViewPage'));
-const PortalProjectFilesPage = lazy(() => import('./pages/portal/PortalProjectFilesPage'));
-
-const AppRoutes: React.FC = () => {
-  return (
-    <Suspense fallback={<PageLoader />}>
-      <Routes>
-        {/* Rutas públicas */}
-        <Route path="/landing" element={<LandingPage />} />
-        <Route path="/pricing" element={<PricingPage />} />
-        <Route path="/pay/:invoiceId" element={<PublicInvoicePayPage />} />
-        <Route path="/privacy" element={<PrivacyPolicyPage />} />
-        <Route path="/terms" element={<TermsOfService />} />
-
-        {/* Auth */}
-        <Route element={<AuthLayout />}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-        </Route>
-
-        {/* Portal de cliente (layout propio) */}
-        <Route path="/portal/login" element={<PortalLoginPage />} />
-        <Route path="/portal" element={<PortalLayout />}>
-          <Route index element={<PortalDashboardPage />} />
-          <Route path="invoices/:id" element={<PortalInvoiceViewPage />} />
-          <Route path="budgets/:id" element={<PortalBudgetViewPage />} />
-          <Route path="contracts/:id" element={<PortalContractViewPage />} />
-          <Route path="proposals/:id" element={<PortalProposalViewPage />} />
-          <Route path="projects/:id/files" element={<PortalProjectFilesPage />} />
-        </Route>
-
-        {/* Admin */}
-        <Route path="/admin" element={<AppLayout />}>
-          <Route index element={<AdminDashboard />} />
-        </Route>
-
-        {/* Rutas protegidas */}
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/projects" element={<ProjectPage />} />
-          <Route path="/projects/:id" element={<ProjectDetailPage />} />
-          <Route path="/clients" element={<ClientsPage />} />
-          <Route path="/clients/:id" element={<ClientDetailPage />} />
-          <Route path="/time-tracking" element={<TimeTrackingPage />} />
-          <Route path="/budgets" element={<BudgetsPage />} />
-          <Route path="/proposals" element={<ProposalsPage />} />
-          <Route path="/contracts" element={<ContractsPage />} />
-          <Route path="/invoices" element={<InvoicesPage />} />
-          <Route path="/invoices/new" element={<CreateInvoicePage />} />
-          <Route path="/expenses" element={<ExpensesPage />} />
-          <Route path="/tax-ledger" element={<TaxLedgerPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/reports/profitability" element={<ProfitabilityReportPage />} />
-          <Route path="/forecasting" element={<ForecastingPage />} />
-          <Route path="/job-market" element={<JobMarketDashboard />} />
-          <Route path="/job-market/:id" element={<JobDetailPage />} />
-          <Route path="/job-market/:id/applicants" element={<JobApplicantsPage />} />
-          <Route path="/post-job" element={<JobPostForm />} />
-          <Route path="/saved-jobs" element={<SavedJobsPage />} />
-          <Route path="/my-applications" element={<MyApplicationsPage />} />
-          <Route path="/my-job-posts" element={<MyJobPostsPage />} />
-          <Route path="/ai-assistant" element={<AIAssistantPage />} />
-          <Route path="/team" element={<TeamManagementDashboard />} />
-          <Route path="/roles" element={<RoleManagement />} />
-          <Route path="/knowledge-base" element={<KnowledgeBase />} />
-          <Route path="/my-timesheet" element={<MyTeamTimesheet />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/public-profile" element={<PublicProfilePage />} />
-          <Route path="/billing" element={<BillingPage />} />
-          <Route path="/integrations" element={<IntegrationsManager />} />
-          <Route path="/affiliate" element={<AffiliateProgramPage />} />
-          <Route path="/inbox" element={<InboxPage />} />
-        </Route>
-
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/landing" replace />} />
-      </Routes>
-    </Suspense>
-  );
+// FIX: Carga segura de componentes lazy con recarga en caso de error
+const safeLazy = (importFn: () => Promise<any>) => {
+  return lazy(async () => {
+    try {
+      return await importFn();
+    } catch (error) {
+      console.error("Fallo de carga de módulo:", error);
+      // Si falla una importación, recargar la página (puede ser problema de caché)
+      window.location.reload();
+      throw error;
+    }
+  });
 };
 
-export default AppRoutes;
+// Lazy Components (carga diferida para mejor performance)
+const DashboardPage = safeLazy(() => import('./pages/DashboardPage'));
+const ClientsPage = safeLazy(() => import('./pages/ClientsPage'));
+const ClientDetailPage = safeLazy(() => import('./pages/ClientDetailPage'));
+const ProjectPage = safeLazy(() => import('./pages/ProjectPage'));
+const ProjectDetailPage = safeLazy(() => import('./pages/ProjectDetailPage'));
+const InvoicesPage = safeLazy(() => import('./pages/InvoicesPage'));
+const ReceiptsPage = safeLazy(() => import('./pages/ReceiptsPage'));
+const FiscalCompliancePage = safeLazy(() => import('./pages/FiscalCompliancePage'));
+const BankReconciliationPage = safeLazy(() => import('./pages/BankReconciliationPage'));
+const CreateInvoicePage = safeLazy(() => import('./pages/CreateInvoicePage'));
+const ExpensesPage = safeLazy(() => import('./pages/ExpensesPage'));
+const BudgetsPage = safeLazy(() => import('./pages/BudgetsPage'));
+const ProposalsPage = safeLazy(() => import('./pages/ProposalsPage'));
+const ContractsPage = safeLazy(() => import('./pages/ContractsPage'));
+const TemplateMarketplacePage = safeLazy(() => import('./pages/TemplateMarketplacePage'));
+const TimeTrackingPage = safeLazy(() => import('./pages/TimeTrackingPage'));
+const ReportsPage = safeLazy(() => import('./pages/ReportsPage'));
+const ProfitabilityReportPage = safeLazy(() => import('./pages/ProfitabilityReportPage'));
+const TaxLedgerPage = safeLazy(() => import('./pages/TaxLedgerPage'));
+const AIAssistantPage = safeLazy(() => import('./pages/AIAssistantPage'));
+const JobMarketDashboard = safeLazy(() => import('./pages/JobMarketDashboard'));
+const JobDetailPage = safeLazy(() => import('./pages/JobDetailPage'));
+const JobPostForm = safeLazy(() => import('./pages/JobPostForm'));
+const JobApplicantsPage = safeLazy(() => import('./pages/JobApplicantsPage'));
+const MyJobPostsPage = safeLazy(() => import('./pages/MyJobPostsPage'));
+const PublicProfilePage = safeLazy(() => import('./pages/PublicProfilePage'));
+const MyApplicationsPage = safeLazy(() => import('./pages/MyApplicationsPage'));
+const SavedJobsPage = safeLazy(() => import('./pages/SavedJobsPage'));
+const TeamManagementDashboard = safeLazy(() => import('./pages/TeamManagementDashboard'));
+const MyTeamTimesheet = safeLazy(() => import('./pages/MyTeamTimesheet'));
+const KnowledgeBase = safeLazy(() => import('./pages/KnowledgeBase'));
+const InboxPage = safeLazy(() => import('./pages/InboxPage'));
+const RoleManagement = safeLazy(() => import('./pages/RoleManagement'));
+const IntegrationsManager = safeLazy(() => import('./pages/IntegrationsManager'));
+const ForecastingPage = safeLazy(() => import('./pages/ForecastingPage'));
+const AffiliateProgramPage = safeLazy(() => import('./pages/AffiliateProgramPage'));
+const BillingPage = safeLazy(() => import('./pages/BillingPage'));
+const PortalBrandingPage = safeLazy(() => import('./pages/PortalBrandingPage'));
+const SettingsPage = safeLazy(() => import('./pages/SettingsPage'));
+const AdminDashboard = safeLazy(() => import('./pages/AdminDashboard'));
+
+const PortalLayout = safeLazy(() => import('./pages/portal/PortalLayout'));
+const PortalLoginPage = safeLazy(() => import('./pages/portal/PortalLoginPage'));
+const PortalDashboardPage = safeLazy(() => import('./pages/portal/PortalDashboardPage'));
+const PortalInvoiceViewPage = safeLazy(() => import('./pages/portal/PortalInvoiceViewPage'));
+const PortalContractViewPage = safeLazy(() => import('./pages/portal/PortalContractViewPage'));
+const PortalBudgetViewPage = safeLazy(() => import('./pages/portal/PortalBudgetViewPage'));
+const PortalProposalViewPage = safeLazy(() => import('./pages/portal/PortalProposalViewPage'));
+
+// Spinner de carga mientras se cargan componentes lazy
+const LoadingFallback = () => (
+    <div className="flex h-screen w-full items-center justify-center bg-gray-950">
+        <div className="w-12 h-12 border-[3px] border-primary-500/20 border-t-primary-500 rounded-full animate-spin"></div>
+    </div>
+);
+
+// Layout principal de la aplicación (sidebar + header + contenido)
+const MainLayout = () => {
+    const [sidebarOpen, setSidebarOpen] = React.useState(false);
+    // Con el cronómetro activo, en móvil aparece además la barra tipo
+    // "mini-player" justo encima del menú inferior — hace falta más espacio
+    // al fondo del contenido para que no quede tapado por las dos barras.
+    const hasActiveTimer = useAppStore(state => !!state.activeTimer);
+    return (
+        <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden font-sans selection:bg-primary-500/30">
+    <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <div className="flex-1 flex flex-col min-w-0">
+    <Header onMenuClick={() => setSidebarOpen(true)} />
+
+    <main className={`flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6 lg:p-8 md:pb-8 animate-fade-in ${hasActiveTimer ? 'pb-40' : 'pb-24'}`}>
+                    <Suspense fallback={<div className="flex justify-center py-10"><div className="w-8 h-8 border-2 border-primary-500/20 border-t-primary-500 rounded-full animate-spin"></div></div>}>
+                        <Outlet />
+                    </Suspense>
+                </main>
+            </div>
+            <MobileBottomNav onMoreClick={() => setSidebarOpen(true)} />
+            <GlobalTimerWidget />
+        </div>
+    );
+};
+
+function App() {
+    const { initializeAuth, isAuthenticated, isProfileLoading, stopTimer } = useAppStore();
+    
+    // FIX CRÍTICO: Solo inicializar UNA VEZ cuando la app arranca
+    useEffect(() => {
+        console.log("🎬 App.tsx: Inicializando autenticación...");
+        initializeAuth();
+    }, [initializeAuth]);
+
+    // NUEVO (ítem 7 del roadmap): dos formas en que el toque en "Detener"
+    // de la notificación del cronómetro llega hasta aquí —
+    // 1. Con una pestaña ya abierta: el Service Worker manda este mensaje.
+    // 2. Sin ninguna pestaña abierta: el Service Worker abre una nueva con
+    //    ?stopTimer=1, y se lee aquí al arrancar. Se limpia el parámetro
+    //    de la URL después para que un refresco posterior no vuelva a
+    //    disparar el stop.
+    useEffect(() => {
+        const handleSwMessage = (event: MessageEvent) => {
+            if (event.data?.type === 'STOP_ACTIVE_TIMER') {
+                stopTimer();
+            }
+        };
+        navigator.serviceWorker?.addEventListener('message', handleSwMessage);
+
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('stopTimer') === '1') {
+            stopTimer();
+            params.delete('stopTimer');
+            const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : '');
+            window.history.replaceState({}, '', cleanUrl);
+        }
+
+        return () => navigator.serviceWorker?.removeEventListener('message', handleSwMessage);
+    }, [stopTimer]);
+
+    // Mostrar spinner mientras se verifica si hay sesión
+    if (isProfileLoading) {
+        console.log("⏳ App.tsx: Cargando perfil...");
+        return <LoadingFallback />;
+    }
+
+    console.log("✅ App.tsx: Renderizando rutas. isAuthenticated =", isAuthenticated);
+
+    return (
+            <>
+                <ToastContainer />
+                <CookieBanner />
+                <Routes>
+                    {/* Rutas de autenticación (login/register) */}
+                    <Route path="/auth" element={<AuthLayout />}>
+                        <Route path="login" element={<LoginPage />} />
+                        <Route path="register" element={<RegisterPage />} />
+                        <Route path="forgot-password" element={<ForgotPasswordPage />} />
+                        <Route path="reset-password" element={<ResetPasswordPage />} />
+                        <Route index element={<Navigate to="login" replace />} />
+                    </Route>
+                    
+                    {/* Portal para clientes */}
+                    <Route path="/portal" element={<Suspense fallback={<LoadingFallback />}><PortalLayout /></Suspense>}>
+                        <Route path="login" element={<PortalLoginPage />} />
+                        <Route path="dashboard" element={<PortalDashboardPage />} />
+                        <Route path="invoices/:invoiceId" element={<PortalInvoiceViewPage />} />
+                        <Route path="contracts/:contractId" element={<PortalContractViewPage />} />
+                        <Route path="budgets/:budgetId" element={<PortalBudgetViewPage />} />
+                        <Route path="proposals/:proposalId" element={<PortalProposalViewPage />} />
+                        <Route index element={<Navigate to="dashboard" replace />} />
+                    </Route>
+
+                    {/* Páginas públicas */}
+                    <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                    <Route path="/terms" element={<TermsOfService />} />
+                    <Route path="/pricing" element={<PricingPage />} />
+                    {/* NUEVO: pago de facturas sin login del cliente — ver
+                        PublicInvoicePayPage.tsx para el porqué. */}
+                    <Route path="/pay/:invoiceId" element={<PublicInvoicePayPage />} />
+                    
+                    {/* FIX: Rutas protegidas - solo accesibles si estás autenticado */}
+                    <Route 
+                        path="/" 
+                        element={isAuthenticated ? <MainLayout /> : <LandingPage />}
+                    >
+                        <Route index element={<DashboardPage />} />
+                        <Route path="clients" element={<ClientsPage />} />
+                        <Route path="clients/:clientId" element={<ClientDetailPage />} />
+                        <Route path="projects" element={<ProjectPage />} />
+                        <Route path="projects/:projectId" element={<ProjectDetailPage />} />
+                        <Route path="invoices" element={<InvoicesPage />} />
+                        <Route path="receipts" element={<ReceiptsPage />} />
+                        <Route path="fiscal" element={<FiscalCompliancePage />} />
+                        <Route path="bank-reconciliation" element={<BankReconciliationPage />} />
+                        <Route path="invoices/create" element={<CreateInvoicePage />} />
+                        <Route path="expenses" element={<ExpensesPage />} />
+                        <Route path="budgets" element={<BudgetsPage />} />
+                        <Route path="proposals" element={<ProposalsPage />} />
+                        <Route path="contracts" element={<ContractsPage />} />
+                        <Route path="template-marketplace" element={<TemplateMarketplacePage />} />
+                        <Route path="time-tracking" element={<TimeTrackingPage />} />
+                        <Route path="reports" element={<ReportsPage />} />
+                        <Route path="reports/profitability" element={<ProfitabilityReportPage />} />
+                        <Route path="tax-ledger" element={<TaxLedgerPage />} />
+                        <Route path="ai-assistant" element={<AIAssistantPage />} />
+                        <Route path="job-market" element={<JobMarketDashboard />} />
+                        <Route path="job-market/:jobId" element={<JobDetailPage />} />
+                        <Route path="job-market/:jobId/applicants" element={<JobApplicantsPage />} />
+                        <Route path="post-job" element={<JobPostForm />} />
+                        <Route path="my-job-posts" element={<MyJobPostsPage />} />
+                        <Route path="public-profile" element={<PublicProfilePage />} />
+                        <Route path="my-applications" element={<MyApplicationsPage />} />
+                        <Route path="saved-jobs" element={<SavedJobsPage />} />
+                        <Route path="team" element={<TeamManagementDashboard />} />
+                        <Route path="my-timesheet" element={<MyTeamTimesheet />} />
+                        <Route path="knowledge-base" element={<KnowledgeBase />} />
+                        <Route path="inbox" element={<InboxPage />} />
+                        <Route path="roles" element={<RoleManagement />} />
+                        <Route path="integrations" element={<IntegrationsManager />} />
+                        <Route path="forecasting" element={<ForecastingPage />} />
+                        <Route path="affiliate" element={<AffiliateProgramPage />} />
+                        <Route path="billing" element={<BillingPage />} />
+                        <Route path="portal-branding" element={<PortalBrandingPage />} />
+                        <Route path="settings" element={<SettingsPage />} />
+                        <Route path="admin" element={<AdminDashboard />} />
+                    </Route>
+
+                    {/* Capturador de rutas no encontradas */}
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+           </>
+    );
+}
+
+export default App;
