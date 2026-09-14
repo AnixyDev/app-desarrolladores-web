@@ -116,13 +116,39 @@ const MainLayout = () => {
 };
 
 function App() {
-    const { initializeAuth, isAuthenticated, isProfileLoading } = useAppStore();
+    const { initializeAuth, isAuthenticated, isProfileLoading, stopTimer } = useAppStore();
     
     // FIX CRÍTICO: Solo inicializar UNA VEZ cuando la app arranca
     useEffect(() => {
         console.log("🎬 App.tsx: Inicializando autenticación...");
         initializeAuth();
     }, [initializeAuth]);
+
+    // NUEVO (ítem 7 del roadmap): dos formas en que el toque en "Detener"
+    // de la notificación del cronómetro llega hasta aquí —
+    // 1. Con una pestaña ya abierta: el Service Worker manda este mensaje.
+    // 2. Sin ninguna pestaña abierta: el Service Worker abre una nueva con
+    //    ?stopTimer=1, y se lee aquí al arrancar. Se limpia el parámetro
+    //    de la URL después para que un refresco posterior no vuelva a
+    //    disparar el stop.
+    useEffect(() => {
+        const handleSwMessage = (event: MessageEvent) => {
+            if (event.data?.type === 'STOP_ACTIVE_TIMER') {
+                stopTimer();
+            }
+        };
+        navigator.serviceWorker?.addEventListener('message', handleSwMessage);
+
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('stopTimer') === '1') {
+            stopTimer();
+            params.delete('stopTimer');
+            const cleanUrl = window.location.pathname + (params.toString() ? `?${params}` : '');
+            window.history.replaceState({}, '', cleanUrl);
+        }
+
+        return () => navigator.serviceWorker?.removeEventListener('message', handleSwMessage);
+    }, [stopTimer]);
 
     // Mostrar spinner mientras se verifica si hay sesión
     if (isProfileLoading) {
