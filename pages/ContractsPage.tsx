@@ -12,6 +12,8 @@ import { sendDocumentEmail } from '@/services/emailService';
 import ContractFormModal from '@/components/contracts/ContractFormModal';
 import ContractSignModal from '@/components/contracts/ContractSignModal';
 import ContractActionsMenu from '@/components/contracts/ContractActionsMenu';
+import BuySignatureCreditsModal from '@/components/modals/BuySignatureCreditsModal';
+import { FileSignatureIcon } from '@/components/icons/Icon';
 
 const ContractsPage: React.FC = () => {
   const {
@@ -30,6 +32,7 @@ const ContractsPage: React.FC = () => {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSignOpen, setIsSignOpen] = useState(false);
+  const [isBuySignatureCreditsOpen, setIsBuySignatureCreditsOpen] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
   const [contractToSign, setContractToSign] = useState<Contract | null>(null);
 
@@ -136,7 +139,22 @@ const ContractsPage: React.FC = () => {
     <div>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <h1 className="text-2xl font-semibold text-white">Contratos</h1>
-        <Button onClick={handleOpenCreate}>Crear Contrato</Button>
+        <div className="flex items-center gap-3">
+          {/* NUEVO: ítem 5 del roadmap — créditos de firma electrónica,
+              comprados aparte de la suscripción (mismo patrón que los
+              créditos de IA). La firma con validez legal real (eIDAS) en
+              sí llega en una próxima actualización; esto ya deja montada
+              la venta de créditos por adelantado. */}
+          <button
+            onClick={() => setIsBuySignatureCreditsOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-300 hover:border-gray-600 transition-colors"
+            title="Comprar créditos de firma"
+          >
+            <FileSignatureIcon className="w-4 h-4 text-primary-400" />
+            {profile?.signature_credits ?? 0} firmas
+          </button>
+          <Button onClick={handleOpenCreate}>Crear Contrato</Button>
+        </div>
       </div>
 
       <Card>
@@ -249,6 +267,11 @@ const ContractsPage: React.FC = () => {
         onSign={handleSign}
         contract={contractToSign}
         clients={clients}
+      />
+
+      <BuySignatureCreditsModal
+        isOpen={isBuySignatureCreditsOpen}
+        onClose={() => setIsBuySignatureCreditsOpen(false)}
       />
     </div>
   );
