@@ -7,7 +7,7 @@ import Input from '@/components/ui/Input';
 import { NewInvoice } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient';
-import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon } from '@/components/icons/Icon';
+import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon, LinkIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal';
 import CreateRecurringInvoiceModal from '@/components/modals/CreateRecurringInvoiceModal';
@@ -263,8 +263,9 @@ const handleSelectBudget = (budgetId: string) => {
       return;
     }
 
+    const paymentLink = `${window.location.origin}/portal/invoices/${invoice.id}`;
     const subject = `Factura ${invoice.invoice_number}`;
-    const html = `<p>Hola ${client.name},</p><p>Te envío la factura ${invoice.invoice_number} por un importe de ${formatCurrency(invoice.total_cents)}. La encontrarás adjunta en este email.</p><p>Un saludo.</p>`;
+    const html = `<p>Hola ${client.name},</p><p>Te envío la factura ${invoice.invoice_number} por un importe de ${formatCurrency(invoice.total_cents)}. La encontrarás adjunta en este email.</p><p>Puedes pagarla online con tarjeta desde este enlace: <a href="${paymentLink}">${paymentLink}</a></p><p>Un saludo.</p>`;
 
     try {
       await sendDocumentEmail({
@@ -274,10 +275,25 @@ const handleSelectBudget = (budgetId: string) => {
         pdfBase64,
         filename: `Factura-${invoice.invoice_number}.pdf`,
       });
-      addToast('Email enviado con la factura adjunta.', 'success');
+      addToast('Email enviado con la factura adjunta y el enlace de pago.', 'success');
     } catch (error) {
       console.error('Error enviando el email:', error);
       addToast('No se pudo enviar el email. Inténtalo de nuevo.', 'error');
+    }
+  };
+
+  // NUEVO: hasta ahora la única forma de que un cliente pagara con Stripe
+  // era que tú le mandaras el email y él entrara al enlace de dentro — no
+  // había manera de coger ese enlace suelto (para WhatsApp, un chat, etc.)
+  // sin pasar por el email. Copia directamente la URL de la factura en el
+  // portal, donde ya está montado el cobro con tarjeta vía Stripe Connect.
+  const handleCopyPaymentLink = async (invoice: typeof invoices[number]) => {
+    const paymentLink = `${window.location.origin}/portal/invoices/${invoice.id}`;
+    try {
+      await navigator.clipboard.writeText(paymentLink);
+      addToast('Enlace de pago copiado.', 'success');
+    } catch {
+      addToast('No se pudo copiar el enlace.', 'error');
     }
   };
 
@@ -408,13 +424,22 @@ const handleSelectBudget = (budgetId: string) => {
                           <td className="px-6 py-4 sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                             <div className="flex items-center justify-center gap-2">
                               {status.label !== 'PAGADA' && (
-                                <button
-                                  onClick={() => setPaymentModalInvoiceId(inv.id)}
-                                  className="p-2 text-gray-400 hover:text-green-400 transition-colors"
-                                  title="Registrar pago"
-                                >
-                                  <DollarSignIcon className="w-4 h-4" />
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => setPaymentModalInvoiceId(inv.id)}
+                                    className="p-2 text-gray-400 hover:text-green-400 transition-colors"
+                                    title="Registrar pago"
+                                  >
+                                    <DollarSignIcon className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleCopyPaymentLink(inv)}
+                                    className="p-2 text-gray-400 hover:text-primary-400 transition-colors"
+                                    title="Copiar enlace de pago (Stripe)"
+                                  >
+                                    <LinkIcon className="w-4 h-4" />
+                                  </button>
+                                </>
                               )}
                               <button
                                 onClick={() => handleDownloadPdf(inv)}
@@ -493,9 +518,14 @@ const handleSelectBudget = (budgetId: string) => {
 
                         <div className="flex items-center justify-end gap-1 pt-1 border-t border-gray-800/50">
                           {status.label !== 'PAGADA' && (
-                            <button onClick={() => setPaymentModalInvoiceId(inv.id)} className="p-2 text-gray-400 hover:text-green-400 transition-colors" title="Registrar pago">
-                              <DollarSignIcon className="w-4 h-4" />
-                            </button>
+                            <>
+                              <button onClick={() => setPaymentModalInvoiceId(inv.id)} className="p-2 text-gray-400 hover:text-green-400 transition-colors" title="Registrar pago">
+                                <DollarSignIcon className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleCopyPaymentLink(inv)} className="p-2 text-gray-400 hover:text-primary-400 transition-colors" title="Copiar enlace de pago (Stripe)">
+                                <LinkIcon className="w-4 h-4" />
+                              </button>
+                            </>
                           )}
                           <button onClick={() => handleDownloadPdf(inv)} className="p-2 text-gray-400 hover:text-white transition-colors" title="Descargar PDF">
                             <Download className="w-4 h-4" />
