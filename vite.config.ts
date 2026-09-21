@@ -13,14 +13,33 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname),
       },
     },
-    esbuild: {
-      // Elimina console.log/warn/info/debug/error y debugger SOLO en build de producción.
-      // En "npm run dev" / "pnpm dev" se mantienen intactos para depurar normalmente.
-      drop: isProd ? ['console', 'debugger'] : [],
-    },
+    // CAMBIO: se elimina el bloque esbuild.drop.
+    //
+    // Vite 8 transforma y minifica con oxc, no con esbuild, e ignoraba esa
+    // opción por completo. Lo avisaba en cada build:
+    //   "Both esbuild and oxc options were set. oxc options will be used and
+    //    esbuild options will be ignored. The following esbuild options were
+    //    set: { drop: [ 'console', 'debugger' ] }"
+    // Resultado: desde la subida a Vite 8 los console.log seguían saliendo en
+    // producción — 26 console.log, 68 console.error y 24 console.warn en el
+    // chunk de entrada, con correos de usuario y trazas de autenticación a la
+    // vista de cualquiera que abriese F12. El equivalente en oxc está en las
+    // opciones de minificado (output.minify), más abajo.
     build: {
       sourcemap: false, // antes: true — exponía el código fuente completo en F12 > Sources
       chunkSizeWarningLimit: 600,
+      rollupOptions: {
+        output: {
+          // CAMBIO: sustituto real de esbuild.drop en Vite 8 / Rolldown.
+          // compress.dropConsole elimina las llamadas a console.* y
+          // dropDebugger las sentencias debugger. Solo afecta al build de
+          // producción: en "pnpm dev" no se minifica, así que los logs siguen
+          // intactos para depurar.
+          minify: isProd
+            ? { compress: { dropConsole: true, dropDebugger: true } }
+            : false,
+        },
+      },
       // CAMBIO (rendimiento): se elimina manualChunks por completo.
       //
       // Por qué: al forzar a mano los grupos de vendors se creaban
