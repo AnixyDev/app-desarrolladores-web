@@ -27,7 +27,17 @@ const container = document.getElementById('root')!;
 container.innerHTML = '';
 
 ReactDOM.createRoot(container).render(
-  <BrowserRouter>
+  // CAMBIO: se activa v7_relativeSplatPath, que silencia este aviso de consola:
+  //   "⚠️ React Router Future Flag Warning: Relative route resolution within
+  //    Splat routes is changing in v7."
+  //
+  // Es seguro en este proyecto: el flag solo cambia cómo se resuelven las rutas
+  // RELATIVAS dentro de una ruta splat, y aquí la única splat es
+  // <Route path="*" element={<Navigate to="/" replace />} /> en App.tsx, que
+  // apunta a una ruta ABSOLUTA y no tiene rutas hijas. Tampoco hay ninguna
+  // navegación relativa ("..") en todo el código. O sea: no cambia nada hoy,
+  // y deja el terreno preparado para subir a react-router-dom v7.
+  <BrowserRouter future={{ v7_relativeSplatPath: true }}>
     <App />
   </BrowserRouter>
 );
