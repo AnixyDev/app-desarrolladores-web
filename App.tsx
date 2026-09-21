@@ -116,8 +116,21 @@ const MainLayout = () => {
 };
 
 function App() {
-    const { initializeAuth, isAuthenticated, isProfileLoading, stopTimer } = useAppStore();
-    
+    // FIX CRÍTICO (re-renders x12): antes se hacía `useAppStore()` sin selector,
+    // lo que suscribía a App.tsx al store COMBINADO completo (auth + clients +
+    // projects + finance + team + notifications + jobs + portal + inbox).
+    // Cualquier set() en cualquier slice —incluidos los fetch en cascada que
+    // dispara initializeAuth() al arrancar (fetchClients, fetchJobs,
+    // fetchProjects, fetchFinanceData, etc.)— forzaba un re-render de App,
+    // aunque App solo lee 4 campos.
+    //
+    // Con selectores individuales Zustand solo notifica a este componente
+    // cuando ESE valor concreto cambia, no ante cualquier cambio del store.
+    const initializeAuth = useAppStore(state => state.initializeAuth);
+    const isAuthenticated = useAppStore(state => state.isAuthenticated);
+    const isProfileLoading = useAppStore(state => state.isProfileLoading);
+    const stopTimer = useAppStore(state => state.stopTimer);
+
     // FIX CRÍTICO: Solo inicializar UNA VEZ cuando la app arranca
     useEffect(() => {
         console.log("🎬 App.tsx: Inicializando autenticación...");
