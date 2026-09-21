@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -42,7 +43,7 @@ const formatHoursMinutes = (totalSeconds: number): string => {
 };
 
 const TimeTrackingPage: React.FC = () => {
-    const { timeEntries, projects, tasks, getProjectById, addTimeEntry, updateTimeEntry, deleteTimeEntry, profile, consumeCredits, activeTimer, startTimer, stopTimer, users, fetchUsers } = useAppStore();
+    const { timeEntries, projects, tasks, getProjectById, addTimeEntry, updateTimeEntry, deleteTimeEntry, profile, consumeCredits, activeTimer, startTimer, stopTimer, users, fetchUsers } = useAppStore(useShallow(s => ({ timeEntries: s.timeEntries, projects: s.projects, tasks: s.tasks, getProjectById: s.getProjectById, addTimeEntry: s.addTimeEntry, updateTimeEntry: s.updateTimeEntry, deleteTimeEntry: s.deleteTimeEntry, profile: s.profile, consumeCredits: s.consumeCredits, activeTimer: s.activeTimer, startTimer: s.startTimer, stopTimer: s.stopTimer, users: s.users, fetchUsers: s.fetchUsers })));
     const { addToast } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isAiLoading, setIsAiLoading] = useState(false);

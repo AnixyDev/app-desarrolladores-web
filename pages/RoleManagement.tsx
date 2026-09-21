@@ -1,5 +1,6 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Users as UsersIcon, UserIcon, ShieldIcon, BriefcaseIcon, EditIcon, SaveIcon, TrashIcon, DollarSignIcon } from '@/components/icons/Icon';
 import { UserData } from '@/types';
 import { formatCurrency } from '@/lib/utils';
@@ -119,7 +120,7 @@ const UserRow: React.FC<UserRowProps> = ({ user, onUpdateRole, onUpdateStatus, o
 };
 
 const RoleManagement: React.FC = () => {
-    const { users, profile, updateUserRole, updateUserStatus, deleteUser, updateUserHourlyRate } = useAppStore();
+    const { users, profile, updateUserRole, updateUserStatus, deleteUser, updateUserHourlyRate } = useAppStore(useShallow(s => ({ users: s.users, profile: s.profile, updateUserRole: s.updateUserRole, updateUserStatus: s.updateUserStatus, deleteUser: s.deleteUser, updateUserHourlyRate: s.updateUserHourlyRate })));
     const [isRolesView, setIsRolesView] = useState(false);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [userToDelete, setUserToDelete] = useState<UserData | null>(null);

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency } from '@/lib/utils';
 import { BookIcon, AlertTriangleIcon, DownloadIcon, ZapIcon, FileTextIcon } from '@/components/icons/Icon';
 import Input from '@/components/ui/Input';
@@ -9,7 +10,7 @@ import Button from '@/components/ui/Button';
 import { generateTaxReportPdf } from '@/services/pdfService';
 
 const TaxLedgerPage: React.FC = () => {
-    const { invoices, expenses, clients, profile } = useAppStore();
+    const { invoices, expenses, clients, profile } = useAppStore(useShallow(s => ({ invoices: s.invoices, expenses: s.expenses, clients: s.clients, profile: s.profile })));
     const [year, setYear] = useState(new Date().getFullYear());
     const [quarter, setQuarter] = useState<number | 'annual'>(Math.floor(new Date().getMonth() / 3) + 1);
     const [irpfPercentage, setIrpfPercentage] = useState(20);

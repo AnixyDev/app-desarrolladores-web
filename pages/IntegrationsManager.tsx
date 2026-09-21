@@ -5,6 +5,7 @@ import { ZapIcon, TrashIcon, SettingsIcon, PlusIcon, RefreshCwIcon, CheckCircleI
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/useToast';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 
 // --- TYPES ---
 interface Integration {
@@ -145,7 +146,7 @@ const AddIntegrationForm: React.FC<{ onClose: () => void; onSave: (integration: 
 // metía el objeto en memoria, así que al refrescar la página siempre volvía
 // a estar vacía. Ahora persiste de verdad en la tabla `integrations`.
 const IntegrationsManager: React.FC = () => {
-  const { profile } = useAppStore();
+  const { profile } = useAppStore(useShallow(s => ({ profile: s.profile })));
   const { addToast } = useToast();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [isLoading, setIsLoading] = useState(true);

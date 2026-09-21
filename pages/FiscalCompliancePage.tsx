@@ -4,6 +4,7 @@
 // editar ni borrar, ni desde la UI ni desde la base de datos (RLS).
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -12,7 +13,7 @@ import { ShieldCheckIcon, RefreshCwIcon, DownloadIcon } from '@/components/icons
 import { formatCurrency } from '@/lib/utils';
 
 const FiscalCompliancePage: React.FC = () => {
-  const { fiscalRecords, profile, verifyFiscalChain } = useAppStore();
+  const { fiscalRecords, profile, verifyFiscalChain } = useAppStore(useShallow(s => ({ fiscalRecords: s.fiscalRecords, profile: s.profile, verifyFiscalChain: s.verifyFiscalChain })));
   const { addToast } = useToast();
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ valid: boolean; brokenAt?: string } | null>(null);

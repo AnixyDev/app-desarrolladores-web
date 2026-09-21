@@ -15,6 +15,7 @@
 
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { supabase } from '@/lib/supabaseClient';
 import Card, { CardContent } from '@/components/ui/Card';
@@ -64,7 +65,7 @@ interface MarketplaceListing {
 }
 
 const TemplateMarketplacePage: React.FC = () => {
-  const { profile } = useAppStore();
+  const { profile } = useAppStore(useShallow(s => ({ profile: s.profile })));
   const { addToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'mine' | 'marketplace'>('marketplace');

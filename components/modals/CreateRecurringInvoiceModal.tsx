@@ -8,6 +8,7 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { InvoiceItem } from '@/types';
 import { PlusIcon, TrashIcon } from '@/components/icons/Icon';
 import { formatCurrency } from '@/lib/utils';
@@ -20,7 +21,7 @@ interface CreateRecurringInvoiceModalProps {
 const emptyItem: InvoiceItem = { description: '', quantity: 1, price_cents: 0 };
 
 const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = ({ isOpen, onClose }) => {
-  const { clients, projects, addRecurringInvoice } = useAppStore();
+  const { clients, projects, addRecurringInvoice } = useAppStore(useShallow(s => ({ clients: s.clients, projects: s.projects, addRecurringInvoice: s.addRecurringInvoice })));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [clientId, setClientId] = useState(clients[0]?.id || '');

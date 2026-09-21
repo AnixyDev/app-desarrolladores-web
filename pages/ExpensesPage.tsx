@@ -1,6 +1,7 @@
 import React, { useState, lazy, Suspense } from 'react';
 // FIX: Remove .tsx and .ts extensions from imports to fix module resolution errors.
 import { useAppStore } from '../hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -15,15 +16,7 @@ const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationMod
 const ExpenseOcrModal = lazy(() => import('@/components/modals/ExpenseOcrModal'));
 
 const ExpensesPage: React.FC = () => {
-    const {
-        expenses,
-        recurringExpenses,
-        addExpense,
-        deleteExpense,
-        addRecurringExpense,
-        deleteRecurringExpense,
-        projects,
-    } = useAppStore();
+    const { expenses, recurringExpenses, addExpense, deleteExpense, addRecurringExpense, deleteRecurringExpense, projects } = useAppStore(useShallow(s => ({ expenses: s.expenses, recurringExpenses: s.recurringExpenses, addExpense: s.addExpense, deleteExpense: s.deleteExpense, addRecurringExpense: s.addRecurringExpense, deleteRecurringExpense: s.deleteRecurringExpense, projects: s.projects })));
     const { addToast } = useToast();
 
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);

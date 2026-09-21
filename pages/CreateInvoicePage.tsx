@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader, CardFooter } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -15,15 +16,7 @@ import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
 const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
 
 const CreateInvoicePage: React.FC = () => {
-  const {
-    clients,
-    projects,
-    timeEntries,
-    profile,
-    addInvoice,
-    addRecurringInvoice,
-    consumeCredits,
-  } = useAppStore();
+  const { clients, projects, timeEntries, profile, addInvoice, addRecurringInvoice, consumeCredits } = useAppStore(useShallow(s => ({ clients: s.clients, projects: s.projects, timeEntries: s.timeEntries, profile: s.profile, addInvoice: s.addInvoice, addRecurringInvoice: s.addRecurringInvoice, consumeCredits: s.consumeCredits })));
   const navigate = useNavigate();
   const location = useLocation();
   const { addToast } = useToast();

@@ -3,6 +3,7 @@ import Modal from '../ui/Modal';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { getStripe, createPaymentIntent } from '@/services/stripeService';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Button from '../ui/Button';
 import { formatCurrency } from '@/lib/utils';
 import { RefreshCwIcon, AlertTriangleIcon } from '../icons/Icon';
@@ -75,7 +76,7 @@ const StripePaymentModal: React.FC<StripePaymentModalProps> = ({ isOpen, onClose
     // cliente no tiene ninguna sesión de DevFreelancer. Antes esto
     // bloqueaba el pago con "Debes iniciar sesión", lo cual no tenía
     // sentido para un cliente que ni siquiera debería tener cuenta aquí.
-    const { profile } = useAppStore();
+    const { profile } = useAppStore(useShallow(s => ({ profile: s.profile })));
 
     useEffect(() => {
         if (isOpen && amountCents > 0) {

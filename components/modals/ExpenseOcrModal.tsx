@@ -3,6 +3,7 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { SparklesIcon, UploadIcon, AlertTriangleIcon } from '../icons/Icon';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { extractExpenseFromImage, AI_CREDIT_COSTS, ExtractedExpenseData } from '@/services/geminiService';
 
@@ -36,7 +37,7 @@ const fileToBase64 = (file: File): Promise<string> =>
     });
 
 const ExpenseOcrModal: React.FC<ExpenseOcrModalProps> = ({ isOpen, onClose, onExtracted }) => {
-    const { profile, consumeCredits } = useAppStore();
+    const { profile, consumeCredits } = useAppStore(useShallow(s => ({ profile: s.profile, consumeCredits: s.consumeCredits })));
     const { addToast } = useToast();
     const fileInputRef = useRef<HTMLInputElement>(null);
 

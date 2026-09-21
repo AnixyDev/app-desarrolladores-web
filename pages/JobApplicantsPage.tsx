@@ -12,6 +12,7 @@ import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { CheckCircleIcon as CheckCircle, XCircleIcon as XCircle, ClockIcon as Clock } from '@/components/icons/Icon';
 import { Users, ArrowLeft } from 'lucide-react';
@@ -32,7 +33,7 @@ const statusBadge = (status: JobApplicationStatus) => {
 
 const JobApplicantsPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
-  const { getJobById, getApplicationsByJobId, viewApplication, updateApplicationStatus } = useAppStore();
+  const { getJobById, getApplicationsByJobId, viewApplication, updateApplicationStatus } = useAppStore(useShallow(s => ({ getJobById: s.getJobById, getApplicationsByJobId: s.getApplicationsByJobId, viewApplication: s.viewApplication, updateApplicationStatus: s.updateApplicationStatus })));
   const { addToast } = useToast();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 

@@ -3,6 +3,7 @@ import React, { useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { useProfitability, SortKey, ProfitabilityData } from '@/hooks/useProfitability';
 
@@ -80,7 +81,7 @@ interface FinancialAnalysis {
 }
 
 const ProfitabilityReportPage: React.FC = () => {
-  const { consumeCredits } = useAppStore();
+  const { consumeCredits } = useAppStore(useShallow(s => ({ consumeCredits: s.consumeCredits })));
   const { addToast } = useToast();
   const { profitabilityData, sortedData, sortConfig, requestSort, summary } = useProfitability();
 

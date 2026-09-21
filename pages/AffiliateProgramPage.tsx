@@ -3,12 +3,13 @@ import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { Share2Icon as Share2, CopyIcon as Copy, Users, DollarSignIcon as DollarSign, CheckCircleIcon as CheckCircle } from '@/components/icons/Icon';
 import { formatCurrency } from '@/lib/utils';
 
 const AffiliateProgramPage = () => {
-  const { profile, referrals } = useAppStore();
+  const { profile, referrals } = useAppStore(useShallow(s => ({ profile: s.profile, referrals: s.referrals })));
   const { addToast } = useToast();
 
   if (!profile) {

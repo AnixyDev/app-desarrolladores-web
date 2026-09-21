@@ -4,6 +4,7 @@ import { Job } from '@/types';
 import Button from '@/components/ui/Button';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import EmptyState from '@/components/ui/EmptyState';
 import { useToast } from '@/hooks/useToast';
 import { formatJobPublishDate } from '@/lib/utils';
@@ -96,7 +97,7 @@ const JobCard: React.FC<{ job: Job, onApply: (job: Job) => void, onSave: (jobId:
 };
 
 const JobMarketDashboard = () => {
-  const { jobs, savedJobIds, saveJob, profile, notifiedJobIds, addNotification, markJobAsNotified } = useAppStore();
+  const { jobs, savedJobIds, saveJob, profile, notifiedJobIds, addNotification, markJobAsNotified } = useAppStore(useShallow(s => ({ jobs: s.jobs, savedJobIds: s.savedJobIds, saveJob: s.saveJob, profile: s.profile, notifiedJobIds: s.notifiedJobIds, addNotification: s.addNotification, markJobAsNotified: s.markJobAsNotified })));
   const { addToast } = useToast();
   const navigate = useNavigate();
 

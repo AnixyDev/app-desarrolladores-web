@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { LayoutGrid, List, Plus as PlusIcon, Search as SearchIcon } from 'lucide-react';
 import { ProjectCard } from '@/components/projects/ProjectCard';
 import Button from '@/components/ui/Button';
@@ -80,7 +81,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ id, label, color, projects,
 };
 
 const ProjectPage: React.FC = () => {
-    const { projects, tasks, clients, getClientById, addProject, updateProject } = useAppStore();
+    const { projects, tasks, clients, getClientById, addProject, updateProject } = useAppStore(useShallow(s => ({ projects: s.projects, tasks: s.tasks, clients: s.clients, getClientById: s.getClientById, addProject: s.addProject, updateProject: s.updateProject })));
     const { addToast } = useToast();
     const navigate = useNavigate();
 

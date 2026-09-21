@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
@@ -9,7 +10,7 @@ import { redirectToCheckout, redirectToCustomerPortal, StripeItemKey } from '@/s
 import { useToast } from '@/hooks/useToast';
 
 const BillingPage: React.FC = () => {
-    const { profile, refreshProfile, fetchJobs } = useAppStore();
+    const { profile, refreshProfile, fetchJobs } = useAppStore(useShallow(s => ({ profile: s.profile, refreshProfile: s.refreshProfile, fetchJobs: s.fetchJobs })));
     const { addToast } = useToast();
     const [searchParams, setSearchParams] = useSearchParams();
     const [isLoadingPage, setIsLoadingPage] = useState(true);

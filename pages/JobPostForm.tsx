@@ -2,6 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Briefcase, DollarSign, Clock, Hash, Send, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useNavigate } from 'react-router-dom';
 
 const commonSkills = [
@@ -40,7 +41,7 @@ const JobPostForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const { addToast } = useToast();
-  const { profile, addJob } = useAppStore();
+  const { profile, addJob } = useAppStore(useShallow(s => ({ profile: s.profile, addJob: s.addJob })));
   const navigate = useNavigate();
 
   useEffect(() => {

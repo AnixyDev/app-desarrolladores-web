@@ -4,6 +4,7 @@
 // pendientes. Nunca marca nada como cobrado sin confirmación explícita.
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { supabase } from '@/lib/supabaseClient';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
@@ -28,7 +29,7 @@ const callFn = async (fnName: string, action: string, payload?: Record<string, u
 };
 
 const BankReconciliationPage: React.FC = () => {
-  const { clients, invoices } = useAppStore();
+  const { clients, invoices } = useAppStore(useShallow(s => ({ clients: s.clients, invoices: s.invoices })));
   const { addToast } = useToast();
 
   const [loading, setLoading] = useState(true);

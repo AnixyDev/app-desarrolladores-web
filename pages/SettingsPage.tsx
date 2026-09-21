@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { supabase } from '@/lib/supabaseClient';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -11,7 +12,7 @@ import { useToast } from '@/hooks/useToast';
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal' | 'connect';
 
 const SettingsPage: React.FC = () => {
-  const { profile, updateProfile, logout, updateVeriFactuSettings, verifyFiscalChain } = useAppStore();
+  const { profile, updateProfile, logout, updateVeriFactuSettings, verifyFiscalChain } = useAppStore(useShallow(s => ({ profile: s.profile, updateProfile: s.updateProfile, logout: s.logout, updateVeriFactuSettings: s.updateVeriFactuSettings, verifyFiscalChain: s.verifyFiscalChain })));
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
