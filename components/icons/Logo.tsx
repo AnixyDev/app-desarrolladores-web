@@ -9,11 +9,20 @@ export const Logo: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
                 <stop offset="1" stopColor="#9D00FF"/>
             </linearGradient>
         </defs>
+        {/*
+          CAMBIO: React espera los atributos SVG en camelCase. En kebab-case
+          (dominant-baseline / text-anchor) los trataba como propiedades DOM
+          desconocidas y avisaba en consola en cada render del Sidebar:
+            Warning: Invalid DOM property `dominant-baseline`.
+          Se veía bien porque React acaba pasándolos al DOM igualmente.
+          Ojo: en index.html el héroe estático los lleva en kebab-case y así
+          deben quedarse — allí es SVG dentro de HTML, no JSX.
+        */}
         <text
             x="50%"
             y="52%"
-            dominant-baseline="middle"
-            text-anchor="middle"
+            dominantBaseline="middle"
+            textAnchor="middle"
             fontSize="22"
             fontFamily="Inter, sans-serif"
             fontWeight="800"
