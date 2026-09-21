@@ -3,6 +3,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { DollarSign, Clock, Zap, Star, Briefcase } from 'lucide-react';
@@ -13,7 +14,7 @@ const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptM
 
 const JobDetailPage: React.FC = () => {
     const { jobId } = useParams<{ jobId: string }>();
-    const { getJobById, saveJob, savedJobIds, profile } = useAppStore();
+    const { getJobById, saveJob, savedJobIds, profile } = useAppStore(useShallow(s => ({ getJobById: s.getJobById, saveJob: s.saveJob, savedJobIds: s.savedJobIds, profile: s.profile })));
     
     const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);

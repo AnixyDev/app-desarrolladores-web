@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import AuthCard from '@/components/auth/AuthCard';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
@@ -27,7 +28,7 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { login } = useAppStore();
+  const { login } = useAppStore(useShallow(s => ({ login: s.login })));
   const navigate = useNavigate();
 
   const emailInvalid = emailTouched && email.length > 0 && !EMAIL_REGEX.test(email);

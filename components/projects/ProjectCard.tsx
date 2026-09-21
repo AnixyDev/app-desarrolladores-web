@@ -3,6 +3,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Project } from '@/types';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { AlertTriangleIcon, ChevronRightIcon } from '@/components/icons/Icon';
 
 interface ProjectCardProps {
@@ -24,7 +25,7 @@ const STATUS_BORDER_COLOR: Record<Project['status'], string> = {
 };
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({ project, progress, clientName, onOpen }) => {
-    const { timeEntries, profile } = useAppStore();
+    const { timeEntries, profile } = useAppStore(useShallow(s => ({ timeEntries: s.timeEntries, profile: s.profile })));
 
     // Rentabilidad: solo se usa para decidir si se muestra el aviso de "sobre presupuesto",
     // ya no hay una caja de cifras en la tarjeta — los números completos viven en el detalle.

@@ -4,6 +4,7 @@
 // que el cliente quiere una constancia por escrito de lo que ha pagado.
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -27,7 +28,7 @@ const initialFormState = {
 };
 
 const ReceiptsPage: React.FC = () => {
-  const { receipts, clients, projects, profile, addReceipt, deleteReceipt } = useAppStore();
+  const { receipts, clients, projects, profile, addReceipt, deleteReceipt } = useAppStore(useShallow(s => ({ receipts: s.receipts, clients: s.clients, projects: s.projects, profile: s.profile, addReceipt: s.addReceipt, deleteReceipt: s.deleteReceipt })));
   const { addToast } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);

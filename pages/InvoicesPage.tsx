@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -100,18 +101,7 @@ const PaymentLinkMenuButton: React.FC<{
 };
 
 const InvoicesPage: React.FC = () => {
-  const {
-    invoices,
-    recurringInvoices,
-    clients,
-    profile,
-    fiscalRecords,
-    getClientById,
-    addInvoice,
-    deleteInvoice,
-    addRecurringInvoice,
-    deleteRecurringInvoice,
-  } = useAppStore();
+  const { invoices, recurringInvoices, clients, profile, fiscalRecords, getClientById, addInvoice, deleteInvoice, addRecurringInvoice, deleteRecurringInvoice } = useAppStore(useShallow(s => ({ invoices: s.invoices, recurringInvoices: s.recurringInvoices, clients: s.clients, profile: s.profile, fiscalRecords: s.fiscalRecords, getClientById: s.getClientById, addInvoice: s.addInvoice, deleteInvoice: s.deleteInvoice, addRecurringInvoice: s.addRecurringInvoice, deleteRecurringInvoice: s.deleteRecurringInvoice })));
   const { addToast } = useToast();
 
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
@@ -120,7 +110,7 @@ const InvoicesPage: React.FC = () => {
   const [sourceBudgetId, setSourceBudgetId] = useState<string>('');
   const [sourceContractId, setSourceContractId] = useState<string>('');
 
-const { budgets, contracts } = useAppStore(); // añade budgets y contracts a la desestructuración de arriba
+const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets, contracts: s.contracts }))); // añade budgets y contracts a la desestructuración de arriba
   // Estado de pagos: mapa invoice_id -> { paidCents, count }
   const [paymentsByInvoice, setPaymentsByInvoice] = useState<Record<string, PaymentSummary>>({});
   const [paymentModalInvoiceId, setPaymentModalInvoiceId] = useState<string | null>(null);

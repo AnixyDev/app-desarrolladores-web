@@ -1,6 +1,7 @@
 // hooks/useProfitability.ts
 import { useMemo, useState } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 
 export interface ProfitabilityData {
   projectId: string;
@@ -23,7 +24,7 @@ export interface SortConfig {
 }
 
 export function useProfitability() {
-  const { projects, clients, invoices, timeEntries, expenses } = useAppStore();
+  const { projects, clients, invoices, timeEntries, expenses } = useAppStore(useShallow(s => ({ projects: s.projects, clients: s.clients, invoices: s.invoices, timeEntries: s.timeEntries, expenses: s.expenses })));
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
 
   // ── Cálculo de rentabilidad por proyecto ──────────────────────────────────

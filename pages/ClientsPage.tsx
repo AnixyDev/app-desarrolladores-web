@@ -2,6 +2,7 @@ import React, { useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 // FIX: Remove .tsx and .ts extensions from imports to resolve module resolution errors.
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -26,7 +27,7 @@ const initialClientState: NewClient = {
 };
 
 const ClientsPage: React.FC = () => {
-    const { clients, addClient, updateClient, deleteClient, profile } = useAppStore();
+    const { clients, addClient, updateClient, deleteClient, profile } = useAppStore(useShallow(s => ({ clients: s.clients, addClient: s.addClient, updateClient: s.updateClient, deleteClient: s.deleteClient, profile: s.profile })));
     const { addToast } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);

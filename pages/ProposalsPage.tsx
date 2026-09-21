@@ -1,6 +1,7 @@
 // pages/ProposalsPage.tsx
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -23,7 +24,7 @@ import { Proposal } from '@/types';
 type FilterStatus = 'all' | Proposal['status'];
 
 const ProposalsPage: React.FC = () => {
-  const { proposals, clients, addProposal, deleteProposal, updateProposal, addInvoice, profile } = useAppStore();
+  const { proposals, clients, addProposal, deleteProposal, updateProposal, addInvoice, profile } = useAppStore(useShallow(s => ({ proposals: s.proposals, clients: s.clients, addProposal: s.addProposal, deleteProposal: s.deleteProposal, updateProposal: s.updateProposal, addInvoice: s.addInvoice, profile: s.profile })));
   const { addToast } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);

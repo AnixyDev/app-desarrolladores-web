@@ -1,5 +1,6 @@
 import React, { lazy, Suspense, useMemo } from 'react';
 import { useAppStore } from '../hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Sparkles, TrendingUp, Users, Briefcase, Clock } from 'lucide-react';
 
 // Carga diferida — los gráficos no bloquean el chunk principal
@@ -40,7 +41,7 @@ const ChartSkeleton: React.FC<{ height?: string }> = ({ height = 'h-[300px]' }) 
 
 // ── Página principal ──────────────────────────────────────────────────────────
 const DashboardPage: React.FC = () => {
-  const { profile, invoices, expenses, projects, clients, timeEntries } = useAppStore();
+  const { profile, invoices, expenses, projects, clients, timeEntries } = useAppStore(useShallow(s => ({ profile: s.profile, invoices: s.invoices, expenses: s.expenses, projects: s.projects, clients: s.clients, timeEntries: s.timeEntries })));
 
   // ── Ingresos del mes actual (facturas pagadas con issue_date en este mes) ──
   const monthlyIncome = useMemo(() => {

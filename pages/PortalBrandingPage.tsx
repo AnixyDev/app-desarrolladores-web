@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { supabase } from '@/lib/supabaseClient';
 import { ZapIcon, UploadIcon, CopyIcon, CheckCircleIcon } from '@/components/icons/Icon';
@@ -16,7 +17,7 @@ import { ZapIcon, UploadIcon, CopyIcon, CheckCircleIcon } from '@/components/ico
 const DEFAULT_BRAND_COLOR = '#d9009f';
 
 const PortalBrandingPage: React.FC = () => {
-    const { profile, updateProfile } = useAppStore();
+    const { profile, updateProfile } = useAppStore(useShallow(s => ({ profile: s.profile, updateProfile: s.updateProfile })));
     const { addToast } = useToast();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = useState(false);

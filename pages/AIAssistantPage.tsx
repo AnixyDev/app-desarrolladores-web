@@ -4,6 +4,7 @@ import Button from '@/components/ui/Button';
 import { SendIcon as Send, SparklesIcon as Sparkles, UserIcon as User, RefreshCwIcon as RefreshCw } from '@/components/icons/Icon';
 import { getAIResponse, AI_CREDIT_COSTS } from '@/services/geminiService';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 
 interface Message {
@@ -14,7 +15,7 @@ interface Message {
 
 const AIAssistantPage = () => {
   const { addToast } = useToast();
-  const { profile, consumeCredits } = useAppStore();
+  const { profile, consumeCredits } = useAppStore(useShallow(s => ({ profile: s.profile, consumeCredits: s.consumeCredits })));
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',

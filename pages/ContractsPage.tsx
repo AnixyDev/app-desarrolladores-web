@@ -1,6 +1,7 @@
 // pages/ContractsPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import StatusChip from '@/components/ui/StatusChip';
@@ -16,11 +17,7 @@ import BuySignatureCreditsModal from '@/components/modals/BuySignatureCreditsMod
 import { FileSignatureIcon } from '@/components/icons/Icon';
 
 const ContractsPage: React.FC = () => {
-  const {
-    profile, contracts, clients, projects,
-    addContract, updateContract, deleteContract, sendContract,
-    getClientById, getProjectById, subscribeToContractsRealtime,
-  } = useAppStore();
+  const { profile, contracts, clients, projects, addContract, updateContract, deleteContract, sendContract, getClientById, getProjectById, subscribeToContractsRealtime } = useAppStore(useShallow(s => ({ profile: s.profile, contracts: s.contracts, clients: s.clients, projects: s.projects, addContract: s.addContract, updateContract: s.updateContract, deleteContract: s.deleteContract, sendContract: s.sendContract, getClientById: s.getClientById, getProjectById: s.getProjectById, subscribeToContractsRealtime: s.subscribeToContractsRealtime })));
   // CAMBIO: NUEVO. Activa la suscripción de Realtime al montar la página,
   // y la limpia al desmontar — así el estado "Firmado" aparece al instante
   // cuando el cliente firma desde el portal, sin recargar manualmente.

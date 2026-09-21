@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency } from '@/lib/utils';
 
 interface InvoiceFromTimeModalProps {
@@ -11,7 +12,7 @@ interface InvoiceFromTimeModalProps {
 }
 
 const InvoiceFromTimeModal: React.FC<InvoiceFromTimeModalProps> = ({ isOpen, onClose, onGenerate }) => {
-    const { clients, projects, timeEntries, profile } = useAppStore();
+    const { clients, projects, timeEntries, profile } = useAppStore(useShallow(s => ({ clients: s.clients, projects: s.projects, timeEntries: s.timeEntries, profile: s.profile })));
     
     const [selectedClientId, setSelectedClientId] = useState<string>('');
     const [selectedProjectId, setSelectedProjectId] = useState<string>('');

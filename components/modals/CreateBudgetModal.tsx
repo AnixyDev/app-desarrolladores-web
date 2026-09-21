@@ -3,6 +3,7 @@ import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { NewBudget, InvoiceItem, Budget } from '@/types';
 import { PlusIcon, TrashIcon } from '@/components/icons/Icon';
 
@@ -16,7 +17,7 @@ interface CreateBudgetModalProps {
 }
 
 const CreateBudgetModal: React.FC<CreateBudgetModalProps> = ({ isOpen, onClose, budgetToEdit }) => {
-  const { clients, addBudget, updateBudget } = useAppStore();
+  const { clients, addBudget, updateBudget } = useAppStore(useShallow(s => ({ clients: s.clients, addBudget: s.addBudget, updateBudget: s.updateBudget })));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = !!budgetToEdit;
 

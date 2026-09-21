@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { InboxIcon, MailIcon, FileTextIcon, BriefcaseIcon } from '@/components/icons/Icon';
 import EmptyState from '@/components/ui/EmptyState';
 import Button from '@/components/ui/Button';
@@ -21,7 +22,7 @@ const formatTimestamp = (iso: string): string => {
 };
 
 const InboxPage: React.FC = () => {
-  const { notifications, markAsRead, markAllAsRead } = useAppStore();
+  const { notifications, markAsRead, markAllAsRead } = useAppStore(useShallow(s => ({ notifications: s.notifications, markAsRead: s.markAsRead, markAllAsRead: s.markAllAsRead })));
   const navigate = useNavigate();
   const hasUnread = notifications.some(n => !n.isRead);
 

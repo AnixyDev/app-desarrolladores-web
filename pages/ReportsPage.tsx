@@ -2,6 +2,7 @@
 import React, { useState, useMemo, lazy, Suspense } from 'react';
 
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
@@ -55,15 +56,7 @@ const StatCard: React.FC<{
 );
 
 const ReportsPage: React.FC = () => {
-  const {
-    invoices,
-    expenses,
-    clients,
-    projects,
-    timeEntries,
-    profile,
-    consumeCredits,
-  } = useAppStore();
+  const { invoices, expenses, clients, projects, timeEntries, profile, consumeCredits } = useAppStore(useShallow(s => ({ invoices: s.invoices, expenses: s.expenses, clients: s.clients, projects: s.projects, timeEntries: s.timeEntries, profile: s.profile, consumeCredits: s.consumeCredits })));
 
   const { addToast } = useToast();
 

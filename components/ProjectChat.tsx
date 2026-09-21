@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '../hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { SendIcon, SparklesIcon, UserIcon } from './icons/Icon';
 import { ProjectMessage } from '../types';
 import Input from './ui/Input';
@@ -10,7 +11,7 @@ interface ProjectChatProps {
 }
 
 const ProjectChat: React.FC<ProjectChatProps> = ({ projectId }) => {
-  const { profile } = useAppStore();
+  const { profile } = useAppStore(useShallow(s => ({ profile: s.profile })));
 
   const [messages, setMessages] = useState<ProjectMessage[]>([]);
   const [input, setInput] = useState('');

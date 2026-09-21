@@ -8,6 +8,7 @@
 import React from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { InboxIcon, MailIcon, FileTextIcon, BriefcaseIcon } from '../icons/Icon';
 
 // El tipo Notification real no distingue categoría — se infiere del link
@@ -29,7 +30,7 @@ const formatTimestamp = (iso: string): string => {
 };
 
 const SmartInboxWidget: React.FC = () => {
-  const { notifications, markAsRead } = useAppStore();
+  const { notifications, markAsRead } = useAppStore(useShallow(s => ({ notifications: s.notifications, markAsRead: s.markAsRead })));
   const navigate = useNavigate();
   const unreadCount = notifications.filter(n => !n.isRead).length;
   const recentNotifications = notifications.slice(0, 8);

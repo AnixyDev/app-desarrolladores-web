@@ -2,6 +2,7 @@
 import React, { useState, lazy, Suspense } from 'react';
 
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Star, Briefcase } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -17,7 +18,7 @@ const UpgradePromptModal = lazy(
 );
 
 const SavedJobsPage: React.FC = () => {
-  const { getSavedJobs, saveJob, profile } = useAppStore();
+  const { getSavedJobs, saveJob, profile } = useAppStore(useShallow(s => ({ getSavedJobs: s.getSavedJobs, saveJob: s.saveJob, profile: s.profile })));
   const savedJobs = getSavedJobs();
   const navigate = useNavigate();
 

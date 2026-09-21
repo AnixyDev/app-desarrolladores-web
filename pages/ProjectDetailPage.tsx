@@ -3,6 +3,7 @@ import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 // FIX: Remove .tsx and .ts extensions from imports to resolve module resolution errors.
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -20,19 +21,7 @@ const ProjectDetailPage: React.FC = () => {
     const navigate = useNavigate();
     const { addToast } = useToast();
 
-    const {
-        getProjectById,
-        getClientById,
-        getTasksByProjectId,
-        timeEntries,
-        expenses,
-        profile,
-        addTask,
-        toggleTask,
-        deleteTask,
-        deleteProject,
-        updateProjectStatus
-    } = useAppStore();
+    const { getProjectById, getClientById, getTasksByProjectId, timeEntries, expenses, profile, addTask, toggleTask, deleteTask, deleteProject, updateProjectStatus } = useAppStore(useShallow(s => ({ getProjectById: s.getProjectById, getClientById: s.getClientById, getTasksByProjectId: s.getTasksByProjectId, timeEntries: s.timeEntries, expenses: s.expenses, profile: s.profile, addTask: s.addTask, toggleTask: s.toggleTask, deleteTask: s.deleteTask, deleteProject: s.deleteProject, updateProjectStatus: s.updateProjectStatus })));
 
     const [newTaskDescription, setNewTaskDescription] = useState('');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);

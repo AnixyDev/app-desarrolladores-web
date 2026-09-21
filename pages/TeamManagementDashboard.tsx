@@ -2,6 +2,7 @@ import React, { useState, lazy, Suspense } from 'react';
 // FIX: Switched to the centralized Icon wrapper for consistency and added the missing User icon.
 import { Users, UserPlus, Trash2, MailIcon as Mail, UserIcon as User } from '@/components/icons/Icon';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { UserData } from '@/types';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/hooks/useToast';
@@ -23,7 +24,7 @@ interface NewMember {
 const initialNewMember: NewMember = { name: '', email: '', role: roles[0] };
 
 const TeamManagementDashboard: React.FC = () => {
-  const { users, inviteUser, deleteUser, teamMembership } = useAppStore();
+  const { users, inviteUser, deleteUser, teamMembership } = useAppStore(useShallow(s => ({ users: s.users, inviteUser: s.inviteUser, deleteUser: s.deleteUser, teamMembership: s.teamMembership })));
   const { addToast } = useToast();
   
   const [showInviteModal, setShowInviteModal] = useState(false);

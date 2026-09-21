@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import StatusChip from '@/components/ui/StatusChip';
@@ -19,11 +20,7 @@ import { useToast } from '../hooks/useToast';
 import CreateBudgetModal from '../components/modals/CreateBudgetModal';
 
 const BudgetsPage: React.FC = () => {
-  const {
-    budgets,
-    getClientById,
-    updateBudgetStatus,
-  } = useAppStore();
+  const { budgets, getClientById, updateBudgetStatus } = useAppStore(useShallow(s => ({ budgets: s.budgets, getClientById: s.getClientById, updateBudgetStatus: s.updateBudgetStatus })));
 
   const { addToast } = useToast();
 

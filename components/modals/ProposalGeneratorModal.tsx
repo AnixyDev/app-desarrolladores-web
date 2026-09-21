@@ -4,6 +4,7 @@ import Button from '../ui/Button';
 import { SparklesIcon, RefreshCwIcon, SendIcon } from '../icons/Icon';
 import { generateProposalText, refineProposalText, AI_CREDIT_COSTS } from '@/services/geminiService';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { Job } from '@/types';
 
@@ -16,7 +17,7 @@ interface ProposalGeneratorModalProps {
 }
 
 const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen, onClose, job }) => {
-    const { profile, consumeCredits, applyForJob } = useAppStore();
+    const { profile, consumeCredits, applyForJob } = useAppStore(useShallow(s => ({ profile: s.profile, consumeCredits: s.consumeCredits, applyForJob: s.applyForJob })));
     const { addToast } = useToast();
     const [proposalText, setProposalText] = useState('');
     const [isLoading, setIsLoading] = useState(false);

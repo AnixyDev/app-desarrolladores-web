@@ -1,5 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import { Building, Briefcase, TrashIcon, Users, Star } from 'lucide-react';
 import { Job } from '@/types';
@@ -14,7 +15,7 @@ const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptM
 const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
 const MyJobPostsPage: React.FC = () => {
-    const { jobs, applications, profile, deleteJob } = useAppStore();
+    const { jobs, applications, profile, deleteJob } = useAppStore(useShallow(s => ({ jobs: s.jobs, applications: s.applications, profile: s.profile, deleteJob: s.deleteJob })));
     const { addToast } = useToast();
     const navigate = useNavigate();
 

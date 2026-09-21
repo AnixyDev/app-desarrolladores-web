@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Clock, CheckCircle, ListTodo, Calendar, Pause, Play, Plus, GitBranch, Bell } from 'lucide-react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { useElapsedTime } from '@/hooks/useElapsedTime';
 import { formatDuration } from '@/lib/utils';
@@ -17,7 +18,7 @@ interface ManualEntry {
 }
 
 const MyTeamTimesheet: React.FC = () => {
-  const { tasks, projects, timeEntries, addTimeEntry, toggleTask, teamMembership, activeTimer, startTimer, stopTimer } = useAppStore();
+  const { tasks, projects, timeEntries, addTimeEntry, toggleTask, teamMembership, activeTimer, startTimer, stopTimer } = useAppStore(useShallow(s => ({ tasks: s.tasks, projects: s.projects, timeEntries: s.timeEntries, addTimeEntry: s.addTimeEntry, toggleTask: s.toggleTask, teamMembership: s.teamMembership, activeTimer: s.activeTimer, startTimer: s.startTimer, stopTimer: s.stopTimer })));
   const { addToast } = useToast();
 
   // El cronómetro vive en el store global (activeTimer, con un timestamp de

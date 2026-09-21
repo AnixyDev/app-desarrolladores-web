@@ -1,5 +1,6 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import { Send, Briefcase } from 'lucide-react';
 import { JobApplication } from '@/types';
@@ -16,7 +17,7 @@ const applicationStatusConfig = {
 };
 
 const MyApplicationsPage: React.FC = () => {
-    const { applications, getJobById, profile } = useAppStore();
+    const { applications, getJobById, profile } = useAppStore(useShallow(s => ({ applications: s.applications, getJobById: s.getJobById, profile: s.profile })));
     const navigate = useNavigate();
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     
