@@ -18,7 +18,15 @@ import './index.css';
 // Mantenerlo activo cargaba un script de Google en segundo plano
 // que generaba errores de "Cross-Origin-Opener-Policy" en consola.
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+// CAMBIO (rendimiento): index.html pinta un héroe estático dentro de #root
+// para que el navegador muestre contenido sin esperar al JavaScript (FCP/LCP).
+// createRoot() NO borra el contenido previo del contenedor: lo añade al final.
+// Sin este vaciado se verían el héroe estático y el real, uno encima de otro.
+// Se hace en el mismo tick que el render, así que no hay parpadeo.
+const container = document.getElementById('root')!;
+container.innerHTML = '';
+
+ReactDOM.createRoot(container).render(
   <BrowserRouter>
     <App />
   </BrowserRouter>

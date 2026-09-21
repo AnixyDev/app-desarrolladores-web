@@ -21,43 +21,23 @@ export default defineConfig(({ mode }) => {
     build: {
       sourcemap: false, // antes: true — exponía el código fuente completo en F12 > Sources
       chunkSizeWarningLimit: 600,
-      rollupOptions: {
-        output: {
-          manualChunks(id) {
-            if (!id.includes('node_modules')) return;
-
-            if (id.includes('react-router-dom') || id.includes('/react-dom/') || id.includes('/react/')) {
-              return 'vendor-react';
-            }
-            if (id.includes('recharts')) return 'vendor-recharts';
-            // CAMBIO: qrcode/canvg/dompurify son dependencias reales de jsPDF
-            // (dompurify salió en el audit de seguridad como '.>jspdf>dompurify'),
-            // usadas solo para el QR tributario de las facturas.
-            if (id.includes('jspdf') || id.includes('qrcode') || id.includes('canvg') || id.includes('dompurify')) {
-              return 'vendor-pdf';
-            }
-            if (id.includes('@stripe/stripe-js') || id.includes('@stripe/react-stripe-js')) return 'vendor-stripe';
-            if (id.includes('@google/generative-ai')) return 'vendor-ai';
-            if (id.includes('marked')) return 'vendor-markdown';
-            if (id.includes('@dnd-kit')) return 'vendor-dnd';
-            // CAMBIO: antes solo '@supabase/supabase-js' exacto — el cliente
-            // de auth interno vive en '@supabase/auth-js' (módulo "GoTrue"),
-            // que no coincidía y caía en el cajón genérico. Ampliado a @supabase/*.
-            if (id.includes('@supabase/')) return 'vendor-supabase';
-            if (id.includes('@react-oauth/google')) return 'vendor-google-auth';
-            if (id.includes('lucide-react')) return 'vendor-icons';
-            if (id.includes('zustand') || id.includes('uuid')) return 'vendor-utils';
-
-            // CAMBIO: NUEVO. Mayores ocupantes del cajón genérico 'vendor'
-            // (visto con rollup-plugin-visualizer) — separarlos permite que el
-            // navegador los cachee de forma independiente entre despliegues.
-            if (id.includes('core-js')) return 'vendor-corejs';
-            if (id.includes('/lodash/')) return 'vendor-lodash';
-            if (id.includes('html2canvas')) return 'vendor-html2canvas';
-            return 'vendor';
-          },
-        },
-      },
+      // CAMBIO (rendimiento): se elimina manualChunks por completo.
+      //
+      // Por qué: al forzar a mano los grupos de vendors se creaban
+      // dependencias cruzadas entre chunks. El resultado era que el chunk de
+      // entrada importaba de forma ESTÁTICA vendor-pdf (jsPDF, 488 kB),
+      // vendor-dnd, vendor-supabase, vendor-corejs y el cajón 'vendor' — y
+      // Vite generaba un <link rel="modulepreload"> para cada uno en el HTML.
+      // Es decir: la landing pública descargaba ~1,2 MB de JavaScript que solo
+      // hacen falta dentro de la app (generar PDFs, Kanban, gráficas).
+      //
+      // Sin manualChunks, Rolldown reparte los chunks siguiendo los
+      // import() dinámicos reales: jsPDF, recharts y html2canvas quedan en
+      // chunks aparte que solo se descargan al entrar en las páginas que los
+      // usan. El HTML pasa de 9 modulepreload a ninguno.
+      //
+      // NO volver a añadir manualChunks sin comprobar después, en dist/index.html,
+      // cuántos <link rel="modulepreload"> se generan.
     },
   };
 });
