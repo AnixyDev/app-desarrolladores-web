@@ -18,20 +18,102 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#030712" />
 
-    <!-- Fonts -->
+    <!-- Conexiones anticipadas: fuentes + API de Supabase (primera llamada de sesión) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      rel="stylesheet"
-    />
+    <link rel="preconnect" href="https://umqsjycqypxvhbhmidma.supabase.co" crossorigin />
 
-    <!-- Stripe (OK cargar externo) -->
-    <script src="https://js.stripe.com/v3/" async></script>
+    <!--
+      CAMBIO (rendimiento): la hoja de estilos de Google Fonts bloqueaba el
+      renderizado 750 ms (Lighthouse: "Solicitudes que bloquean el renderizado").
+      Con rel="preload" + onload el navegador la descarga en paralelo y la
+      aplica al llegar, sin retrasar el primer pintado. Las familias y pesos
+      son exactamente los mismos que antes, así que no cambia nada visual;
+      display=swap ya hacía que el texto se viera con la fuente de sistema
+      mientras tanto.
+    -->
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      />
+    </noscript>
+
+    <!--
+      CAMBIO (rendimiento): se elimina <script src="https://js.stripe.com/v3/">.
+      No hacía falta: services/stripeService.ts usa loadStripe() de
+      @stripe/stripe-js, que inyecta ese mismo script bajo demanda la primera
+      vez que se abre un pago. Tenerlo aquí cargaba 271 kB en TODAS las páginas
+      (incluida la landing pública) y era el principal responsable del
+      Total Blocking Time de 230 ms, además de abrir el iframe de
+      m.stripe.network. Los pagos siguen funcionando igual.
+    -->
+
+    <!--
+      CAMBIO (rendimiento): estilos críticos del héroe, en línea.
+      Solo lo justo para pintar la cabecera y el titular sin esperar al CSS
+      ni al JS. Los valores replican las clases de Tailwind que usa
+      pages/LandingPage.tsx, para que al montar React no se mueva nada (CLS).
+    -->
+    <style>
+      #pre-hero { font-family: Inter, -apple-system, BlinkMacFontSmoothing, 'Segoe UI', Roboto, sans-serif; }
+      #pre-hero .ph-nav { height: 80px; border-bottom: 1px solid #1f2937; display: flex; align-items: center; gap: 12px; padding: 0 24px; }
+      #pre-hero .ph-brand { font-family: 'Space Grotesk', Inter, sans-serif; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.025em; color: #fff; }
+      #pre-hero .ph-main { max-width: 64rem; margin: 0 auto; padding: 80px 24px 96px; text-align: center; }
+      #pre-hero .ph-badge { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 24px; padding: 4px 12px; border-radius: 9999px; border: 1px solid #1f2937; background: rgba(17,24,39,.6); font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace; font-size: .75rem; line-height: 1rem; color: #9ca3af; }
+      #pre-hero .ph-title { font-family: 'Space Grotesk', Inter, sans-serif; font-size: 2.25rem; font-weight: 700; line-height: 1.1; letter-spacing: -0.025em; margin: 0 0 24px; color: #fff; }
+      #pre-hero .ph-sub { color: #9ca3af; font-size: 1.125rem; line-height: 1.75rem; margin: 0 auto; max-width: 42rem; }
+      @media (min-width: 640px) {
+        #pre-hero .ph-nav { padding: 0 48px; }
+        #pre-hero .ph-title { font-size: 3rem; }
+        #pre-hero .ph-sub { font-size: 1.25rem; line-height: 1.75rem; }
+      }
+      @media (min-width: 768px) { #pre-hero .ph-title { font-size: 3.75rem; } }
+    </style>
   </head>
 
   <body class="bg-gray-950 text-white selection:bg-primary-500/30">
-    <div id="root"></div>
+    <!--
+      CAMBIO (rendimiento): copia estática del héroe de la landing.
+      Antes, #root estaba vacío y el navegador no pintaba NADA hasta descargar
+      y ejecutar todo el JavaScript: FCP 4,4 s y LCP 5,8 s en móvil.
+      Este bloque se pinta con el propio HTML (~1 s) y React lo sustituye por
+      la landing real al montar. Solo se muestra en "/": el script de abajo lo
+      retira en cualquier otra ruta antes del primer pintado.
+    -->
+    <div id="root">
+      <div id="pre-hero">
+        <div class="ph-nav">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="preLogoGradient" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#F000B8" />
+                <stop offset="1" stop-color="#9D00FF" />
+              </linearGradient>
+            </defs>
+            <text x="50%" y="52%" dominant-baseline="middle" text-anchor="middle" font-size="22" font-family="Inter, sans-serif" font-weight="800" fill="url(#preLogoGradient)">DF</text>
+          </svg>
+          <span class="ph-brand">DevFreelancer</span>
+        </div>
+        <div class="ph-main">
+          <div class="ph-badge"><span style="color:#ef74bd">$</span> whoami</div>
+          <h1 class="ph-title">La gestión de tu negocio, con la lógica de un desarrollador</h1>
+          <p class="ph-sub">Clientes, proyectos, facturas con IVA/IRPF automático y cobro online. Sin plantillas de Excel, sin PDFs perdidos en el correo.</p>
+        </div>
+      </div>
+    </div>
+    <script>
+      if (location.pathname !== '/') {
+        var ph = document.getElementById('pre-hero');
+        if (ph) ph.remove();
+      }
+    </script>
 
     <!-- ÚNICO punto de entrada -->
     <script type="module" src="/main.tsx"></script>
