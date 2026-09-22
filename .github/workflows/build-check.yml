@@ -23,8 +23,22 @@ jobs:
       - name: Activar pnpm vía corepack (integrado en Node, sin acciones externas)
         run: corepack enable && corepack prepare pnpm@9 --activate
 
-      - name: Instalar dependencias (idéntico a lo que hace Vercel)
+      # CORRECCIÓN: este paso NO es "idéntico a lo que hace Vercel", como decía
+      # antes. Aquí se usa pnpm 9 (fijado arriba por corepack) y Vercel usa
+      # 10.28. Coinciden en lo esencial —instalación con lockfile congelado—
+      # pero no son la misma versión, y ya nos mordió una vez: pnpm 9 y 10
+      # exigen pnpm-workspace.yaml con "packages", pnpm 12 no.
+      # Para que las tres máquinas (CI, Vercel y local) usen la misma versión,
+      # habría que fijar "packageManager" en package.json.
+      - name: Instalar dependencias (lockfile congelado, como en Vercel)
         run: pnpm install --frozen-lockfile
+
+      # NUEVO: los tests existían (vitest, src/test/) pero el CI no los ejecutaba
+      # nunca. Un test que nadie corre se pudre en silencio: deja de reflejar el
+      # código y nadie se entera hasta que falla algo en producción.
+      # Este paso SÍ bloquea: si un test se rompe, no se mergea.
+      - name: Tests (vitest)
+        run: pnpm test
 
       # NOTA: tsc --noEmit se deja como aviso, no bloquea el merge.
       # El proyecto tiene ~80 errores de tipos preexistentes (Job, Notification,
