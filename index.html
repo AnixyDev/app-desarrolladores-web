@@ -62,6 +62,24 @@
       pages/LandingPage.tsx, para que al montar React no se mueva nada (CLS).
     -->
     <style>
+      /*
+        CAMBIO: el fondo oscuro se declara aqui, en el propio HTML, ademas de
+        en la clase bg-gray-950 del <body>.
+        Motivo: esa clase vive en index.css. En "pnpm dev" Vite NO enlaza el
+        CSS con <link>, lo inyecta desde JavaScript - asi que entre que el
+        navegador pinta el HTML y arranca el JS el fondo es transparente, o
+        sea BLANCO. Medido: 286 ms en blanco en cada recarga en dev (en
+        produccion son 0 ms, porque alli index.css si es un <link> bloqueante).
+        Eso es el "guino blanco" al entrar: en dev, cualquier recarga completa
+        lo provoca - y al hacer login hay una, porque Vite recarga la pagina
+        cuando descubre dependencias nuevas (las del dashboard) y porque
+        safeLazy() en App.tsx llama a window.location.reload() si falla la
+        carga de una pagina diferida.
+        Con estas dos lineas el fondo correcto esta desde el primer fotograma,
+        sin esperar a nada. #030712 es exactamente gray-950 de Tailwind.
+      */
+      html, body { background-color: #030712; color: #fff; }
+
       #pre-hero { font-family: Inter, -apple-system, BlinkMacFontSmoothing, 'Segoe UI', Roboto, sans-serif; }
       #pre-hero .ph-nav { height: 80px; border-bottom: 1px solid #1f2937; display: flex; align-items: center; gap: 12px; padding: 0 24px; }
       #pre-hero .ph-brand { font-family: 'Space Grotesk', Inter, sans-serif; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.025em; color: #fff; }
