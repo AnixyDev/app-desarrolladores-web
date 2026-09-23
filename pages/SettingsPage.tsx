@@ -11,6 +11,39 @@ import { useToast } from '@/hooks/useToast';
 
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal' | 'connect';
 
+const DIA_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Estado de caducidad del certificado digital.
+ *
+ * Hasta ahora la fecha de caducidad no se guardaba ni se mostraba en ningún
+ * sitio: nada avisaba de que el certificado estaba a punto de vencer, y los
+ * envíos a Verifactu habrían empezado a fallar sin previo aviso.
+ */
+export const estadoCaducidad = (iso: string | null | undefined) => {
+  if (!iso) return null;
+  const fecha = new Date(iso);
+  if (Number.isNaN(fecha.getTime())) return null;
+
+  const dias = Math.floor((fecha.getTime() - Date.now()) / DIA_MS);
+  const fechaTexto = fecha.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  if (dias < 0) {
+    return { nivel: 'caducado' as const, color: 'text-red-400', icono: '⛔',
+             texto: `Caducado el ${fechaTexto} — renuévalo, las facturas con Verifactu fallarán` };
+  }
+  if (dias <= 30) {
+    return { nivel: 'urgente' as const, color: 'text-red-400', icono: '⚠️',
+             texto: `Caduca en ${dias} ${dias === 1 ? 'día' : 'días'} (${fechaTexto}) — renuévalo ya` };
+  }
+  if (dias <= 60) {
+    return { nivel: 'aviso' as const, color: 'text-amber-400', icono: '⚠️',
+             texto: `Caduca en ${dias} días (${fechaTexto}) — conviene ir renovándolo` };
+  }
+  return { nivel: 'vigente' as const, color: 'text-gray-400', icono: '',
+           texto: `Válido hasta el ${fechaTexto}` };
+};
+
 const SettingsPage: React.FC = () => {
   const { profile, updateProfile, logout, updateVeriFactuSettings, verifyFiscalChain } = useAppStore(useShallow(s => ({ profile: s.profile, updateProfile: s.updateProfile, logout: s.logout, updateVeriFactuSettings: s.updateVeriFactuSettings, verifyFiscalChain: s.verifyFiscalChain })));
   const { addToast } = useToast();
@@ -46,6 +79,7 @@ const SettingsPage: React.FC = () => {
   const [secretsStatus, setSecretsStatus] = useState<{
     gemini_configured: boolean; gemini_updated_at: string | null;
     certificate_configured: boolean; certificate_uploaded_at: string | null;
+    certificate_expires_at: string | null; certificate_subject: string | null;
   } | null>(null);
   const [loadingSecretsStatus, setLoadingSecretsStatus] = useState(true);
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
@@ -713,12 +747,34 @@ const SettingsPage: React.FC = () => {
                   {loadingSecretsStatus ? (
                     <p className="text-sm text-gray-500">Cargando...</p>
                   ) : secretsStatus?.certificate_configured ? (
-                    <div className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
-                      <span className="text-sm text-green-400">✅ Certificado guardado {secretsStatus.certificate_uploaded_at && `(subido el ${new Date(secretsStatus.certificate_uploaded_at).toLocaleDateString('es-ES')})`}</span>
-                      <Button size="sm" variant="danger" onClick={handleDeleteCertificate}>
-                        <TrashIcon className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    (() => {
+                      const caducidad = estadoCaducidad(secretsStatus.certificate_expires_at);
+                      const alerta = caducidad && caducidad.nivel !== 'vigente';
+                      return (
+                        <div className={`flex items-start justify-between p-3 rounded-lg ${alerta ? 'bg-gray-800 ring-1 ring-red-500/40' : 'bg-gray-800'}`}>
+                          <div className="space-y-1 pr-3">
+                            <p className="text-sm text-green-400">
+                              ✅ Certificado guardado {secretsStatus.certificate_uploaded_at && `(subido el ${new Date(secretsStatus.certificate_uploaded_at).toLocaleDateString('es-ES')})`}
+                            </p>
+                            {secretsStatus.certificate_subject && (
+                              <p className="text-xs text-gray-400">Titular: {secretsStatus.certificate_subject}</p>
+                            )}
+                            {caducidad ? (
+                              <p className={`text-xs ${caducidad.color}`}>
+                                {caducidad.icono} {caducidad.texto}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-gray-500">
+                                Fecha de caducidad desconocida — vuelve a subirlo para registrarla.
+                              </p>
+                            )}
+                          </div>
+                          <Button size="sm" variant="danger" onClick={handleDeleteCertificate}>
+                            <TrashIcon className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      );
+                    })()
                   ) : (
                     <div className="space-y-2">
                       <input
