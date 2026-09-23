@@ -71,15 +71,37 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
-  // 🛡️ IDEMPOTENCY CHECK
-  const { data: alreadyProcessed } = await supabase
+  // 🛡️ IDEMPOTENCIA — RESERVA PREVIA
+  //
+  // CAMBIO: antes esto era un SELECT aqui y un INSERT al FINAL, despues de
+  // procesar. Entre medias cabia todo el trabajo, asi que la clave primaria
+  // de processed_stripe_events (event_id) no servia de candado:
+  //   - Stripe reintenta cuando no recibe un 2xx. Si la funcion agota su
+  //     tiempo DESPUES de sumar creditos pero antes de registrar el evento,
+  //     el reintento lo procesa entero otra vez.
+  //   - Dos entregas simultaneas del mismo evento pasaban las dos el SELECT.
+  // Resultado: creditos sumados dos veces, referidos duplicados, plantillas
+  // compradas dos veces.
+  //
+  // Ahora se RESERVA el evento antes de tocar nada. El INSERT es el candado:
+  // si otro proceso ya lo reservo, falla con violacion de clave primaria
+  // (23505) y aqui se responde 200 sin hacer nada. Si el procesamiento falla
+  // mas adelante, la reserva se borra para que el reintento de Stripe pueda
+  // rehacerlo (ver el catch del final).
+  const { error: reservaError } = await supabase
     .from('processed_stripe_events')
-    .select('event_id')
-    .eq('event_id', event.id)
-    .maybeSingle()
+    .insert({ event_id: event.id, type: event.type })
 
-  if (alreadyProcessed) {
-    return new Response(JSON.stringify({ duplicate: true }), { status: 200 })
+  if (reservaError) {
+    if (reservaError.code === '23505') {
+      console.log(`↩️ Evento ${event.id} ya reservado por otra ejecucion — se ignora`)
+      return new Response(JSON.stringify({ duplicate: true }), { status: 200 })
+    }
+    // Cualquier otro error al reservar: no se procesa y se devuelve 500 para
+    // que Stripe reintente. Procesar sin poder registrar el evento seria
+    // peor: no habria forma de evitar el duplicado en el reintento.
+    console.error('❌ No se pudo reservar el evento, se rechaza para que Stripe reintente:', reservaError)
+    return new Response(JSON.stringify({ error: 'No se pudo reservar el evento' }), { status: 500 })
   }
 
   // Busca el perfil dueno de un customer de Stripe, ya sea por columna
@@ -121,24 +143,50 @@ serve(async (req) => {
           // completar el checkout; el webhook de subscription.updated de
           // abajo actua como red de seguridad por si este evento llega
           // antes de que exista la suscripcion en Stripe.
-          if (itemKey === 'proPlan') {
-            await supabase.from('profiles').update({ plan: 'Pro', ai_credits: PRO_PLAN_WELCOME_CREDITS }).eq('id', userId)
-          } else if (itemKey === 'teamsPlan' || itemKey === 'teamsPlanYearly') {
-            await supabase.from('profiles').update({ plan: 'Teams', ai_credits: TEAMS_PLAN_WELCOME_CREDITS }).eq('id', userId)
+          // CAMBIO (creditos borrados al suscribirse): antes estas dos ramas
+          // hacian `ai_credits: PRO_PLAN_WELCOME_CREDITS`, que ASIGNA en vez
+          // de sumar. Si alguien compraba 500 creditos y despues se suscribia
+          // a Pro, se quedaba con 50 — creditos pagados, perdidos.
+          // La rama hermana (customer.subscription.updated, mas abajo) ya lo
+          // hacia bien con Math.max y un comentario que dice justo esto; a
+          // esta se le habia olvidado. Ahora usan el mismo criterio: los
+          // creditos de bienvenida son un SUELO, nunca un techo.
+          if (itemKey === 'proPlan' || itemKey === 'teamsPlan' || itemKey === 'teamsPlanYearly') {
+            const esTeams = itemKey !== 'proPlan'
+            const bienvenida = esTeams ? TEAMS_PLAN_WELCOME_CREDITS : PRO_PLAN_WELCOME_CREDITS
+            const { data: profile } = await supabase
+              .from('profiles').select('ai_credits').eq('id', userId).maybeSingle()
+            await supabase.from('profiles').update({
+              plan: esTeams ? 'Teams' : 'Pro',
+              ai_credits: Math.max(profile?.ai_credits ?? 0, bienvenida),
+            }).eq('id', userId)
           } else if (itemKey?.startsWith('aiCredits')) {
+            // CAMBIO (suma no atomica): antes se leia ai_credits y despues se
+            // escribia leido + n. Entre las dos cabia otra operacion y una de
+            // las sumas se perdia. sumar_creditos() lo hace en una sola
+            // sentencia SQL, con la fila bloqueada por Postgres.
             const creditsToAdd = parseInt(session.metadata?.credits || '0')
-            const { data: profile } = await supabase.from('profiles').select('ai_credits').eq('id', userId).single()
-            if (profile) {
-              await supabase.from('profiles').update({ ai_credits: (profile.ai_credits || 0) + creditsToAdd }).eq('id', userId)
+            if (creditsToAdd > 0) {
+              const { error: creditError } = await supabase.rpc('sumar_creditos', {
+                p_user_id: userId, p_ai: creditsToAdd, p_firma: 0,
+              })
+              // Si falla, se lanza: el catch de abajo libera la reserva y
+              // Stripe reintenta. Tragarse este error significaria cobrar sin
+              // entregar los creditos.
+              if (creditError) throw new Error(`No se pudieron sumar ${creditsToAdd} creditos de IA: ${creditError.message}`)
             }
           } else if (itemKey?.startsWith('signatureCredits')) {
             // Ítem 5 del roadmap — paquetes de firma electrónica, mismo
             // patrón que aiCredits: se compran aparte, no caducan, y se
             // consumen uno a uno al enviar un documento a firmar.
+            // CAMBIO: mismo motivo que arriba — suma atomica en vez de
+            // leer-y-escribir.
             const creditsToAdd = parseInt(session.metadata?.credits || '0')
-            const { data: profile } = await supabase.from('profiles').select('signature_credits').eq('id', userId).single()
-            if (profile) {
-              await supabase.from('profiles').update({ signature_credits: (profile.signature_credits || 0) + creditsToAdd }).eq('id', userId)
+            if (creditsToAdd > 0) {
+              const { error: creditError } = await supabase.rpc('sumar_creditos', {
+                p_user_id: userId, p_ai: 0, p_firma: creditsToAdd,
+              })
+              if (creditError) throw new Error(`No se pudieron sumar ${creditsToAdd} creditos de firma: ${creditError.message}`)
             }
           } else if (itemKey === 'featuredJobPost') {
             // FIX: no existía. JobPostForm.tsx llamaba a este checkout sin
@@ -373,20 +421,29 @@ serve(async (req) => {
       }
     }
 
-    const { error: insertError } = await supabase.from('processed_stripe_events').insert({
-      event_id: event.id,
-      type: event.type
-    })
-
-    if (insertError) {
-      console.error(`❌ Error saving processed event to DB:`, insertError)
-    }
-
+    // CAMBIO: el INSERT que habia aqui se ha movido ARRIBA, antes de procesar,
+    // para que la clave primaria haga de candado. Aqui ya no hace falta.
     console.log(`✅ Successfully processed webhook event: ${event.id} of type ${event.type}`)
     return new Response(JSON.stringify({ received: true }), { status: 200 })
 
   } catch (error: any) {
     console.error(`❌ Webhook processing error for event ${event?.id || 'unknown'}:`, error)
+
+    // CAMBIO: se libera la reserva. Sin esto, un fallo a mitad dejaria el
+    // evento marcado como procesado para siempre y el reintento de Stripe se
+    // descartaria como duplicado — perdiendo el cobro en silencio.
+    // Nota: si el fallo ocurrio DESPUES de aplicar parte de los cambios, el
+    // reintento repetira esa parte. Es el mal menor frente a perderla entera,
+    // y las operaciones de plan usan Math.max, que es repetible sin dano.
+    const { error: liberaError } = await supabase
+      .from('processed_stripe_events')
+      .delete()
+      .eq('event_id', event.id)
+
+    if (liberaError) {
+      console.error(`❌ Ademas, no se pudo liberar la reserva de ${event.id}:`, liberaError)
+    }
+
     return new Response(JSON.stringify({ error: 'Internal Error', details: error.message }), { status: 500 })
   }
 })
