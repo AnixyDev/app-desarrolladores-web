@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@13.10.0?target=deno";
+import { articulo, esComprablePorCheckout } from "../_shared/catalogo-stripe.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,35 @@ const corsHeaders = {
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
+
+const ORIGEN_POR_DEFECTO = "https://devfreelancer.app";
+const ORIGENES_PERMITIDOS = [
+  "https://devfreelancer.app",
+  "https://www.devfreelancer.app",
+];
+
+/**
+ * El origen para las URL de vuelta salia de `metadata.origin`, es decir, del
+ * navegador. Ahora se toma de la cabecera Origin y solo si es uno nuestro.
+ */
+function origenSeguro(origen: string | null): string {
+  if (!origen) return ORIGEN_POR_DEFECTO;
+  try {
+    const parsed = new URL(origen);
+    if (parsed.protocol === "http:" && parsed.hostname === "localhost") return parsed.origin;
+    if (parsed.protocol === "https:" && ORIGENES_PERMITIDOS.includes(parsed.origin)) {
+      return parsed.origin;
+    }
+  } catch { /* origen ilegible */ }
+  return ORIGEN_POR_DEFECTO;
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -41,31 +71,55 @@ serve(async (req) => {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return new Response("Unauthorized", { status: 401 });
+      return json({ error: "No autorizado" }, 401);
     }
 
     const body = await req.json();
 
-    const {
-      priceId,
-      mode = "payment",
-      amount,
-      productName,
-      metadata,
-      client_reference_id,
-    } = body;
-
-    // ----------------------------
-    // VALIDACIÓN DE ENTRADA
-    // ----------------------------
-    if (!priceId && !amount) {
-      throw new Error("Missing priceId or amount");
+    // ------------------------------------------------------------------
+    // TODO lo que decide QUE se compra y CUANTO cuesta sale del catalogo
+    // del servidor. Del cuerpo de la peticion solo se lee el itemKey y dos
+    // referencias que no afectan al precio.
+    //
+    // Antes se aceptaban `priceId`, `mode`, `amount` y el `metadata` entero.
+    // Como el webhook concede plan y creditos mirando metadata.itemKey y
+    // metadata.credits, sin comprobar el importe, un usuario registrado podia
+    // pagar 1 centimo por el plan Teams o por un millon de creditos. Y como
+    // el metadata del cliente se esparcia DESPUES de supabase_user_id, tambien
+    // podia ponerlo a nombre de otra persona.
+    // ------------------------------------------------------------------
+    const itemKey = String(body?.itemKey || "");
+    if (!esComprablePorCheckout(itemKey)) {
+      console.error(`[create-checkout-session] itemKey no valido: "${itemKey}" (usuario ${user.id})`);
+      return json({ error: "El artículo de compra no es válido." }, 400);
     }
 
-    // Origen REAL (siempre limpio)
-    const origin =
-      metadata?.origin ||
-      "https://devfreelancer.app";
+    const item = articulo(itemKey)!;
+
+    // Referencias sin efecto sobre el precio. job_id se comprueba ademas
+    // contra el usuario para no dejar destacar la oferta de otro.
+    const jobId = body?.job_id ? String(body.job_id) : null;
+    const clientReferenceId = body?.client_reference_id
+      ? String(body.client_reference_id)
+      : undefined;
+
+    if (itemKey === "featuredJobPost") {
+      if (!jobId) {
+        return json({ error: "Falta la oferta que se quiere destacar." }, 400);
+      }
+      const { data: job } = await supabase
+        .from("jobs")
+        .select("id")
+        .eq("id", jobId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!job) {
+        console.error(`[create-checkout-session] oferta ajena o inexistente: ${jobId} (usuario ${user.id})`);
+        return json({ error: "Oferta no encontrada." }, 404);
+      }
+    }
+
+    const origin = origenSeguro(req.headers.get("Origin"));
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -102,63 +156,29 @@ serve(async (req) => {
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      mode,
-      client_reference_id: client_reference_id || undefined,
+      mode: item.mode,
+      client_reference_id: clientReferenceId,
 
-      line_items: priceId
-        ? [
-            {
-              price: priceId,
-              quantity: 1,
-            },
-          ]
-        : [
-            {
-              price_data: {
-                currency: "eur",
-                product_data: {
-                  name: productName || "Pago DevFreelancer",
-                },
-                unit_amount: Math.round(Number(amount)),
-              },
-              quantity: 1,
-            },
-          ],
+      line_items: [{ price: item.priceId!, quantity: 1 }],
 
       success_url: `${origin}/billing?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/billing?payment=cancelled`,
 
+      // El metadata lo compone el servidor entero. El usuario es SIEMPRE el
+      // del token, y los creditos salen del catalogo, no de la peticion.
       metadata: {
         supabase_user_id: user.id,
-        ...(metadata || {}),
+        itemKey,
+        ...(item.credits !== undefined ? { credits: String(item.credits) } : {}),
+        ...(jobId ? { job_id: jobId } : {}),
       },
 
-      allow_promotion_codes: mode === "subscription",
+      allow_promotion_codes: item.mode === "subscription",
     });
 
-    return new Response(
-      JSON.stringify({ url: session.url }),
-      {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    return json({ url: session.url });
   } catch (error) {
     console.error("Checkout session error:", error);
-
-    return new Response(
-      JSON.stringify({
-        error: String((error as any)?.message || error),
-      }),
-      {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    return json({ error: "No se pudo iniciar el pago. Inténtalo de nuevo." }, 400);
   }
 });

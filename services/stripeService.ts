@@ -60,84 +60,12 @@ export const getStripe = () => {
    Catálogo de productos
 -------------------------- */
 
-// CAMBIO (subida de precios, ago 2026): priceId de proPlan y teamsPlan
-// actualizados a los nuevos importes (9,95€/mes y 45,95€/mes). Se añade
-// proPlanYearly, que antes no existía. teamsPlanYearly actualizado a 395€.
-// Los price_id ANTIGUOS se desactivaron en Stripe (ya no admiten checkouts
-// nuevos), pero los suscriptores que ya los tenían contratados siguen
-// pagando su importe de siempre — no se les ha tocado nada.
-export const STRIPE_ITEMS = {
-  proPlan: {
-    priceId: 'price_1U0juK8oC5awQy15YPiUjnn2', // 9,95€/mes
-    mode: 'subscription' as const,
-    name: 'Pro Plan',
-  },
-  proPlanYearly: {
-    priceId: 'price_1U0juP8oC5awQy15fzLhBWOd', // 99,95€/año — nuevo, antes no existía
-    mode: 'subscription' as const,
-    name: 'Pro Plan (Anual)',
-  },
-  teamsPlan: {
-    priceId: 'price_1U0juV8oC5awQy15ATm0EYe4', // 45,95€/mes
-    mode: 'subscription' as const,
-    name: 'Plan de equipos (Mensual)',
-  },
-  teamsPlanYearly: {
-    priceId: 'price_1U0jub8oC5awQy15QXzf5Vgp', // 395€/año
-    mode: 'subscription' as const,
-    name: 'Plan de equipos (Anual)',
-},
-  aiCredits100: {
-    priceId: 'price_1SOgpy8oC5awQy15TW22fBot',
-    mode: 'payment' as const,
-    name: '100 Créditos de IA',
-    credits: 100,
-  },
-  aiCredits500: {
-    priceId: 'price_1SOgr18oC5awQy15o1gTM2VM',
-    mode: 'payment' as const,
-    name: '500 Créditos de IA',
-    credits: 500,
-  },
-  aiCredits1000: {
-    priceId: 'price_1SOguC8oC5awQy15LGchpkVG',
-    mode: 'payment' as const,
-    name: '1000 Créditos de IA',
-    credits: 1000,
-  },
-  // Ítem 5 del roadmap — paquetes de firma electrónica. Creados en Stripe
-  // el 14/09, pago único (no suscripción).
-  signatureCredits5: {
-    priceId: 'price_1UFXFl8oC5awQy15P41Fag3Q',
-    mode: 'payment' as const,
-    name: '5 Créditos de Firma',
-    credits: 5,
-  },
-  signatureCredits10: {
-    priceId: 'price_1UFXHB8oC5awQy15XZrgT22B',
-    mode: 'payment' as const,
-    name: '10 Créditos de Firma',
-    credits: 10,
-  },
-  signatureCredits25: {
-    priceId: 'price_1UFXIH8oC5awQy15crrwynWT',
-    mode: 'payment' as const,
-    name: '25 Créditos de Firma',
-    credits: 25,
-  },
-  featuredJobPost: {
-    priceId: 'price_1SOlOv8oC5awQy15Q2aXoEg7',
-    mode: 'payment' as const,
-    name: 'Oferta de empleo destacada',
-  },
-  invoicePayment: {
-    priceId: null,
-    mode: 'payment' as const,
-    name: 'Pago de Factura',
-  },
-};
-
-export type StripeItemKey = keyof typeof STRIPE_ITEMS;
+// El catálogo vive en supabase/functions/_shared/catalogo-stripe.ts para que
+// el servidor y el navegador usen exactamente el mismo, sin posibilidad de que
+// se separen. Se reexporta aquí para no romper los imports existentes.
+export { STRIPE_ITEMS } from '../supabase/functions/_shared/catalogo-stripe';
+export type { StripeItemKey } from '../supabase/functions/_shared/catalogo-stripe';
+import { STRIPE_ITEMS, type StripeItemKey } from '../supabase/functions/_shared/catalogo-stripe';
 
 /* -------------------------
    Checkout (CORREGIDO)
@@ -154,26 +82,21 @@ export const redirectToCheckout = async (
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || !session) throw new Error('Sesión expirada.');
 
+  // CAMBIO: antes aquí se mandaban priceId, mode, amount y el metadata entero,
+  // y el servidor los reenviaba a Stripe tal cual. Eso permitía pedir un
+  // checkout de 1 céntimo con el itemKey de un plan de pago, porque el webhook
+  // concede el plan y los créditos mirando el metadata, no el importe.
+  //
+  // Ahora el servidor tiene su propio catálogo (supabase/functions/_shared/
+  // catalogo-stripe.ts, el mismo que importa este archivo) y resuelve precio,
+  // modo, créditos y usuario por su cuenta. Aquí solo va el itemKey y las
+  // referencias que no afectan al precio.
   const bodyPayload = {
-    priceId: item.priceId,
-    mode: item.mode,
-    // Eliminamos undefined del payload para evitar errores de serialización JSON
-    ...(itemKey === 'invoicePayment' && { 
-        amount: extraParams.amount_cents,
-        productName: `Factura ${extraParams.invoice_number}` 
-    }),
-    client_reference_id: extraParams.client_reference_id,
-    // FIX: 'credits' (definido en STRIPE_ITEMS para aiCredits*/signatureCredits*)
-    // nunca llegaba al metadata de la sesión de Stripe. El webhook lee
-    // session.metadata.credits para saber cuántos créditos conceder — sin
-    // esto, SIEMPRE resolvía a 0 y la compra se cobraba sin dar nada a
-    // cambio. Se incluye aquí solo si el item lo define.
-    metadata: {
-      ...extraParams,
-      itemKey,
-      origin: window.location.origin,
-      ...('credits' in item ? { credits: String(item.credits) } : {}),
-    },
+    itemKey,
+    ...(extraParams.job_id ? { job_id: extraParams.job_id } : {}),
+    ...(extraParams.client_reference_id
+      ? { client_reference_id: extraParams.client_reference_id }
+      : {}),
   };
 
   const { data, error } = await supabase.functions.invoke('create-checkout-session', {

@@ -14,6 +14,24 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+const ORIGEN_POR_DEFECTO = 'https://devfreelancer.app';
+const ORIGENES_PERMITIDOS = [
+  'https://devfreelancer.app',
+  'https://www.devfreelancer.app',
+];
+
+function origenSeguro(origen: string | null): string {
+  if (!origen) return ORIGEN_POR_DEFECTO;
+  try {
+    const parsed = new URL(origen);
+    if (parsed.protocol === 'http:' && parsed.hostname === 'localhost') return parsed.origin;
+    if (parsed.protocol === 'https:' && ORIGENES_PERMITIDOS.includes(parsed.origin)) {
+      return parsed.origin;
+    }
+  } catch { /* origen ilegible */ }
+  return ORIGEN_POR_DEFECTO;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -51,7 +69,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const origin = req.headers.get('Origin') || 'https://devfreelancer.app';
+    // El destino del enlace de la invitacion salia de la cabecera Origin sin
+    // comprobarla. Esa cabecera la fija quien hace la peticion, asi que era
+    // una URL sin validar dentro de un correo que sale con tu dominio.
+    // (Supabase Auth ademas filtra redirectTo contra su lista de URLs
+    // permitidas, pero no conviene depender solo de eso.)
+    const origin = origenSeguro(req.headers.get('Origin'));
 
     // Cliente con la Service Role Key: único con permiso para invitar usuarios.
     const supabaseAdmin = createClient(
