@@ -26,6 +26,12 @@ const initialProfile: Profile = {
     affiliate_code: '',
     stripe_account_id: '',
     stripe_onboarding_complete: false,
+    // CAMBIO: faltaba signature_credits, que en types.ts es obligatorio.
+    // tsc lo avisaba (TS2741) y el build pasaba igual porque Vite no hace
+    // comprobacion estricta. Valor 0, igual que la columna en Supabase:
+    // integer NOT NULL DEFAULT 0. Asi el perfil por defecto (el que se ve
+    // mientras carga la sesion) no anuncia creditos de firma que no existen.
+    signature_credits: 0,
 };
 
 // Utilidad: evita que una llamada se quede colgada para siempre.

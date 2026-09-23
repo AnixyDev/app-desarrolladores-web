@@ -40,14 +40,18 @@ jobs:
       - name: Tests unitarios (vitest)
         run: pnpm test
 
-      # NOTA: tsc --noEmit se deja como aviso, no bloquea el merge.
-      # El proyecto tiene ~80 errores de tipos preexistentes (Job, Notification,
-      # TimeEntry, etc.) que nunca han roto el build real, porque Vercel tampoco
-      # los comprueba (vite build no hace type-check estricto). Bloquear con esto
-      # ahora dejaría el CI en rojo permanentemente. Cuando se vaya arreglando esa
-      # deuda de tipos, se puede quitar "continue-on-error" para hacerlo bloqueante.
-      - name: Comprobar tipos de TypeScript (informativo, no bloquea)
-        continue-on-error: true
+      # CAMBIO: tsc --noEmit ahora BLOQUEA.
+      # El comentario anterior decía "~80 errores de tipos preexistentes". Ya no
+      # es cierto: quedaban 3, y están corregidos (las dos llamadas huérfanas a
+      # setPaymentLinkMenuInvoiceId en InvoicesPage.tsx y el signature_credits
+      # que faltaba en el perfil por defecto de authSlice.ts). tsc sale limpio.
+      #
+      # Merece la pena bloquear: el error de InvoicesPage NO era deuda de tipos,
+      # era un ReferenceError real en tiempo de ejecución al pulsar "Copiar
+      # enlace". Vite no lo detecta porque no comprueba tipos, y la prueba de
+      # humo tampoco, porque solo carga páginas y no abre menús. Con este paso
+      # en rojo, un fallo así no llega a main.
+      - name: Comprobar tipos de TypeScript (BLOQUEA)
         run: pnpm exec tsc --noEmit
 
       # Las claves VITE_* se incrustan en el bundle EN TIEMPO DE BUILD. Aquí no
