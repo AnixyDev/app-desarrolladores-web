@@ -22,10 +22,25 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 // detecta el hostname real y solo se aplica el dominio compartido en
 // producción — en local, la sesión sigue funcionando igual que siempre,
 // solo que atada a localhost en vez de compartida.
+// CAMBIO: antes esto era "si el host NO es exactamente 'localhost', usa
+// .devfreelancer.app". Eso rompia el login en todo lo demas:
+//   - 127.0.0.1 (el propio Vite lo ofrece como segunda URL)
+//   - la IP de la red local (probar desde el movil con --host)
+//   - los despliegues de vista previa de Vercel (*.vercel.app)
+// En todos esos casos el navegador RECHAZA la cookie, porque una pagina no
+// puede fijar una cookie para un dominio que no es el suyo. Resultado: el
+// login devuelve 200, la sesion no se guarda en ninguna parte y la app te
+// devuelve a la pantalla de acceso sin decir por que.
+// Ahora se invierte la condicion: el dominio compartido solo se aplica
+// cuando la pagina SE SIRVE desde devfreelancer.app o un subdominio suyo,
+// que es el unico caso en que el navegador lo aceptaria.
 function getCookieDomain(): string | undefined {
   if (typeof window === 'undefined') return undefined;
-  if (window.location.hostname === 'localhost') return undefined;
-  return '.devfreelancer.app';
+  const host = window.location.hostname;
+  if (host === 'devfreelancer.app' || host.endsWith('.devfreelancer.app')) {
+    return '.devfreelancer.app';
+  }
+  return undefined;
 }
 
 const cookieDomain = getCookieDomain();

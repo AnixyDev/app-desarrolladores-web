@@ -23,8 +23,22 @@ jobs:
       - name: Activar pnpm vía corepack (integrado en Node, sin acciones externas)
         run: corepack enable && corepack prepare pnpm@9 --activate
 
-      - name: Instalar dependencias (idéntico a lo que hace Vercel)
+      # CORRECCIÓN: este paso NO es "idéntico a lo que hace Vercel", como decía
+      # antes. Aquí se usa pnpm 9 (fijado arriba por corepack) y Vercel usa
+      # 10.28. Coinciden en lo esencial —instalación con lockfile congelado—
+      # pero no son la misma versión, y ya nos mordió una vez: pnpm 9 y 10
+      # exigen pnpm-workspace.yaml con "packages", pnpm 12 no.
+      # Para que las tres máquinas (CI, Vercel y local) usen la misma versión,
+      # habría que fijar "packageManager" en package.json.
+      - name: Instalar dependencias (lockfile congelado, como en Vercel)
         run: pnpm install --frozen-lockfile
+
+      # Los tests existían (vitest, src/test/) pero el CI no los ejecutaba
+      # nunca. Un test que nadie corre se pudre en silencio: deja de reflejar el
+      # código y nadie se entera hasta que falla algo en producción.
+      # Este paso SÍ bloquea: si un test se rompe, no se mergea.
+      - name: Tests unitarios (vitest)
+        run: pnpm test
 
       # NOTA: tsc --noEmit se deja como aviso, no bloquea el merge.
       # El proyecto tiene ~80 errores de tipos preexistentes (Job, Notification,
@@ -36,9 +50,33 @@ jobs:
         continue-on-error: true
         run: pnpm exec tsc --noEmit
 
+      # Las claves VITE_* se incrustan en el bundle EN TIEMPO DE BUILD. Aquí no
+      # hay .env.local (está en .gitignore, y bien que está), así que sin estas
+      # variables lib/supabaseClient.ts lanza "Faltan variables de entorno" nada
+      # más cargar el módulo: el build pasa, pero la app es una página en blanco.
+      # Son valores FALSOS a propósito: la prueba de humo intercepta todas las
+      # llamadas de red, así que nunca se usan contra un servidor real. No hacen
+      # falta secretos de GitHub para esto.
       - name: Build de producción (vite build) — esto SÍ bloquea, es lo que corre Vercel
+        env:
+          VITE_SUPABASE_URL: https://ejemplo.supabase.co
+          VITE_SUPABASE_ANON_KEY: clave-falsa-solo-para-el-build-de-ci
+          VITE_STRIPE_PUBLISHABLE_KEY: pk_test_falsa_solo_para_el_build_de_ci
         run: pnpm run build
 
-      - name: ✅ Build correcto
+      # La prueba de humo necesita dist/, así que va DESPUÉS del build.
+      # Descarga solo Chromium (no los tres navegadores) para no alargar el CI.
+      - name: Instalar Chromium para la prueba de humo
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Recorre las 35 páginas de detrás del login con un Supabase simulado,
+      # en dos pasadas: con todos los campos rellenos y con todos los campos
+      # opcionales a NULL. Detecta páginas en blanco, excepciones y errores de
+      # consola — la clase de fallo que introduce un cambio global en el store.
+      # Bloquea: si una página deja de pintarse, no se mergea.
+      - name: Prueba de humo de las páginas privadas
+        run: node scripts/smoke-paginas.mjs
+
+      - name: ✅ Todo correcto
         if: success()
-        run: echo "El build pasó sin errores. Seguro para desplegar."
+        run: echo "Tests, build y prueba de humo pasaron. Seguro para desplegar."

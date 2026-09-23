@@ -50,11 +50,49 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
     });
 }
 
+// CAMBIO: traduce el error de Supabase a un mensaje útil para el usuario.
+//
+// Deliberadamente NO se vuelca el mensaje crudo del servidor: para credenciales
+// incorrectas se mantiene un texto genérico a propósito, porque distinguir
+// "ese email no existe" de "la contraseña no es esa" permitiría a un atacante
+// averiguar qué cuentas están dadas de alta. Los casos que sí se detallan
+// (email sin confirmar, cuenta suspendida, rate limit) no añaden información
+// que la propia API no devuelva ya a quien la llame directamente.
+//
+// Para cualquier caso no contemplado se muestra el código de Supabase, que es
+// lo que hace falta para diagnosticar. Antes ese dato solo iba a console.error,
+// y desde que se eliminan los console.* en producción se perdía del todo.
+const mensajeDeErrorDeLogin = (error: any): string => {
+    const codigo = error?.code ?? '';
+    const estado = error?.status ?? 0;
+
+    switch (codigo) {
+        case 'invalid_credentials':
+            return 'Credenciales incorrectas. Inténtalo de nuevo.';
+        case 'email_not_confirmed':
+            return 'Tu email todavía no está confirmado. Revisa tu bandeja de entrada.';
+        case 'user_banned':
+            return 'Esta cuenta está suspendida.';
+        case 'over_request_rate_limit':
+        case 'over_email_send_rate_limit':
+            return 'Demasiados intentos. Espera unos minutos y vuelve a probar.';
+    }
+
+    if (estado === 429) return 'Demasiados intentos. Espera unos minutos y vuelve a probar.';
+    if (!estado) return 'No se pudo conectar con el servidor. Comprueba tu conexión.';
+
+    return `No se pudo iniciar sesión (código: ${codigo || estado}).`;
+};
+
 export interface AuthSlice {
   isAuthenticated: boolean;
   isProfileLoading: boolean;
   profile: Profile;
-  login: (email: string, password?: string) => Promise<boolean>;
+  // CAMBIO: antes devolvía solo `boolean`, así que LoginPage no tenía forma de
+  // saber POR QUÉ había fallado y mostraba siempre "Credenciales incorrectas",
+  // incluso cuando la causa era otra (email sin confirmar, rate limit, servidor
+  // caído). Ahora devuelve el motivo, igual que `register`.
+  login: (email: string, password?: string) => Promise<{ success: boolean; message?: string }>;
   loginWithGoogle: (payload: GoogleJwtPayload) => Promise<void>;
   logout: () => Promise<void>;
   register: (name: string, email: string, password?: string) => Promise<{ success: boolean; message?: string }>;
@@ -262,25 +300,39 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
     // Login con email/password tradicional
     login: async (email, password) => {
-        set({ isProfileLoading: true });
+        // CAMBIO: aquí se hacía `set({ isProfileLoading: true })`, y eso impedía
+        // que el usuario viera NUNCA el motivo de un fallo de login.
+        //
+        // App.tsx devuelve <LoadingFallback /> mientras isProfileLoading es true,
+        // así que al empezar el login se desmontaba el árbol de rutas entero —
+        // LoginPage incluida. Al terminar, LoginPage se volvía a montar desde
+        // cero y su estado `error` nacía otra vez en null: el mensaje se perdía
+        // antes de poder pintarse. Comprobado midiendo el DOM durante el proceso:
+        // a 400 ms y 900 ms el formulario no existía.
+        //
+        // No hace falta esa bandera aquí: LoginPage ya tiene su propio estado
+        // `loading` para el botón, y en caso de éxito refreshProfile() y
+        // onAuthStateChange se encargan de ella.
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password: password || ''
             });
 
-            if (error) throw error;
+            if (error) return { success: false, message: mensajeDeErrorDeLogin(error) };
 
             if (data.user) {
                 await get().refreshProfile();
-                return true;
+                return { success: true };
             }
+
+            // Sin error pero tampoco usuario: no deberia ocurrir, pero si ocurre
+            // es mejor decirlo que devolver un "credenciales incorrectas" falso.
+            return { success: false, message: 'No se pudo iniciar sesión. Inténtalo de nuevo.' };
         } catch (error: any) {
-            console.error("Login Error:", error.message);
-        } finally {
-            set({ isProfileLoading: false });
+            // Fallos de red o excepciones del SDK (AuthRetryableFetchError, etc.).
+            return { success: false, message: mensajeDeErrorDeLogin(error) };
         }
-        return false;
     },
 
     // Ya no es necesario para Google OAuth: Supabase maneja el callback automáticamente

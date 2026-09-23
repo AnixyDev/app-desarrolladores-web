@@ -42,11 +42,16 @@ const LoginPage: React.FC = () => {
     setError(null);
 
     try {
-      const success = await login(email, password);
+      // CAMBIO: login() ahora devuelve el motivo del fallo. Antes se mostraba
+      // siempre "Credenciales incorrectas", aunque la causa real fuese otra
+      // (email sin confirmar, demasiados intentos, servidor inaccesible), y el
+      // motivo verdadero se perdía en un console.error que ya no existe en
+      // producción.
+      const { success, message } = await login(email, password);
       if (success) {
         navigate('/');
       } else {
-        setError('Credenciales incorrectas. Inténtalo de nuevo.');
+        setError(message ?? 'Credenciales incorrectas. Inténtalo de nuevo.');
       }
     } catch (err) {
       setError('Error al conectar con el servidor.');
