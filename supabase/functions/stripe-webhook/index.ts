@@ -315,27 +315,81 @@ serve(async (req) => {
         if (invoiceId) {
           const { data: invoice, error: fetchErr } = await supabase
             .from('invoices')
-            .select('id, total_cents, paid')
+            .select('id, user_id, total_cents, paid')
             .eq('id', invoiceId)
             .maybeSingle()
 
           if (fetchErr || !invoice) {
             console.error(`⚠️ payment_intent.succeeded: factura ${invoiceId} no encontrada`, fetchErr?.message)
-          } else if (invoice.paid) {
-            // Ya estaba marcada (p.ej. reintento del webhook) — no-op.
-          } else if (invoice.total_cents !== paymentIntent.amount_received) {
-            // Defensa en profundidad: el importe cobrado no coincide con
-            // el total de la factura. No se marca como pagada
-            // automáticamente; queda registrado para revisión manual.
-            console.error(
-              `⚠️ payment_intent.succeeded: importe no coincide para factura ${invoiceId} ` +
-              `(factura=${invoice.total_cents}, cobrado=${paymentIntent.amount_received})`
-            )
           } else {
-            await supabase.from('invoices').update({
-              paid: true,
-              payment_date: new Date().toISOString(),
-            }).eq('id', invoiceId)
+            // FIX 1: el cobro no dejaba rastro en public.payments — solo se
+            // marcaba invoices.paid. Por eso remaining_cents seguia mostrando
+            // el total despues de pagar, y ni el historial del cliente ni las
+            // previsiones veian el ingreso. Ahora se registra como un pago mas,
+            // igual que los manuales y los del banco.
+            //
+            // El indice unico parcial sobre stripe_payment_intent_id hace de
+            // candado: si Stripe reenvia el evento, el segundo insert falla con
+            // 23505 y se ignora en vez de duplicar el cobro.
+            const cobrado = paymentIntent.amount_received ?? 0
+
+            const { error: pagoError } = await supabase.from('payments').insert({
+              invoice_id: invoiceId,
+              // Obligatorio: la columna tiene default auth.uid(), que con la
+              // clave de servicio es NULL y violaria el NOT NULL.
+              user_id: invoice.user_id,
+              amount_cents: cobrado,
+              paid_at: new Date().toISOString().split('T')[0],
+              method: 'Stripe',
+              stripe_payment_intent_id: paymentIntent.id,
+            })
+
+            if (pagoError && pagoError.code !== '23505') {
+              console.error(
+                `⚠️ payment_intent.succeeded: no se pudo registrar el pago de la factura ${invoiceId}:`,
+                pagoError.message
+              )
+            }
+            if (pagoError?.code === '23505') {
+              console.log(`↩️ Pago ${paymentIntent.id} ya registrado — no se duplica`)
+            }
+
+            // FIX 2: antes se exigia que UN solo cobro fuese exactamente igual
+            // al total de la factura. Pero la pagina publica cobra lo que queda
+            // por pagar, asi que en cuanto habia un pago parcial registrado a
+            // mano los numeros no coincidian nunca: el cliente pagaba el resto,
+            // el dinero entraba, y la factura se quedaba en pendiente para
+            // siempre con un console.error como unico rastro.
+            // Ahora se mira la SUMA de los pagos registrados.
+            if (!invoice.paid) {
+              const { data: pagos, error: sumaError } = await supabase
+                .from('payments')
+                .select('amount_cents')
+                .eq('invoice_id', invoiceId)
+
+              if (sumaError) {
+                console.error(
+                  `⚠️ payment_intent.succeeded: no se pudo sumar los pagos de la factura ${invoiceId}:`,
+                  sumaError.message
+                )
+              } else {
+                const totalPagado = (pagos ?? []).reduce((s, p) => s + (p.amount_cents ?? 0), 0)
+
+                if (totalPagado >= invoice.total_cents) {
+                  await supabase.from('invoices').update({
+                    paid: true,
+                    payment_date: new Date().toISOString(),
+                  }).eq('id', invoiceId)
+                } else {
+                  // Pago parcial legitimo: queda registrado y la factura sigue
+                  // abierta por la diferencia. No es un error.
+                  console.log(
+                    `💶 Factura ${invoiceId}: pago parcial registrado ` +
+                    `(${totalPagado} de ${invoice.total_cents})`
+                  )
+                }
+              }
+            }
           }
         }
 
