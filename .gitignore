@@ -29,3 +29,4 @@ dist-ssr
 metadata.json
 supabase/.temp/
 bundle-analysis.html
+supabase/.branches/
