@@ -33,12 +33,17 @@ serve(async (req) => {
     )
 
     const { amount, description, metadata } = await req.json()
-    // IMPORTANTE: para compras de plantillas del marketplace, 'amount' del
-    // cliente NUNCA se usa tal cual para cobrar — se sobreescribe más abajo
-    // con el precio real guardado en la BD. Si no, cualquiera podría
-    // manipular el importe antes de pagar. finalAmount es lo único que se
-    // usa realmente al crear el PaymentIntent.
-    let finalAmount = Number(amount)
+    // IMPORTANTE: 'amount' del cliente NUNCA se usa para cobrar. Se
+    // sobreescribe siempre con el importe real leido de la base de datos —
+    // el precio de la plantilla, o lo que queda por pagar de la factura.
+    //
+    // FIX: este comentario ya existia, pero solo era cierto para las
+    // plantillas del marketplace. La ruta de facturas se quedaba con el
+    // numero que mandaba el navegador, y la pagina /pay/:factura es publica
+    // y sin sesion: cualquiera con el enlace podia pedir cobrar 1 centimo de
+    // una factura de 5.000 €. Ahora finalAmount arranca en null y solo lo
+    // fija el servidor; si ninguna rama lo fija, no se cobra.
+    let finalAmount: number | null = null
 
     // Optional: Get user to attach to customer, or create guest customer
     const { data: { user } } = await supabaseClient.auth.getUser()
@@ -71,11 +76,53 @@ serve(async (req) => {
 
       const { data: invoice } = await supabaseAdmin
         .from('invoices')
-        .select('user_id')
+        .select('user_id, total_cents, paid')
         .eq('id', metadata.invoice_id)
         .maybeSingle()
 
-      if (invoice?.user_id) {
+      if (!invoice) {
+        return new Response(
+          JSON.stringify({ error: 'Esta factura ya no está disponible.' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+
+      if (invoice.paid) {
+        return new Response(
+          JSON.stringify({ error: 'Esta factura ya está pagada.' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+
+      // El importe se calcula AQUI, con los pagos ya registrados, no se acepta
+      // el del navegador. Es la misma cuenta que hace get-public-invoice para
+      // mostrar "queda por pagar", pero esta es la que manda.
+      const { data: pagosPrevios, error: pagosError } = await supabaseAdmin
+        .from('payments')
+        .select('amount_cents')
+        .eq('invoice_id', metadata.invoice_id)
+
+      if (pagosError) {
+        console.error('[payment-sheet] no se pudieron leer los pagos previos:', pagosError.message)
+        return new Response(
+          JSON.stringify({ error: 'No se pudo calcular el importe pendiente. Inténtalo de nuevo.' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+
+      const yaPagado = (pagosPrevios ?? []).reduce((suma, p) => suma + (p.amount_cents ?? 0), 0)
+      const pendiente = Number(invoice.total_cents) - yaPagado
+
+      if (!Number.isFinite(pendiente) || pendiente <= 0) {
+        return new Response(
+          JSON.stringify({ error: 'Esta factura no tiene importe pendiente.' }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+
+      finalAmount = Math.round(pendiente)
+
+      if (invoice.user_id) {
         const { data: freelancerProfile } = await supabaseAdmin
           .from('profiles')
           .select('stripe_account_id, stripe_onboarding_complete')
@@ -84,7 +131,8 @@ serve(async (req) => {
 
         if (freelancerProfile?.stripe_account_id && freelancerProfile.stripe_onboarding_complete) {
           connectParams = {
-            application_fee_amount: Math.round(Number(amount) * (PLATFORM_FEE_PERCENT / 100)),
+            // Sobre finalAmount, no sobre el 'amount' del navegador.
+            application_fee_amount: Math.round(finalAmount * (PLATFORM_FEE_PERCENT / 100)),
             transfer_data: {
               destination: freelancerProfile.stripe_account_id,
             },
@@ -150,6 +198,19 @@ serve(async (req) => {
           destination: sellerProfile.stripe_account_id,
         },
       }
+    }
+
+    // Red de seguridad: si ninguna rama del servidor fijo el importe, no se
+    // cobra. Antes se caia aqui con el numero del navegador.
+    if (finalAmount === null || !Number.isInteger(finalAmount) || finalAmount <= 0) {
+      console.error('[payment-sheet] importe no resuelto en servidor', {
+        invoice_id: metadata?.invoice_id ?? null,
+        template_id: metadata?.template_id ?? null,
+      })
+      return new Response(
+        JSON.stringify({ error: 'No se pudo determinar el importe a cobrar.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
     }
 
     const paymentIntent = await stripe.paymentIntents.create({
