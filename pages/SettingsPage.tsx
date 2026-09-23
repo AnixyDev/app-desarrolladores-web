@@ -137,6 +137,14 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleDeleteGeminiKey = async () => {
+    const seguro = window.confirm(
+      'Vas a eliminar tu API key de Gemini.\n\n' +
+      'Se borra cifrada de la base de datos y no se puede recuperar desde aquí. ' +
+      'Podrás generar una nueva en Google AI Studio.\n\n' +
+      '¿Seguro que quieres eliminarla?'
+    );
+    if (!seguro) return;
+
     try {
       await callManageSecrets('delete_gemini_key');
       addToast('API key eliminada.', 'info');
@@ -177,6 +185,18 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleDeleteCertificate = async () => {
+    // El borrado es DEFINITIVO: manage-secrets llama a storage.remove(), y
+    // Supabase Storage no tiene papelera ni versiones. Los backups de base de
+    // datos tampoco incluyen los objetos de Storage. Antes este boton borraba
+    // el certificado de un solo clic, sin preguntar nada.
+    const seguro = window.confirm(
+      'Vas a eliminar tu certificado digital.\n\n' +
+      'Esto es IRREVERSIBLE: no se puede recuperar desde aquí ni desde los backups. ' +
+      'Para volver a tenerlo necesitarás el fichero .p12 original y su contraseña.\n\n' +
+      '¿Seguro que quieres eliminarlo?'
+    );
+    if (!seguro) return;
+
     try {
       await callManageSecrets('delete_certificate');
       addToast('Certificado eliminado.', 'info');
