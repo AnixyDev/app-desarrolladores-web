@@ -50,7 +50,18 @@ jobs:
         continue-on-error: true
         run: pnpm exec tsc --noEmit
 
+      # Las claves VITE_* se incrustan en el bundle EN TIEMPO DE BUILD. Aquí no
+      # hay .env.local (está en .gitignore, y bien que está), así que sin estas
+      # variables lib/supabaseClient.ts lanza "Faltan variables de entorno" nada
+      # más cargar el módulo: el build pasa, pero la app es una página en blanco.
+      # Son valores FALSOS a propósito: la prueba de humo intercepta todas las
+      # llamadas de red, así que nunca se usan contra un servidor real. No hacen
+      # falta secretos de GitHub para esto.
       - name: Build de producción (vite build) — esto SÍ bloquea, es lo que corre Vercel
+        env:
+          VITE_SUPABASE_URL: https://ejemplo.supabase.co
+          VITE_SUPABASE_ANON_KEY: clave-falsa-solo-para-el-build-de-ci
+          VITE_STRIPE_PUBLISHABLE_KEY: pk_test_falsa_solo_para_el_build_de_ci
         run: pnpm run build
 
       # La prueba de humo necesita dist/, así que va DESPUÉS del build.
