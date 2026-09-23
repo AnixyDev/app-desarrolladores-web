@@ -365,12 +365,21 @@ const handleSelectBudget = (budgetId: string) => {
     } catch {
       addToast('No se pudo copiar el enlace.', 'error');
     }
-    setPaymentLinkMenuInvoiceId(null);
+    // CAMBIO: se elimina setPaymentLinkMenuInvoiceId(null).
+    // Esa función NO EXISTE: el estado de abierto/cerrado se movió dentro de
+    // PaymentLinkMenuButton (su propio useState isOpen) y esta llamada quedó
+    // huérfana del refactor. Lanzaba en tiempo de ejecución:
+    //   ReferenceError: setPaymentLinkMenuInvoiceId is not defined
+    // El enlace sí se copiaba y el aviso sí salía —el error ocurre después—,
+    // pero dejaba una excepción sin capturar en cada uso. Vite no lo detecta
+    // porque no hace comprobación estricta de tipos; tsc sí lo avisaba.
+    // No hace falta cerrar nada aquí: el propio menú llama a setIsOpen(false)
+    // antes de invocar este callback.
   };
 
   const handleOpenPaymentLink = (invoice: typeof invoices[number]) => {
     window.open(getPaymentLink(invoice), '_blank', 'noopener,noreferrer');
-    setPaymentLinkMenuInvoiceId(null);
+    // CAMBIO: misma llamada huérfana que arriba, eliminada por el mismo motivo.
   };
 
   const handleDeleteInvoice = async (id: string) => {
