@@ -37,6 +37,26 @@ const supabase = createClient(
     Deno.env.get('SUPABASE_ANON_KEY')!
 );
 
+const RETORNO_POR_DEFECTO = 'https://devfreelancer.app/settings';
+const ORIGENES_PERMITIDOS = [
+    'https://devfreelancer.app',
+    'https://www.devfreelancer.app',
+];
+
+/**
+ * Devuelve la URL de retorno solo si apunta a un origen nuestro; si no, la de
+ * por defecto. Nunca deja pasar al exterior una URL que venga de una cabecera.
+ */
+function urlDeRetornoSegura(referer: string | null): string {
+    if (!referer) return RETORNO_POR_DEFECTO;
+    try {
+        const parsed = new URL(referer);
+        if (parsed.protocol === 'http:' && parsed.hostname === 'localhost') return referer; // desarrollo
+        if (parsed.protocol === 'https:' && ORIGENES_PERMITIDOS.includes(parsed.origin)) return referer;
+    } catch { /* URL ilegible */ }
+    return RETORNO_POR_DEFECTO;
+}
+
 Deno.serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
@@ -79,7 +99,11 @@ Deno.serve(async (req) => {
     const stripeCustomerId = profile.stripe_customer_id;
 
     try {
-        const returnUrl = req.headers.get('Referer') || 'https://devfreelancer.app/settings';
+        // FIX: antes se pasaba la cabecera Referer tal cual a Stripe como URL
+        // de retorno. Referer la fija quien hace la peticion, asi que era una
+        // URL sin validar entrando en un servicio externo. Ahora solo se
+        // acepta si apunta a un origen nuestro; si no, se usa el de siempre.
+        const returnUrl = urlDeRetornoSegura(req.headers.get('Referer'));
 
         const session = await stripe.billingPortal.sessions.create({
             customer: stripeCustomerId,

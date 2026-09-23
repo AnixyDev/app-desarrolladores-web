@@ -5,6 +5,7 @@
 // nada como cobrado sin que el usuario confirme (action=confirm_match).
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { claveAes, descifrarTexto } from '../_shared/cripto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,19 +20,6 @@ function jsonResponse(body: unknown, status = 200) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
-}
-
-async function getAesKey(rawHex: string): Promise<CryptoKey> {
-  const keyBytes = new Uint8Array(rawHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
-  return crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-}
-
-async function decryptFromBase64(b64: string, key: CryptoKey): Promise<string> {
-  const combined = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  const iv = combined.slice(0, 12);
-  const cipherBytes = combined.slice(12);
-  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBytes);
-  return new TextDecoder().decode(plainBuf);
 }
 
 function base64url(input: ArrayBuffer | string): string {
@@ -66,7 +54,7 @@ async function createEnableBankingJWT(appId: string, privateKeyPem: string): Pro
 function normalize(text: string): string {
   return (text || '')
     .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -102,6 +90,26 @@ Deno.serve(async (req) => {
         .from('bank_transactions').select('*').eq('id', transaction_id).eq('user_id', user.id).single();
       if (txError || !tx) return jsonResponse({ error: 'Movimiento no encontrado.' }, 404);
 
+      // FIX (fallo entre usuarios): el movimiento bancario si se comprobaba,
+      // pero invoice_id llegaba del navegador y NUNCA se verificaba. Como esta
+      // funcion usa la clave de servicio (sin RLS) y un trigger en payments
+      // (sync_invoice_paid_status) marca la factura como pagada en cuanto la
+      // suma de pagos cubre el total, cualquier usuario con sesion podia
+      // marcar como PAGADA la factura de otro con solo conocer su UUID — y
+      // esos UUID circulan en los enlaces publicos de pago /pay/:factura.
+      const { data: invoice, error: invoiceError } = await supabaseAdmin
+        .from('invoices').select('id').eq('id', invoice_id).eq('user_id', user.id).maybeSingle();
+      if (invoiceError || !invoice) {
+        console.error(`[bank-sync] intento de cotejo contra factura ajena o inexistente por ${user.id}`);
+        return jsonResponse({ error: 'Factura no encontrada.' }, 404);
+      }
+
+      // Confirmar dos veces el mismo cotejo insertaba dos pagos, y con el
+      // trigger sumando eso descuadra el total de la factura.
+      if (tx.match_status === 'confirmed') {
+        return jsonResponse({ success: true, already_confirmed: true });
+      }
+
       const { error: paymentError } = await supabaseAdmin.from('payments').insert({
         user_id: user.id,
         invoice_id,
@@ -115,7 +123,8 @@ Deno.serve(async (req) => {
       const { error: updateError } = await supabaseAdmin
         .from('bank_transactions')
         .update({ match_status: 'confirmed', matched_invoice_id: invoice_id })
-        .eq('id', transaction_id);
+        .eq('id', transaction_id)
+        .eq('user_id', user.id);
       if (updateError) throw updateError;
 
       return jsonResponse({ success: true });
@@ -123,6 +132,7 @@ Deno.serve(async (req) => {
 
     if (action === 'ignore_match') {
       const { transaction_id } = payload || {};
+      if (!transaction_id) return jsonResponse({ error: 'Faltan datos.' }, 400);
       const { error } = await supabaseAdmin
         .from('bank_transactions').update({ match_status: 'ignored' }).eq('id', transaction_id).eq('user_id', user.id);
       if (error) throw error;
@@ -137,12 +147,14 @@ Deno.serve(async (req) => {
       .eq('user_id', user.id)
       .maybeSingle();
 
-    if (!secrets?.enablebanking_app_id) {
+    if (!secrets?.enablebanking_app_id || !secrets?.enablebanking_private_key_encrypted) {
       return jsonResponse({ error: 'No has configurado tus credenciales de Enable Banking.' }, 400);
     }
 
-    const aesKey = await getAesKey(encryptionKeyHex);
-    const privateKeyPem = await decryptFromBase64(secrets.enablebanking_private_key_encrypted, aesKey);
+    // claveAes valida que APP_ENCRYPTION_KEY sea hexadecimal de longitud valida
+    // en vez de degradarla en silencio (ver _shared/cripto.ts).
+    const aesKey = await claveAes(encryptionKeyHex);
+    const privateKeyPem = await descifrarTexto(secrets.enablebanking_private_key_encrypted, aesKey);
     const jwt = await createEnableBankingJWT(secrets.enablebanking_app_id, privateKeyPem);
     const ebHeaders = { Authorization: `Bearer ${jwt}` };
 
@@ -163,7 +175,17 @@ Deno.serve(async (req) => {
         const dateFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
         const res = await fetch(`${EB_BASE_URL}/accounts/${account.gocardless_account_id}/transactions?date_from=${dateFrom}`, { headers: ebHeaders });
         if (!res.ok) {
-          errors.push(`${account.account_name}: ${res.status === 429 ? 'límite de peticiones del banco alcanzado hoy' : await res.text()}`);
+          // El cuerpo de error del banco va al log, no al navegador: puede
+          // contener detalles internos que no pintan nada en la interfaz.
+          const detalle = await res.text();
+          console.error(`[bank-sync] ${account.account_name}: ${res.status} ${detalle}`);
+          errors.push(
+            `${account.account_name}: ${
+              res.status === 429
+                ? 'límite de peticiones del banco alcanzado hoy'
+                : 'el banco ha rechazado la consulta, inténtalo más tarde'
+            }`
+          );
           continue;
         }
         const data = await res.json();
@@ -197,7 +219,11 @@ Deno.serve(async (req) => {
             .select()
             .maybeSingle();
 
-          if (insertError) { errors.push(insertError.message); continue; }
+          if (insertError) {
+            console.error('[bank-sync] error insertando movimiento:', insertError.message);
+            errors.push(`${account.account_name}: no se pudo guardar un movimiento`);
+            continue;
+          }
           if (!inserted) continue;
           newTransactions++;
 
@@ -227,13 +253,15 @@ Deno.serve(async (req) => {
 
         await supabaseAdmin.from('bank_accounts').update({ last_synced_at: new Date().toISOString() }).eq('id', account.id);
       } catch (e) {
-        errors.push(`${account.account_name}: ${(e as Error).message}`);
+        console.error(`[bank-sync] ${account.account_name}:`, (e as Error)?.message ?? e);
+        errors.push(`${account.account_name}: no se pudo sincronizar`);
       }
     }
 
     return jsonResponse({ success: true, new_transactions: newTransactions, new_suggestions: newSuggestions, errors });
   } catch (e) {
+    // Mensaje generico al navegador, detalle al log.
     console.error('[bank-sync] Error:', (e as Error)?.message ?? e);
-    return jsonResponse({ error: (e as Error)?.message || 'No se pudo sincronizar.' }, 500);
+    return jsonResponse({ error: 'No se pudo sincronizar con el banco. Inténtalo de nuevo.' }, 500);
   }
 });

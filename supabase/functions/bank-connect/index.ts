@@ -6,6 +6,7 @@
 // privada propia de cada usuario — nunca una cuenta compartida.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { claveAes, descifrarTexto } from '../_shared/cripto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,25 +16,33 @@ const corsHeaders = {
 
 const EB_BASE_URL = 'https://api.enablebanking.com';
 
+// Dominios a los que se permite volver tras autorizar en el banco. El
+// redirect_url llegaba del navegador sin ninguna comprobacion y se pasaba tal
+// cual a Enable Banking: es la URL a la que el banco devuelve al usuario CON EL
+// CODIGO DE AUTORIZACION en la query. Una URL arbitraria ahi no deberia
+// aceptarse nunca, aunque hoy la app solo mande su propio origen.
+const ORIGENES_PERMITIDOS = [
+  'https://devfreelancer.app',
+  'https://www.devfreelancer.app',
+];
+
+function redirectUrlPermitida(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol === 'http:' && parsed.hostname === 'localhost') return true; // desarrollo
+  if (parsed.protocol !== 'https:') return false;
+  return ORIGENES_PERMITIDOS.includes(parsed.origin);
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
-}
-
-// --- Descifrado de credenciales propias (AES-256-GCM, igual que manage-secrets) ---
-async function getAesKey(rawHex: string): Promise<CryptoKey> {
-  const keyBytes = new Uint8Array(rawHex.match(/.{1,2}/g)!.map((b) => parseInt(b, 16)));
-  return crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
-}
-
-async function decryptFromBase64(b64: string, key: CryptoKey): Promise<string> {
-  const combined = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  const iv = combined.slice(0, 12);
-  const cipherBytes = combined.slice(12);
-  const plainBuf = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, cipherBytes);
-  return new TextDecoder().decode(plainBuf);
 }
 
 // --- JWT firmado RS256 con la clave privada del usuario, para hablar con Enable Banking ---
@@ -88,9 +97,16 @@ async function getUserCredentials(supabaseAdmin: any, userId: string, aesKey: Cr
     throw new Error('No has configurado tus credenciales de Enable Banking todavía.');
   }
 
-  const privateKeyPem = await decryptFromBase64(secrets.enablebanking_private_key_encrypted, aesKey);
+  const privateKeyPem = await descifrarTexto(secrets.enablebanking_private_key_encrypted, aesKey);
   const jwt = await createEnableBankingJWT(secrets.enablebanking_app_id, privateKeyPem);
   return jwt;
+}
+
+/** El cuerpo de error del banco va al log; al navegador, un mensaje generico. */
+async function registrarErrorRemoto(contexto: string, res: Response): Promise<never> {
+  const detalle = await res.text();
+  console.error(`[bank-connect] ${contexto}: ${res.status} ${detalle}`);
+  throw new Error(`${contexto}. Inténtalo de nuevo en unos minutos.`);
 }
 
 Deno.serve(async (req) => {
@@ -114,7 +130,9 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const aesKey = await getAesKey(encryptionKeyHex);
+    // claveAes valida que APP_ENCRYPTION_KEY sea hexadecimal de longitud valida
+    // en vez de degradarla en silencio (ver _shared/cripto.ts).
+    const aesKey = await claveAes(encryptionKeyHex);
     const { action, payload } = await req.json();
     const jwt = await getUserCredentials(supabaseAdmin, user.id, aesKey);
     const ebHeaders = { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' };
@@ -122,9 +140,12 @@ Deno.serve(async (req) => {
     switch (action) {
       // Lista bancos disponibles para el país indicado (código ISO de 2 letras).
       case 'list_institutions': {
-        const country = payload?.country || 'ES';
+        const country = String(payload?.country || 'ES').toUpperCase();
+        if (!/^[A-Z]{2}$/.test(country)) {
+          return jsonResponse({ error: 'Código de país no válido.' }, 400);
+        }
         const res = await fetch(`${EB_BASE_URL}/aspsps?country=${country}`, { headers: ebHeaders });
-        if (!res.ok) throw new Error(`Error listando bancos: ${await res.text()}`);
+        if (!res.ok) await registrarErrorRemoto('No se pudieron listar los bancos', res);
         const data = await res.json();
         return jsonResponse({ institutions: data.aspsps || [] });
       }
@@ -132,10 +153,14 @@ Deno.serve(async (req) => {
       // Inicia el proceso de autorización con el banco elegido.
       case 'create_requisition': {
         const institutionName = payload?.institution_name;
-        const country = payload?.country || 'ES';
+        const country = String(payload?.country || 'ES').toUpperCase();
         const redirectUrl = payload?.redirect_url;
         if (!institutionName || !redirectUrl) {
           return jsonResponse({ error: 'Falta institution_name o redirect_url.' }, 400);
+        }
+        if (!redirectUrlPermitida(String(redirectUrl))) {
+          console.error(`[bank-connect] redirect_url rechazada para ${user.id}: ${redirectUrl}`);
+          return jsonResponse({ error: 'La URL de retorno no está permitida.' }, 400);
         }
 
         const state = crypto.randomUUID();
@@ -152,7 +177,7 @@ Deno.serve(async (req) => {
             psu_type: 'personal',
           }),
         });
-        if (!res.ok) throw new Error(`Error creando la conexión: ${await res.text()}`);
+        if (!res.ok) await registrarErrorRemoto('No se pudo iniciar la conexión con el banco', res);
         const data = await res.json();
 
         await supabaseAdmin.from('bank_connections').insert({
@@ -174,13 +199,14 @@ Deno.serve(async (req) => {
         const code = payload?.code;
         const state = payload?.state;
         if (!code) return jsonResponse({ error: 'Falta el código de autorización.' }, 400);
+        if (!state) return jsonResponse({ error: 'Falta el identificador de sesión.' }, 400);
 
         const res = await fetch(`${EB_BASE_URL}/sessions`, {
           method: 'POST',
           headers: ebHeaders,
           body: JSON.stringify({ code }),
         });
-        if (!res.ok) throw new Error(`Error completando la conexión: ${await res.text()}`);
+        if (!res.ok) await registrarErrorRemoto('No se pudo completar la conexión', res);
         const session = await res.json();
 
         const { data: connection } = await supabaseAdmin
@@ -189,9 +215,18 @@ Deno.serve(async (req) => {
           .eq('gocardless_requisition_id', state)
           .eq('user_id', user.id)
           .select()
-          .single();
+          .maybeSingle();
+
+        // Si el state no corresponde a una conexión de este usuario no se
+        // vincula ninguna cuenta: antes se seguía con connection_id nulo y las
+        // cuentas quedaban huérfanas.
+        if (!connection) {
+          console.error(`[bank-connect] finalize sin conexión previa para ${user.id}, state=${state}`);
+          return jsonResponse({ error: 'No se encontró la conexión iniciada. Vuelve a empezar el proceso.' }, 404);
+        }
 
         const accountsList = session.accounts || [];
+        let vinculadas = 0;
         for (const acc of accountsList) {
           const accountUid = typeof acc === 'string' ? acc : acc.uid;
           if (!accountUid) continue;
@@ -207,16 +242,27 @@ Deno.serve(async (req) => {
             }
           } catch { /* no crítico, seguimos con lo que tenemos */ }
 
-          await supabaseAdmin.from('bank_accounts').upsert({
+          // FIX: el onConflict era 'gocardless_account_id', y esa columna era
+          // UNICA GLOBAL. Como el upsert tambien escribe user_id, si dos
+          // usuarios conectaban la misma cuenta el segundo se llevaba la fila
+          // del primero, cambiando su propietario. La unicidad pasa a ser por
+          // usuario (migracion bank_accounts_unicidad_por_usuario_no_global).
+          const { error: upsertError } = await supabaseAdmin.from('bank_accounts').upsert({
             user_id: user.id,
-            connection_id: connection?.id,
+            connection_id: connection.id,
             gocardless_account_id: accountUid, // misma columna, ahora guarda el UID de Enable Banking
             iban,
             account_name: name,
-          }, { onConflict: 'gocardless_account_id' });
+          }, { onConflict: 'user_id,gocardless_account_id' });
+
+          if (upsertError) {
+            console.error('[bank-connect] error guardando cuenta:', upsertError.message);
+            continue;
+          }
+          vinculadas++;
         }
 
-        return jsonResponse({ success: true, accounts_linked: accountsList.length });
+        return jsonResponse({ success: true, accounts_linked: vinculadas });
       }
 
       default:

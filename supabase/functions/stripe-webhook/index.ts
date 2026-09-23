@@ -360,35 +360,29 @@ serve(async (req) => {
             // mano los numeros no coincidian nunca: el cliente pagaba el resto,
             // el dinero entraba, y la factura se quedaba en pendiente para
             // siempre con un console.error como unico rastro.
-            // Ahora se mira la SUMA de los pagos registrados.
-            if (!invoice.paid) {
-              const { data: pagos, error: sumaError } = await supabase
-                .from('payments')
-                .select('amount_cents')
-                .eq('invoice_id', invoiceId)
+            //
+            // Ya NO hace falta marcarla aqui: la base de datos tiene un trigger
+            // (sync_invoice_paid_status, AFTER INSERT/UPDATE/DELETE on payments)
+            // que recalcula invoices.paid y payment_date sumando los pagos. Con
+            // el insert de arriba se dispara solo, y es la misma regla que se
+            // aplica a los pagos manuales y a los conciliados del banco.
+            //
+            // La version anterior de este arreglo duplicaba esa logica aqui y
+            // ademas escribia payment_date con la hora actual, mientras que el
+            // trigger usa la fecha del pago: quedaban distintos segun la ruta.
+            const { data: despues } = await supabase
+              .from('invoices')
+              .select('paid, total_cents')
+              .eq('id', invoiceId)
+              .maybeSingle()
 
-              if (sumaError) {
-                console.error(
-                  `⚠️ payment_intent.succeeded: no se pudo sumar los pagos de la factura ${invoiceId}:`,
-                  sumaError.message
-                )
-              } else {
-                const totalPagado = (pagos ?? []).reduce((s, p) => s + (p.amount_cents ?? 0), 0)
-
-                if (totalPagado >= invoice.total_cents) {
-                  await supabase.from('invoices').update({
-                    paid: true,
-                    payment_date: new Date().toISOString(),
-                  }).eq('id', invoiceId)
-                } else {
-                  // Pago parcial legitimo: queda registrado y la factura sigue
-                  // abierta por la diferencia. No es un error.
-                  console.log(
-                    `💶 Factura ${invoiceId}: pago parcial registrado ` +
-                    `(${totalPagado} de ${invoice.total_cents})`
-                  )
-                }
-              }
+            if (despues?.paid) {
+              console.log(`✅ Factura ${invoiceId} marcada como pagada (${cobrado} cobrados)`)
+            } else {
+              console.log(
+                `💶 Factura ${invoiceId}: pago parcial registrado, sigue abierta ` +
+                `(cobrados ${cobrado} de ${despues?.total_cents ?? invoice.total_cents})`
+              )
             }
           }
         }
