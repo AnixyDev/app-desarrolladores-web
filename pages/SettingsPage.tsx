@@ -8,39 +8,38 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { UserIcon as User, BellIcon as Bell, ShieldIcon as Shield, CreditCard, Globe, RefreshCwIcon, ShieldCheckIcon, TrashIcon, UploadIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
+import { nivelDeCaducidad } from '../supabase/functions/_shared/caducidad-certificado';
 
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal' | 'connect';
 
-const DIA_MS = 24 * 60 * 60 * 1000;
-
 /**
- * Estado de caducidad del certificado digital.
+ * Estado de caducidad del certificado digital, listo para pintar.
  *
- * Hasta ahora la fecha de caducidad no se guardaba ni se mostraba en ningún
- * sitio: nada avisaba de que el certificado estaba a punto de vencer, y los
- * envíos a Verifactu habrían empezado a fallar sin previo aviso.
+ * Los umbrales (60 / 30 / caducado) viven ahora en
+ * supabase/functions/_shared/caducidad-certificado.ts, el mismo archivo que
+ * importa la Edge Function que manda el correo de aviso. Antes estaban solo
+ * aquí, así que el aviso existía únicamente si el usuario entraba a mirar
+ * Ajustes. Aquí queda solo cómo se pinta cada nivel.
  */
 export const estadoCaducidad = (iso: string | null | undefined) => {
-  if (!iso) return null;
-  const fecha = new Date(iso);
-  if (Number.isNaN(fecha.getTime())) return null;
+  const estado = nivelDeCaducidad(iso);
+  if (!estado) return null;
 
-  const dias = Math.floor((fecha.getTime() - Date.now()) / DIA_MS);
-  const fechaTexto = fecha.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  const { nivel, dias, fechaTexto } = estado;
 
-  if (dias < 0) {
-    return { nivel: 'caducado' as const, color: 'text-red-400', icono: '⛔',
+  if (nivel === 'caducado') {
+    return { nivel, color: 'text-red-400', icono: '⛔',
              texto: `Caducado el ${fechaTexto} — renuévalo, las facturas con Verifactu fallarán` };
   }
-  if (dias <= 30) {
-    return { nivel: 'urgente' as const, color: 'text-red-400', icono: '⚠️',
+  if (nivel === 'urgente') {
+    return { nivel, color: 'text-red-400', icono: '⚠️',
              texto: `Caduca en ${dias} ${dias === 1 ? 'día' : 'días'} (${fechaTexto}) — renuévalo ya` };
   }
-  if (dias <= 60) {
-    return { nivel: 'aviso' as const, color: 'text-amber-400', icono: '⚠️',
+  if (nivel === 'aviso') {
+    return { nivel, color: 'text-amber-400', icono: '⚠️',
              texto: `Caduca en ${dias} días (${fechaTexto}) — conviene ir renovándolo` };
   }
-  return { nivel: 'vigente' as const, color: 'text-gray-400', icono: '',
+  return { nivel, color: 'text-gray-400', icono: '',
            texto: `Válido hasta el ${fechaTexto}` };
 };
 
