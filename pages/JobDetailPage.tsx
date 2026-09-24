@@ -14,7 +14,7 @@ const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptM
 
 const JobDetailPage: React.FC = () => {
     const { jobId } = useParams<{ jobId: string }>();
-    const { getJobById, saveJob, savedJobIds, profile } = useAppStore(useShallow(s => ({ getJobById: s.getJobById, saveJob: s.saveJob, savedJobIds: s.savedJobIds, profile: s.profile })));
+    const { datosDeTrabajoCargados, getJobById, saveJob, savedJobIds, profile } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getJobById: s.getJobById, saveJob: s.saveJob, savedJobIds: s.savedJobIds, profile: s.profile })));
     
     const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
@@ -38,6 +38,17 @@ const JobDetailPage: React.FC = () => {
             });
         }
     }, [job]);
+
+    // Sin este chequeo, mientras los datos aun estaban llegando esta pagina
+    // enseñaba el error rojo de "no encontrado": al refrescar, lo primero
+    // que veia el usuario era que su registro no existia.
+    if (!datosDeTrabajoCargados) {
+        return (
+            <div className="flex justify-center py-16">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500" />
+            </div>
+        );
+    }
 
     if (!job) {
         return <div className="text-center text-red-500">Oferta de trabajo no encontrada.</div>;

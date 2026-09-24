@@ -18,7 +18,7 @@ const ClientIncomeChart = lazy(() => import('@/components/charts/ClientIncomeCha
 const ClientDetailPage: React.FC = () => {
     const { clientId } = useParams<{ clientId: string }>();
     const navigate = useNavigate();
-    const { getClientById, projects, invoices, receipts, updateClient, deleteClient } = useAppStore(useShallow(s => ({ getClientById: s.getClientById, projects: s.projects, invoices: s.invoices, receipts: s.receipts, updateClient: s.updateClient, deleteClient: s.deleteClient })));
+    const { datosDeTrabajoCargados, getClientById, projects, invoices, receipts, updateClient, deleteClient } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getClientById: s.getClientById, projects: s.projects, invoices: s.invoices, receipts: s.receipts, updateClient: s.updateClient, deleteClient: s.deleteClient })));
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     
@@ -56,6 +56,17 @@ const ClientDetailPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [clientId, clientInvoices.length]);
     
+    // Sin este chequeo, mientras los datos aun estaban llegando esta pagina
+    // enseñaba el error rojo de "no encontrado": al refrescar, lo primero
+    // que veia el usuario era que su registro no existia.
+    if (!datosDeTrabajoCargados) {
+        return (
+            <div className="flex justify-center py-16">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500" />
+            </div>
+        );
+    }
+
     if (!client) {
         return <div className="text-center text-red-500">Cliente no encontrado.</div>;
     }

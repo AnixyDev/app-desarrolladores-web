@@ -94,6 +94,15 @@ const mensajeDeErrorDeLogin = (error: any): string => {
 export interface AuthSlice {
   isAuthenticated: boolean;
   isProfileLoading: boolean;
+  /**
+   * Si los datos de trabajo (clientes, proyectos, ofertas) ya han llegado.
+   *
+   * Sin esto, las paginas de detalle no podian distinguir "todavia no han
+   * llegado" de "no existe", y enseñaban un error rojo de "no encontrado"
+   * mientras cargaban. Al refrescar la pagina de un proyecto, lo primero que
+   * veia el usuario era ese error.
+   */
+  datosDeTrabajoCargados: boolean;
   profile: Profile;
   // CAMBIO: antes devolvía solo `boolean`, así que LoginPage no tenía forma de
   // saber POR QUÉ había fallado y mostraba siempre "Credenciales incorrectas",
@@ -126,6 +135,7 @@ let backgroundDataFetchedForUser: string | null = null;
 export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, get) => ({
     isAuthenticated: false,
     isProfileLoading: true,
+    datosDeTrabajoCargados: false,
     profile: initialProfile,
 
     // FIX CRÍTICO: refreshProfile ahora acepta opcionalmente una sesión ya
@@ -267,9 +277,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                     // realidad seguían intactos en la base de datos.
                     if (backgroundDataFetchedForUser !== session.user.id) {
                         backgroundDataFetchedForUser = session.user.id;
-                        get().fetchClients().catch(() => {});
                         get().fetchTasks().catch(() => {});
-                        get().fetchJobs().catch(() => {});
                         get().fetchApplications().catch(() => {});
                         get().fetchSavedJobs().catch(() => {});
                         get().fetchUsers().catch(() => {});
@@ -283,19 +291,29 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                         // cargados para poder comprobar algo real — por eso se
                         // esperan explícitamente aquí, en vez de dispararlas en
                         // paralelo como el resto (que antes ni siquiera se llamaban).
+                        // fetchClients y fetchJobs se esperan aqui, no sueltos: de
+                        // ellos dependen las paginas de detalle para saber si un
+                        // registro no existe o si simplemente no ha llegado aun.
                         Promise.all([
+                            get().fetchClients(),
                             get().fetchProjects(),
+                            get().fetchJobs(),
                             get().fetchFinanceData(),
                             get().fetchTimeEntries(),
                         ]).then(() => {
                             get().checkInvoiceStatuses();
                             get().checkProjectProfitability();
-                        }).catch(() => {});
+                        }).catch(() => {
+                            // Si alguna falla, el indicador se levanta igual: mejor
+                            // decir "no encontrado" que dejar un giro infinito.
+                        }).finally(() => {
+                            set({ datosDeTrabajoCargados: true });
+                        });
                     }
                 } else {
                     logger.info("Usuario desconectado");
                     backgroundDataFetchedForUser = null;
-                    set({ isAuthenticated: false, profile: initialProfile, isProfileLoading: false });
+                    set({ isAuthenticated: false, profile: initialProfile, isProfileLoading: false, datosDeTrabajoCargados: false });
                 }
             }, 0);
         });
