@@ -1,0 +1,20 @@
+-- ESTE ARCHIVO ESTÁ VACÍO A PROPÓSITO. No lo rellenes.
+--
+-- Es la primera entrada del historial de migraciones, creada el 16/12/2025 al
+-- enlazar el proyecto con la CLI de Supabase. Su SQL nunca se guardó en la
+-- tabla `supabase_migrations.schema_migrations`: la columna `statements` viene
+-- vacía desde el origen.
+--
+-- Dentro de esta entrada está TODO el esquema anterior a julio de 2026 —
+-- profiles, clients, projects, invoices, tasks, lo fundamental. La siguiente
+-- migración del historial es del 04/07/2026.
+--
+-- Consecuencia: reproducir estas migraciones desde cero falla en la segunda,
+-- porque intenta tocar tablas que se crearon en los meses que faltan. Eso no
+-- tiene arreglo: el contenido no existe en ningún sitio.
+--
+-- Rellenar este archivo con un volcado actual NO lo arregla, lo empeora: las 77
+-- migraciones siguientes se aplicarían sobre un esquema que ya las tiene y
+-- fallarían por duplicado.
+--
+-- Para reconstruir la base de datos desde cero, usa ../schema/. Ver README.md.
