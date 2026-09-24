@@ -23,6 +23,9 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
     const [isLoading, setIsLoading] = useState(false);
     const [isRefining, setIsRefining] = useState<boolean>(false);
     const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
+    // Cual de las dos acciones (generar: 5, refinar: 2) se ha quedado sin saldo,
+    // para que el modal diga el coste correcto y no uno generico.
+    const [costeQueFalta, setCosteQueFalta] = useState<number | undefined>();
     const [generationError, setGenerationError] = useState<string | null>(null);
 
     const userProfileSummary = profile?.bio || `Freelancer con experiencia en desarrollo full-stack. Tarifa por hora: ${profile.hourly_rate_cents / 100}€/h. Habilidades: ${profile.skills?.join(', ')}`;
@@ -30,6 +33,7 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
     const handleGenerate = async () => {
         if (!profile) return;
         if (profile.ai_credits < AI_CREDIT_COSTS.generateProposal) {
+            setCosteQueFalta(AI_CREDIT_COSTS.generateProposal);
             setIsBuyCreditsModalOpen(true);
             return;
         }
@@ -57,6 +61,7 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
     const handleRefine = async (refinementType: 'formal' | 'conciso' | 'entusiasta') => {
         if (!profile || !proposalText) return;
         if (profile.ai_credits < AI_CREDIT_COSTS.refineProposal) {
+            setCosteQueFalta(AI_CREDIT_COSTS.refineProposal);
             setIsBuyCreditsModalOpen(true);
             return;
         }
@@ -156,6 +161,7 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
                 {isBuyCreditsModalOpen && (
                     <BuyCreditsModal
                         isOpen={isBuyCreditsModalOpen}
+                        creditosNecesarios={costeQueFalta}
                         onClose={() => setIsBuyCreditsModalOpen(false)}
                     />
                 )}

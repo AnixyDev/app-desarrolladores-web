@@ -50,6 +50,9 @@ const KnowledgeBase: React.FC = () => {
     const [quizResult, setQuizResult] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
+    // Cual de las dos acciones (documento: 10, cuestionario: 5) se ha quedado
+    // sin saldo, para que el modal diga el coste correcto y no uno generico.
+    const [costeQueFalta, setCosteQueFalta] = useState<number | undefined>();
     
     // Último término que ya se ha buscado y cobrado. Ver el comentario del
     // efecto de abajo: sin esto, la búsqueda se repetía sola.
@@ -160,6 +163,7 @@ const KnowledgeBase: React.FC = () => {
         const tema = generatorTopic.trim();
         if (!tema) return;
         if (saldoInsuficiente(AI_CREDIT_COSTS.generateDocument)) {
+            setCosteQueFalta(AI_CREDIT_COSTS.generateDocument);
             setIsBuyCreditsModalOpen(true);
             return;
         }
@@ -190,6 +194,7 @@ const KnowledgeBase: React.FC = () => {
             addToast('Documento generado con IA', 'success');
         } catch (e) {
             if (esErrorDeCreditos(e)) {
+                setCosteQueFalta(AI_CREDIT_COSTS.generateDocument);
                 setIsBuyCreditsModalOpen(true);
             } else {
                 addToast((e as Error).message || 'No se pudo generar el documento', 'error');
@@ -203,6 +208,7 @@ const KnowledgeBase: React.FC = () => {
         const contenido = currentArticle?.content?.trim();
         if (!contenido) return;
         if (saldoInsuficiente(AI_CREDIT_COSTS.generateQuiz)) {
+            setCosteQueFalta(AI_CREDIT_COSTS.generateQuiz);
             setIsBuyCreditsModalOpen(true);
             return;
         }
@@ -224,6 +230,7 @@ const KnowledgeBase: React.FC = () => {
             addToast('Cuestionario generado', 'success');
         } catch (e) {
             if (esErrorDeCreditos(e)) {
+                setCosteQueFalta(AI_CREDIT_COSTS.generateQuiz);
                 setIsBuyCreditsModalOpen(true);
             } else {
                 addToast((e as Error).message || 'No se pudo generar el cuestionario', 'error');
@@ -316,7 +323,7 @@ const KnowledgeBase: React.FC = () => {
             </Modal>
             
             <Suspense fallback={null}>
-                {isBuyCreditsModalOpen && <BuyCreditsModal isOpen={isBuyCreditsModalOpen} onClose={() => setIsBuyCreditsModalOpen(false)} />}
+                {isBuyCreditsModalOpen && <BuyCreditsModal isOpen={isBuyCreditsModalOpen} creditosNecesarios={costeQueFalta} onClose={() => setIsBuyCreditsModalOpen(false)} />}
                 {isConfirmModalOpen && (
                     <ConfirmationModal
                         isOpen={isConfirmModalOpen}
