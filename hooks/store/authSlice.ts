@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { AppState } from '../useAppStore';
 import { Profile, GoogleJwtPayload } from '../../types';
 import { supabase } from '../../lib/supabaseClient';
+import { logger } from '../../lib/loggerService';
 import type { Session } from '@supabase/supabase-js';
 
 // Estado inicial del perfil (valores por defecto antes de cargar datos reales)
@@ -147,13 +148,13 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     // sí estamos fuera del callback y es seguro.
     refreshProfile: async (knownSession?: Session | null) => {
         if (refreshInFlight) {
-            console.log("⏭️ RefreshProfile ya en curso, reutilizando promesa existente...");
+            logger.info("RefreshProfile ya en curso, reutilizando promesa existente");
             return refreshInFlight;
         }
 
         refreshInFlight = (async () => {
             try {
-                console.log("🔄 RefreshProfile iniciado...");
+                logger.info("RefreshProfile iniciado");
 
                 let session = knownSession;
 
@@ -169,12 +170,12 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                 }
 
                 if (!session?.user) {
-                    console.log("❌ No hay sesión activa");
+                    logger.info("No hay sesion activa");
                     set({ isAuthenticated: false, profile: initialProfile, isProfileLoading: false });
                     return;
                 }
 
-                console.log("✅ Sesión encontrada para:", session.user.email);
+                logger.info("Sesion encontrada");
 
                 // 2. Lectura fresca desde la base de datos
                 const { data: profileData, error: fetchError } = await withTimeout(
@@ -196,7 +197,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
                     set({ profile: fallbackProfile, isAuthenticated: true });
                 } else {
-                    console.log("✅ Perfil cargado correctamente:", profileData.email);
+                    logger.info("Perfil cargado correctamente");
                     set({ profile: profileData as Profile, isAuthenticated: true });
                 }
             } catch (error) {
@@ -218,11 +219,11 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     // onAuthStateChange ya dispara un evento INITIAL_SESSION al arrancar,
     // así que el chequeo manual de getSession() solo decide el estado de "loading" inicial.
     initializeAuth: async () => {
-        console.log("🚀 InitializeAuth iniciado...");
+        logger.info("InitializeAuth iniciado");
         set({ isProfileLoading: true });
 
         supabase.auth.onAuthStateChange((event, session) => {
-            console.log("🔔 AuthStateChange event:", event);
+            logger.info("AuthStateChange", { event });
 
             // FIX CRÍTICO: todo el trabajo async se difiere con setTimeout(0).
             // No basta con evitar getSession() dentro de este callback (ya lo
@@ -238,7 +239,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
             // supabase-js para onAuthStateChange.
             setTimeout(async () => {
                 if (session?.user) {
-                    console.log("✅ Usuario autenticado detectado");
+                    logger.info("Usuario autenticado detectado");
 
                     // FIX: Supabase puede emitir varios eventos (SIGNED_IN,
                     // INITIAL_SESSION, TOKEN_REFRESHED...) seguidos para la
@@ -292,7 +293,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                         }).catch(() => {});
                     }
                 } else {
-                    console.log("❌ Usuario desconectado");
+                    logger.info("Usuario desconectado");
                     backgroundDataFetchedForUser = null;
                     set({ isAuthenticated: false, profile: initialProfile, isProfileLoading: false });
                 }
