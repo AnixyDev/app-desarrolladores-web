@@ -8,6 +8,8 @@ import Skeleton from '@/components/ui/Skeleton';
 import { CheckCircleIcon, CreditCard, Users, RefreshCwIcon, SettingsIcon } from '@/components/icons/Icon';
 import { redirectToCheckout, redirectToCustomerPortal, StripeItemKey } from '@/services/stripeService';
 import { useToast } from '@/hooks/useToast';
+// Los precios salen del catalogo, junto al priceId con el que Stripe cobra.
+import { precioDe } from '../supabase/functions/_shared/catalogo-stripe';
 
 const BillingPage: React.FC = () => {
     const { profile, refreshProfile, fetchJobs } = useAppStore(useShallow(s => ({ profile: s.profile, refreshProfile: s.refreshProfile, fetchJobs: s.fetchJobs })));
@@ -145,8 +147,8 @@ const BillingPage: React.FC = () => {
                     <>
                         <SubscriptionCard
                             plan="Pro" title="Freelancer Pro"
-                            price={billingCycle === 'monthly' ? '9,95€' : '99,95€'}
-                            period={billingCycle === 'monthly' ? 'mes' : 'año'}
+                            price={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.precio ?? ''}
+                            period={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.periodo ?? ''}
                             priceNote={isPro ? 'Ya tienes este plan. Cambia el ciclo de facturación desde el portal.' : undefined}
                             features={["Proyectos e Hitos ilimitados", "Facturación AEAT (TicketBAI ready)", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
                             isCurrent={isPro}
@@ -155,8 +157,8 @@ const BillingPage: React.FC = () => {
                         />
                         <SubscriptionCard
                             plan="Teams" title="Studio Team" recommended={true}
-                            price={billingCycle === 'monthly' ? "45,95€" : "395€"}
-                            period={billingCycle === 'monthly' ? "mes" : "año"}
+                            price={precioDe(billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly')?.precio ?? ''}
+                            period={precioDe(billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly')?.periodo ?? ''}
                             priceNote={isTeams ? 'Ya tienes este plan. Cambia el ciclo de facturación desde el portal.' : undefined}
                             features={["Hasta 5 miembros de equipo", "Roles y permisos avanzados", "Integraciones con Slack y Webhooks", "200 Créditos IA compartidos"]}
                             isCurrent={isTeams} itemKey={billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly'} icon={Users}

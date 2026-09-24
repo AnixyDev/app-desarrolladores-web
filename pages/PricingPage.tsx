@@ -18,6 +18,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Logo } from '@/components/icons/Logo';
 import Button from '@/components/ui/Button';
 import { CheckCircleIcon, CreditCard, Users, SettingsIcon } from '@/components/icons/Icon';
+// Los precios salen del catalogo, junto al priceId con el que Stripe cobra.
+import { precioDe } from '../supabase/functions/_shared/catalogo-stripe';
 
 const PricingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -108,8 +110,8 @@ const PricingPage: React.FC = () => {
           />
           <PlanCard
             title="Freelancer Pro"
-            price={billingCycle === 'monthly' ? '9,95€' : '99,95€'}
-            period={billingCycle === 'monthly' ? 'mes' : 'año'}
+            price={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.precio ?? ''}
+            period={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.periodo ?? ''}
             description="Todo lo que necesitas para escalar tu negocio."
             features={["Proyectos e Hitos ilimitados", "Facturación AEAT (TicketBAI ready)", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
             ctaLabel="Empezar con Pro"
@@ -118,8 +120,8 @@ const PricingPage: React.FC = () => {
           />
           <PlanCard
             title="Studio Team"
-            price={billingCycle === 'monthly' ? '45,95€' : '395€'}
-            period={billingCycle === 'monthly' ? 'mes' : 'año'}
+            price={precioDe(billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly')?.precio ?? ''}
+            period={precioDe(billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly')?.periodo ?? ''}
             recommended
             description="Para equipos y agencias en crecimiento."
             features={["Hasta 5 miembros de equipo", "Roles y permisos avanzados", "Integraciones con Slack y Webhooks", "200 Créditos IA compartidos"]}

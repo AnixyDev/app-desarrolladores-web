@@ -23,6 +23,22 @@ export interface ArticuloStripe {
   name: string;
   /** Creditos que concede el webhook. Solo para los paquetes de creditos. */
   credits?: number;
+  /**
+   * Importe tal y como se le ensena al usuario, en euros.
+   *
+   * Vivia escrito a mano en cada pantalla, y por eso se desincronizo: la
+   * subida de agosto se aplico en PricingPage y en BillingPage, pero
+   * UpgradeModal — el modal de conversion que abren OCHO paginas distintas —
+   * se quedo anunciando 35,95 euros por un plan que cobra 45,95. El usuario
+   * veia un precio y Stripe le cobraba otro.
+   *
+   * El precio de verdad lo fija Stripe con el priceId de arriba; esto es solo
+   * como se muestra, pero al vivir junto al priceId ya no hay dos sitios que
+   * puedan discrepar entre si.
+   */
+  precio?: string;
+  /** 'mes' o 'ano' para las suscripciones. Vacio en los pagos unicos. */
+  periodo?: 'mes' | 'año';
 }
 
 // CAMBIO (subida de precios, ago 2026): priceId de proPlan y teamsPlan
@@ -33,42 +49,53 @@ export interface ArticuloStripe {
 // pagando su importe de siempre — no se les ha tocado nada.
 export const STRIPE_ITEMS = {
   proPlan: {
-    priceId: 'price_1U0juK8oC5awQy15YPiUjnn2', // 9,95€/mes
+    priceId: 'price_1U0juK8oC5awQy15YPiUjnn2',
     mode: 'subscription',
     name: 'Pro Plan',
+    precio: '9,95€',
+    periodo: 'mes',
   },
   proPlanYearly: {
-    priceId: 'price_1U0juP8oC5awQy15fzLhBWOd', // 99,95€/año
+    priceId: 'price_1U0juP8oC5awQy15fzLhBWOd',
     mode: 'subscription',
     name: 'Pro Plan (Anual)',
+    precio: '99,95€',
+    periodo: 'año',
   },
   teamsPlan: {
-    priceId: 'price_1U0juV8oC5awQy15ATm0EYe4', // 45,95€/mes
+    priceId: 'price_1U0juV8oC5awQy15ATm0EYe4',
     mode: 'subscription',
     name: 'Plan de equipos (Mensual)',
+    precio: '45,95€',
+    periodo: 'mes',
   },
   teamsPlanYearly: {
-    priceId: 'price_1U0jub8oC5awQy15QXzf5Vgp', // 395€/año
+    priceId: 'price_1U0jub8oC5awQy15QXzf5Vgp',
     mode: 'subscription',
     name: 'Plan de equipos (Anual)',
+    precio: '395€',
+    periodo: 'año',
   },
   aiCredits100: {
     priceId: 'price_1SOgpy8oC5awQy15TW22fBot',
     mode: 'payment',
     name: '100 Créditos de IA',
     credits: 100,
+    precio: '1,95 €',
   },
   aiCredits500: {
     priceId: 'price_1SOgr18oC5awQy15o1gTM2VM',
     mode: 'payment',
     name: '500 Créditos de IA',
     credits: 500,
+    precio: '3,95 €',
   },
   aiCredits1000: {
     priceId: 'price_1SOguC8oC5awQy15LGchpkVG',
     mode: 'payment',
     name: '1000 Créditos de IA',
     credits: 1000,
+    precio: '5,95 €',
   },
   // Ítem 5 del roadmap — paquetes de firma electrónica. Creados en Stripe
   // el 14/09, pago único (no suscripción).
@@ -122,4 +149,16 @@ export function articulo(clave: string): ArticuloStripe | null {
 export function esComprablePorCheckout(clave: string): clave is StripeItemKey {
   const item = articulo(clave);
   return item !== null && typeof item.priceId === 'string' && item.priceId.length > 0;
+}
+
+/**
+ * El precio de un articulo tal y como se muestra, o null si no tiene.
+ *
+ * Nunca devuelve un precio inventado: si falta, quien lo pinte debe decidir
+ * que ensena, y no dar por bueno un numero escrito a mano.
+ */
+export function precioDe(clave: string): { precio: string; periodo?: 'mes' | 'año' } | null {
+  const item = articulo(clave);
+  if (!item || typeof item.precio !== 'string' || item.precio.length === 0) return null;
+  return { precio: item.precio, periodo: item.periodo };
 }
