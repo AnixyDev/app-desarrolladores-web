@@ -48,6 +48,12 @@ describe('el modulo se puede importar sin navegador', () => {
     // La version anterior hacia `window.location.hostname` en el cuerpo del
     // modulo: importarlo sin navegador reventaba. Aqui se comprueba que la
     // fabrica no depende de ningun global del navegador.
+    // Se silencia la consola: esta prueba llama a error() a proposito y sin
+    // esto dejaba un "[ERROR] algo {}" en rojo en medio de la salida, que
+    // parece un fallo sin serlo.
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'info').mockImplementation(() => {});
+
     const original = globalThis.window;
     // @ts-expect-error: se quita window a proposito para la prueba
     delete globalThis.window;

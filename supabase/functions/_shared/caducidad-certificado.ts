@@ -25,19 +25,32 @@ export interface EstadoCaducidad {
   fechaTexto: string;
 }
 
+/** Medianoche UTC del dia al que pertenece un instante. */
+function diaUtc(fecha: Date): number {
+  return Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate());
+}
+
 /**
  * Nivel de urgencia de una fecha de caducidad.
  *
  * Devuelve null si no hay fecha o no se entiende: los certificados subidos
  * antes de que se registrara la caducidad no tienen ninguna, y eso no es un
  * error.
+ *
+ * Los dias se cuentan de FECHA A FECHA, no de instante a instante. Antes era
+ * `Math.floor((caducidad - ahora) / un_dia)`, y eso descontaba las horas ya
+ * transcurridas del dia en curso: la columna guarda una fecha, que se lee como
+ * las 00:00 de ese dia, asi que un certificado con caducidad dentro de cinco
+ * dias avisaba de "4 dias" si el aviso salia por la tarde. Cuanto mas tarde se
+ * ejecutara la tarea, mas corta la cuenta — y uno que vence manana llegaba a
+ * decir "caduca hoy". El certificado vale durante todo su ultimo dia.
  */
 export function nivelDeCaducidad(iso: string | null | undefined): EstadoCaducidad | null {
   if (!iso) return null;
   const fecha = new Date(iso);
   if (Number.isNaN(fecha.getTime())) return null;
 
-  const dias = Math.floor((fecha.getTime() - Date.now()) / DIA_MS);
+  const dias = Math.round((diaUtc(fecha) - diaUtc(new Date())) / DIA_MS);
   const fechaTexto = fecha.toLocaleDateString('es-ES', {
     day: 'numeric',
     month: 'long',

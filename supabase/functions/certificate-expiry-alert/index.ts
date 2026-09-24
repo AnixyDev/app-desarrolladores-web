@@ -40,10 +40,10 @@ function escaparHtml(texto: string): string {
 }
 
 function asunto(dias: number): string {
-  if (dias < 0) return 'Tu certificado digital ha caducado — las facturas no se podran firmar';
+  if (dias < 0) return 'Tu certificado digital ha caducado — las facturas no se podrán firmar';
   if (dias === 0) return 'Tu certificado digital caduca hoy';
-  if (dias === 1) return 'Tu certificado digital caduca manana';
-  return `Tu certificado digital caduca en ${dias} dias`;
+  if (dias === 1) return 'Tu certificado digital caduca mañana';
+  return `Tu certificado digital caduca en ${dias} días`;
 }
 
 function cuerpo(nombre: string, dias: number, fechaTexto: string, titular: string | null): string {
@@ -53,11 +53,11 @@ function cuerpo(nombre: string, dias: number, fechaTexto: string, titular: strin
     ? 'Tu certificado digital ha caducado'
     : dias === 0
       ? 'Tu certificado digital caduca hoy'
-      : `Tu certificado digital caduca en ${dias} ${dias === 1 ? 'dia' : 'dias'}`;
+      : `Tu certificado digital caduca en ${dias} ${dias === 1 ? 'día' : 'días'}`;
 
   const consecuencia = caducado
-    ? `Desde el ${escaparHtml(fechaTexto)} no se pueden firmar facturas ni enviarlas a Verifactu. Cualquier factura que emitas ahora mismo fallara al sellarse.`
-    : `A partir del ${escaparHtml(fechaTexto)} no podras firmar facturas ni enviarlas a Verifactu.`;
+    ? `Desde el ${escaparHtml(fechaTexto)} no se pueden firmar facturas ni enviarlas a Verifactu. Cualquier factura que emitas ahora mismo fallará al sellarse.`
+    : `A partir del ${escaparHtml(fechaTexto)} no podrás firmar facturas ni enviarlas a Verifactu.`;
 
   const lineaTitular = titular
     ? `<p style="margin:0 0 16px;color:#666;font-size:13px;">Certificado a nombre de: ${escaparHtml(titular)}</p>`
@@ -73,9 +73,9 @@ function cuerpo(nombre: string, dias: number, fechaTexto: string, titular: strin
       </p>
       ${lineaTitular}
       <p style="margin:0 0 24px;color:#333;font-size:15px;line-height:1.5;">
-        Renovar el certificado se hace en la sede electronica de la FNMT o de tu
-        autoridad de certificacion. Una vez lo tengas, subelo en Ajustes y todo
-        seguira funcionando sin mas pasos.
+        Renovar el certificado se hace en la sede electrónica de la FNMT o de tu
+        autoridad de certificación. Una vez lo tengas, súbelo en Ajustes y todo
+        seguirá funcionando sin más pasos.
       </p>
       <p style="margin:0 0 24px;">
         <a href="${URL_AJUSTES}"
@@ -85,8 +85,8 @@ function cuerpo(nombre: string, dias: number, fechaTexto: string, titular: strin
       </p>
       <p style="margin:0;color:#999;font-size:13px;">
         Recibes este aviso porque tienes un certificado digital configurado en
-        DevFreelancer. Se envia cuando faltan 60, 30 y 7 dias, y el dia del
-        vencimiento — nunca mas de una vez por tramo.
+        DevFreelancer. Se envía cuando faltan 60, 30 y 7 días, y el día del
+        vencimiento — nunca más de una vez por tramo.
       </p>
     </div>`;
 }
