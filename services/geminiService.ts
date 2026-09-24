@@ -4,20 +4,12 @@ import { InvoiceItem, KnowledgeArticle } from '@/types';
 /* =========================
    Costes de créditos IA
 ========================= */
-export const AI_CREDIT_COSTS = {
-  chatMessage: 1,
-  analyzeProfitability: 15,
-  generateInvoiceItems: 8,
-  generateProposal: 5,
-  refineProposal: 2,
-  enhanceTimeEntry: 2,
-  searchKnowledgeBase: 3,
-  generateDocument: 10,
-  generateQuiz: 5,
-  generateForecast: 15,
-  summarizeApplicant: 10,
-  extractExpenseFromImage: 6,
-} as const;
+// Los costes viven en supabase/functions/_shared/creditos-ia.ts, el mismo
+// archivo que importa ai-gemini. El servidor es quien cobra de verdad; esto es
+// solo para poder avisar antes de llamar y no gastar un viaje de ida y vuelta.
+export { AI_CREDIT_COSTS } from '../supabase/functions/_shared/creditos-ia';
+export type { FuncionIA } from '../supabase/functions/_shared/creditos-ia';
+import type { FuncionIA } from '../supabase/functions/_shared/creditos-ia';
 
 /* =========================
    Tipos de dominio
@@ -75,11 +67,18 @@ async function callAI(action: string, payload: Record<string, unknown>): Promise
    Chat genérico
 ========================= */
 
+/**
+ * Chat genérico. `feature` dice al servidor QUÉ función se está usando, para
+ * que cobre lo que corresponde: la misma acción atiende al chat (1 crédito),
+ * a generar un documento (10) o un cuestionario (5). El servidor busca el
+ * precio en su propio catálogo; aquí solo se declara cuál es.
+ */
 export const getAIResponse = async (
   prompt: string,
-  history: ChatMessage[] = []
+  history: ChatMessage[] = [],
+  feature: FuncionIA = 'chatMessage'
 ): Promise<string> => {
-  const res = await callAI('getAIResponse', { prompt, history });
+  const res = await callAI('getAIResponse', { prompt, history, feature });
   return (res.text as string) ?? '';
 };
 
@@ -141,6 +140,7 @@ export const generateProposalText = async (
 ): Promise<string> => {
   const res = await callAI('getAIResponse', {
     prompt: `Redacta una propuesta comercial profesional.\n\nTítulo:\n${title}\n\nRequerimientos:\n${context}\n\nPerfil profesional:\n${profileSummary}`,
+    feature: 'generateProposal',
   });
   return res.text as string;
 };
@@ -151,6 +151,7 @@ export const refineProposalText = async (
 ): Promise<string> => {
   const res = await callAI('getAIResponse', {
     prompt: `Reescribe el siguiente texto con un tono ${tone}.\n\nTexto original:\n${originalText}`,
+    feature: 'refineProposal',
   });
   return res.text as string;
 };
@@ -165,6 +166,7 @@ export const rankArticlesByRelevance = async (
 ): Promise<string[]> => {
   const res = await callAI('getAIResponse', {
     prompt: `Consulta:\n${query}\n\nArtículos:\n${JSON.stringify(articles.slice(0, 10))}\n\nDevuelve los títulos más relevantes en texto.`,
+    feature: 'searchKnowledgeBase',
   });
   return [res.text as string];
 };

@@ -423,29 +423,27 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     upgradePlan: (plan) => get().updateProfile({ plan }),
     purchaseCredits: (amount) => get().updateProfile({ ai_credits: (get().profile.ai_credits || 0) + amount }),
 
-    // Consumir créditos de IA de forma atómica.
-    // Los nombres de parámetro deben coincidir EXACTAMENTE con la función RPC en Supabase:
-    // consume_credits_atomic(user_id uuid, amount_to_consume integer) -> boolean
+    // CAMBIO IMPORTANTE: el descuento de créditos ya NO se hace desde aquí.
+    //
+    // Antes esta función llamaba a consume_credits_atomic desde el navegador, y
+    // era el ÚNICO sitio donde se cobraba: la Edge Function ai-gemini ejecutaba
+    // la acción sin mirar ni descontar créditos. Cualquiera que llamara a la
+    // función directamente, saltándose la app, tenía IA ilimitada y gratis.
+    //
+    // Ahora cobra el servidor, dentro de ai-gemini y ANTES de gastar la cuota
+    // de Gemini. Esta función solo refleja en pantalla el descuento que el
+    // servidor ya ha hecho, para que el contador no se quede desfasado hasta la
+    // siguiente recarga del perfil. Si alguna vez discrepan, manda el servidor.
     consumeCredits: async (amount) => {
         const { profile } = get();
-        if (!profile.id || (profile.ai_credits || 0) < amount) return false;
+        if (!profile.id) return false;
 
-        const { data: success, error } = await supabase.rpc('consume_credits_atomic', {
-            user_id: profile.id,
-            amount_to_consume: amount
-        });
-
-        if (error) {
-            console.error("Error consumiendo créditos:", error.message);
-            return false;
-        }
-
-        if (success) {
-            set(state => ({
-                profile: { ...state.profile, ai_credits: (state.profile.ai_credits || 0) - amount } as Profile
-            }));
-            return true;
-        }
-        return false;
+        set(state => ({
+            profile: {
+                ...state.profile,
+                ai_credits: Math.max(0, (state.profile.ai_credits || 0) - amount),
+            } as Profile
+        }));
+        return true;
     },
 });

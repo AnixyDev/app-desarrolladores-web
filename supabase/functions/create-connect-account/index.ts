@@ -114,9 +114,10 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
+    // El error crudo de Stripe va al log; al navegador, un mensaje generico.
     console.error("Connect onboarding error:", error);
     return new Response(
-      JSON.stringify({ error: String((error as any)?.message || error) }),
+      JSON.stringify({ error: "No se pudo iniciar la verificación de tu cuenta de cobro. Inténtalo de nuevo." }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
