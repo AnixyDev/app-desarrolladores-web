@@ -5,6 +5,8 @@ import { SparklesIcon, ZapIcon, CheckCircleIcon, StarIcon, RefreshCwIcon, Shield
 import { STRIPE_ITEMS, redirectToCheckout, StripeItemKey } from '@/services/stripeService';
 import { useToast } from '@/hooks/useToast';
 import { useAppStore } from '@/hooks/useAppStore';
+// Los precios salen del catalogo, junto al priceId con el que Stripe cobra.
+import { precioDe } from '../../supabase/functions/_shared/catalogo-stripe';
 
 interface BuyCreditsModalProps {
   isOpen: boolean;
@@ -122,7 +124,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({ isOpen, onClose, cred
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <CreditCardItem 
                 credits={100}
-                price="1,95 €"
+                price={precioDe('aiCredits100')?.precio ?? ''}
                 itemKey="aiCredits100"
                 color="text-blue-400"
                 features={["~20 Propuestas", "Básico"]}
@@ -130,7 +132,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({ isOpen, onClose, cred
 
             <CreditCardItem 
                 credits={500}
-                price="3,95 €"
+                price={precioDe('aiCredits500')?.precio ?? ''}
                 itemKey="aiCredits500"
                 popular={true}
                 color="text-purple-400"
@@ -139,7 +141,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({ isOpen, onClose, cred
 
             <CreditCardItem 
                 credits={1000}
-                price="5,95 €"
+                price={precioDe('aiCredits1000')?.precio ?? ''}
                 itemKey="aiCredits1000"
                 color="text-yellow-400"
                 features={["Uso intensivo", "Soporte Prioritario", "Para Equipos"]}
