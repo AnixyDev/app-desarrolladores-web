@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
+import { logger } from '@/lib/loggerService';
 import { useShallow } from 'zustand/react/shallow';
 import { LayoutGrid, List, Plus as PlusIcon, Search as SearchIcon } from 'lucide-react';
 import { ProjectCard } from '@/components/projects/ProjectCard';
@@ -159,7 +160,7 @@ const ProjectPage: React.FC = () => {
         const finalStatus = activeDragStatus[activeId]
             ?? (over ? resolveTargetStatus(over.id as string) : null);
 
-        console.log('[Kanban] drop:', { activeId, overId: over?.id, finalStatus, currentStatus: draggedProject?.status });
+        logger.info('Kanban: soltar tarjeta', { activeId, overId: over?.id, finalStatus, currentStatus: draggedProject?.status });
 
         if (finalStatus && draggedProject && draggedProject.status !== finalStatus) {
             updateProject(activeId, { status: finalStatus });

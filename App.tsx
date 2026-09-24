@@ -1,6 +1,7 @@
 import React, { useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAppStore } from './hooks/useAppStore';
+import { logger } from './lib/loggerService';
 import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import MobileBottomNav from './components/layout/MobileBottomNav';
@@ -133,7 +134,7 @@ function App() {
 
     // FIX CRÍTICO: Solo inicializar UNA VEZ cuando la app arranca
     useEffect(() => {
-        console.log("🎬 App.tsx: Inicializando autenticación...");
+        logger.info("App: inicializando autenticacion");
         initializeAuth();
     }, [initializeAuth]);
 
@@ -165,11 +166,11 @@ function App() {
 
     // Mostrar spinner mientras se verifica si hay sesión
     if (isProfileLoading) {
-        console.log("⏳ App.tsx: Cargando perfil...");
+        logger.info("App: cargando perfil");
         return <LoadingFallback />;
     }
 
-    console.log("✅ App.tsx: Renderizando rutas. isAuthenticated =", isAuthenticated);
+    logger.info("App: renderizando rutas", { isAuthenticated });
 
     return (
             <>
