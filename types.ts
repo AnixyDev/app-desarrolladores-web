@@ -299,7 +299,20 @@ export interface RecurringInvoice { id: string; user_id: string; client_id: stri
 export interface NewProject { name: string; client_id: string; status: string; description?: string; start_date?: string; due_date?: string; budget_cents?: number; category?: string; priority?: ProjectPriority; }
 export interface TimeEntry { id: string; user_id: string; project_id: string; task_id?: string; description?: string; duration_seconds: number; start_time: string; end_time?: string; invoice_id?: string | null; logged_by?: string | null; }
 export interface NewTimeEntry { project_id: string; task_id?: string; description?: string; duration_seconds: number; start_time: string; end_time?: string; invoice_id?: string | null; }
-export interface ProjectMessage { id: string; project_id: string; user_id: string; user_name: string; text: string; timestamp: string; }
+// Mensaje del canal de proyecto. Refleja la tabla public.project_messages:
+// `author_name` y `author_role` NO los manda el navegador, los sella un
+// trigger leyendo quien es de verdad quien escribe — asi un cliente del
+// portal no puede firmar un mensaje como si fuera el freelancer.
+export type AutorDelChat = 'freelancer' | 'equipo' | 'cliente';
+export interface ProjectMessage {
+  id: string;
+  project_id: string;
+  author_id: string;
+  author_name: string;
+  author_role: AutorDelChat;
+  body: string;
+  created_at: string;
+}
 export interface Notification { id: string; message: string; link?: string; isRead: boolean; createdAt: string; }
 export interface NewClient { name: string; email: string; company?: string; phone?: string; tax_id?: string; address?: string; }
 export interface GoogleJwtPayload { email: string; name?: string; picture?: string; sub: string; }

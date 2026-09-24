@@ -73,16 +73,17 @@ const PortalDashboardPage: React.FC = () => {
           <CardContent className="p-0">
             <ul className="divide-y divide-gray-800">
               {projects.length > 0 ? projects.map(p => (
-                <li key={p.id} className="p-4">
-                  <div className="flex justify-between items-center">
+                <li key={p.id} className="p-4 hover:bg-gray-800/40 transition-colors">
+                  <Link to={`/portal/projects/${p.id}`} className="flex justify-between items-center gap-3">
                     <div>
                       <p className="font-semibold text-white">{p.name}</p>
                       <p className="text-sm text-gray-400">Vence: {p.due_date}</p>
+                      <p className="text-xs text-primary-400 mt-1">Ver proyecto y mensajes →</p>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full text-xs capitalize bg-purple-500/20 text-purple-400">
+                    <span className="px-2 py-0.5 rounded-full text-xs capitalize bg-purple-500/20 text-purple-400 shrink-0">
                       {p.status}
                     </span>
-                  </div>
+                  </Link>
                 </li>
               )) : <p className="p-4 text-gray-400">No tienes proyectos activos.</p>}
             </ul>
