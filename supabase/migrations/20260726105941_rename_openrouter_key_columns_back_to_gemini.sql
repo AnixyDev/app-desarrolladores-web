@@ -1,0 +1,2 @@
+ALTER TABLE user_secrets RENAME COLUMN openrouter_api_key_encrypted TO gemini_api_key_encrypted;
+ALTER TABLE user_secrets RENAME COLUMN openrouter_api_key_updated_at TO gemini_api_key_updated_at;;
