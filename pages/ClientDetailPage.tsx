@@ -12,15 +12,18 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { Client, NewClient } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
+import { useToast } from '@/hooks/useToast';
 
 const ClientIncomeChart = lazy(() => import('@/components/charts/ClientIncomeChart'));
 
 const ClientDetailPage: React.FC = () => {
     const { clientId } = useParams<{ clientId: string }>();
     const navigate = useNavigate();
-    const { datosDeTrabajoCargados, getClientById, projects, invoices, receipts, updateClient, deleteClient } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getClientById: s.getClientById, projects: s.projects, invoices: s.invoices, receipts: s.receipts, updateClient: s.updateClient, deleteClient: s.deleteClient })));
+    const { datosDeTrabajoCargados, getClientById, projects, invoices, receipts, updateClient, deleteClient, invitarAlPortal } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getClientById: s.getClientById, projects: s.projects, invoices: s.invoices, receipts: s.receipts, updateClient: s.updateClient, deleteClient: s.deleteClient, invitarAlPortal: s.invitarAlPortal })));
+    const { addToast } = useToast();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [invitando, setInvitando] = useState(false);
     
     const client = clientId ? getClientById(clientId) : undefined;
     const [formData, setFormData] = useState<Client | NewClient | null>(client || null);
@@ -100,6 +103,19 @@ const ClientDetailPage: React.FC = () => {
         }
     }
 
+    const handleInvitarAlPortal = async () => {
+        if (invitando) return;
+        setInvitando(true);
+        const resultado = await invitarAlPortal(client.id);
+        setInvitando(false);
+
+        if (resultado.success) {
+            addToast(`Invitación enviada a ${client.email}.`, 'success');
+        } else {
+            addToast(resultado.message || 'No se pudo enviar la invitación.', 'error');
+        }
+    };
+
     const totalInvoiced = clientInvoices.reduce((sum, i) => sum + i.total_cents, 0);
     const totalCollectedFromInvoices = clientInvoices.reduce((sum, i) => {
         if (i.paid) return sum + i.total_cents;
@@ -130,6 +146,44 @@ const ClientDetailPage: React.FC = () => {
                     <CardContent className="space-y-2 text-sm">
                         <div><p className="text-gray-400">Email</p><a href={`mailto:${client.email}`} className="text-white hover:underline">{client.email}</a></div>
                         {client.phone && <div><p className="text-gray-400">Teléfono</p><p className="text-white">{client.phone}</p></div>}
+
+                        {/*
+                          * El Portal de Cliente existía entero y no había forma de que el
+                          * cliente se enterase: ni botón, ni correo, en ninguna parte. Este
+                          * es el botón que faltaba.
+                          */}
+                        <div className="pt-3 mt-3 border-t border-gray-700 space-y-2">
+                            <p className="text-gray-400">Portal de Cliente</p>
+                            <p className="text-xs text-gray-500">
+                                Le damos acceso para que consulte sus proyectos, facturas,
+                                presupuestos y contratos, y pueda escribirte desde ahí.
+                            </p>
+                            <Button
+                                onClick={handleInvitarAlPortal}
+                                disabled={invitando || !client.email}
+                                size="sm"
+                                variant="secondary"
+                                className="w-full"
+                            >
+                                {invitando
+                                    ? 'Enviando…'
+                                    : client.portal_invitado_en
+                                        ? 'Reenviar invitación'
+                                        : 'Invitar al portal'}
+                            </Button>
+                            {!client.email && (
+                                <p className="text-xs text-amber-400">
+                                    Añade un email a la ficha para poder invitarle.
+                                </p>
+                            )}
+                            {client.portal_invitado_en && (
+                                <p className="text-xs text-gray-500">
+                                    Invitado el {new Date(client.portal_invitado_en).toLocaleDateString('es-ES', {
+                                        day: '2-digit', month: '2-digit', year: 'numeric',
+                                    })}
+                                </p>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
 

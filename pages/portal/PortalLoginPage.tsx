@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { supabase } from '@/lib/supabaseClient';
 
 const PortalLoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
+  // El correo de invitación trae la dirección puesta (`?email=`), para que el
+  // cliente no tenga que acordarse de con cuál le dieron de alta: si escribe
+  // otra distinta, no habrá ficha que enlazar y el portal saldrá vacío.
+  // Es solo comodidad — el acceso lo decide el enlace mágico, no este campo.
+  const [searchParams] = useSearchParams();
+  const [email, setEmail] = useState(() => (searchParams.get('email') ?? '').trim());
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
