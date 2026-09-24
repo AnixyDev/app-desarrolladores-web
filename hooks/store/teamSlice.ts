@@ -2,6 +2,9 @@ import { StateCreator } from 'zustand';
 import { UserData, Referral, KnowledgeArticle, TeamMembership } from '@/types';
 import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
+// Los límites viven en el mismo archivo que importa invite-team-member. El
+// servidor es quien manda; esto solo evita el viaje de ida y vuelta.
+import { puedeInvitar } from '../../supabase/functions/_shared/limites-equipo';
 
 export interface TeamSlice {
   users: UserData[];
@@ -91,6 +94,16 @@ export const createTeamSlice: StateCreator<AppState, [], [], TeamSlice> = (set, 
     inviteUser: async (name, email, role) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return { success: false, message: 'No se encontró sesión de usuario.' };
+
+        // Comprobación previa, solo para no dejar una fila huérfana en
+        // team_members cuando ya se sabe que la invitación va a ser
+        // rechazada. Quien decide de verdad es la Edge Function, que vuelve a
+        // comprobar plan y topes contra la base de datos: esto es únicamente
+        // para que el usuario vea el motivo antes y no después.
+        const veredicto = puedeInvitar(get().profile?.plan, get().users.length);
+        if (!veredicto.permitida) {
+            return { success: false, message: veredicto.motivo };
+        }
 
         const { data, error } = await supabase
             .from('team_members')
