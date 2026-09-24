@@ -21,7 +21,7 @@ const ProjectDetailPage: React.FC = () => {
     const navigate = useNavigate();
     const { addToast } = useToast();
 
-    const { getProjectById, getClientById, getTasksByProjectId, timeEntries, expenses, profile, addTask, toggleTask, deleteTask, deleteProject, updateProjectStatus } = useAppStore(useShallow(s => ({ getProjectById: s.getProjectById, getClientById: s.getClientById, getTasksByProjectId: s.getTasksByProjectId, timeEntries: s.timeEntries, expenses: s.expenses, profile: s.profile, addTask: s.addTask, toggleTask: s.toggleTask, deleteTask: s.deleteTask, deleteProject: s.deleteProject, updateProjectStatus: s.updateProjectStatus })));
+    const { datosDeTrabajoCargados, getProjectById, getClientById, getTasksByProjectId, timeEntries, expenses, profile, addTask, toggleTask, deleteTask, deleteProject, updateProjectStatus } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getProjectById: s.getProjectById, getClientById: s.getClientById, getTasksByProjectId: s.getTasksByProjectId, timeEntries: s.timeEntries, expenses: s.expenses, profile: s.profile, addTask: s.addTask, toggleTask: s.toggleTask, deleteTask: s.deleteTask, deleteProject: s.deleteProject, updateProjectStatus: s.updateProjectStatus })));
 
     const [newTaskDescription, setNewTaskDescription] = useState('');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -78,6 +78,17 @@ const ProjectDetailPage: React.FC = () => {
         };
     }, [project, expenses, projectTimeEntries, profile]);
 
+
+    // Sin este chequeo, mientras los datos aun estaban llegando esta pagina
+    // enseñaba el error rojo de "no encontrado": al refrescar, lo primero
+    // que veia el usuario era que su registro no existia.
+    if (!datosDeTrabajoCargados) {
+        return (
+            <div className="flex justify-center py-16">
+                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500" />
+            </div>
+        );
+    }
 
     if (!project || !client) {
         return <div className="text-center text-red-500 mt-8">Proyecto o cliente no encontrado.</div>;

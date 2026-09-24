@@ -33,7 +33,7 @@ const statusBadge = (status: JobApplicationStatus) => {
 
 const JobApplicantsPage: React.FC = () => {
   const { jobId } = useParams<{ jobId: string }>();
-  const { getJobById, getApplicationsByJobId, viewApplication, updateApplicationStatus } = useAppStore(useShallow(s => ({ getJobById: s.getJobById, getApplicationsByJobId: s.getApplicationsByJobId, viewApplication: s.viewApplication, updateApplicationStatus: s.updateApplicationStatus })));
+  const { datosDeTrabajoCargados, getJobById, getApplicationsByJobId, viewApplication, updateApplicationStatus } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getJobById: s.getJobById, getApplicationsByJobId: s.getApplicationsByJobId, viewApplication: s.viewApplication, updateApplicationStatus: s.updateApplicationStatus })));
   const { addToast } = useToast();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
@@ -56,6 +56,17 @@ const JobApplicantsPage: React.FC = () => {
       addToast(result.message || 'No se pudo actualizar la postulación.', 'error');
     }
   };
+
+  // Sin este chequeo, mientras los datos aun estaban llegando esta pagina
+  // enseñaba el error rojo de "no encontrado": al refrescar, lo primero
+  // que veia el usuario era que su registro no existia.
+  if (!datosDeTrabajoCargados) {
+      return (
+          <div className="flex justify-center py-16">
+              <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500" />
+          </div>
+      );
+  }
 
   if (!job) {
     return <div className="text-center text-red-500">Oferta no encontrada.</div>;
