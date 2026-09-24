@@ -315,7 +315,7 @@ const ProjectDetailPage: React.FC = () => {
                 </CardHeader>
                 <CardContent>
                     <Suspense fallback={<div className="h-[500px] flex items-center justify-center text-gray-400">Cargando chat...</div>}>
-                        <ProjectChat projectId={project.id} />
+                        <ProjectChat projectId={project.id} puedeResumir />
                     </Suspense>
                 </CardContent>
             </Card>

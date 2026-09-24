@@ -79,6 +79,7 @@ const AdminDashboard = safeLazy(() => import('./pages/AdminDashboard'));
 const PortalLayout = safeLazy(() => import('./pages/portal/PortalLayout'));
 const PortalLoginPage = safeLazy(() => import('./pages/portal/PortalLoginPage'));
 const PortalDashboardPage = safeLazy(() => import('./pages/portal/PortalDashboardPage'));
+const PortalProjectPage = safeLazy(() => import('./pages/portal/PortalProjectPage'));
 const PortalInvoiceViewPage = safeLazy(() => import('./pages/portal/PortalInvoiceViewPage'));
 const PortalContractViewPage = safeLazy(() => import('./pages/portal/PortalContractViewPage'));
 const PortalBudgetViewPage = safeLazy(() => import('./pages/portal/PortalBudgetViewPage'));
@@ -190,6 +191,7 @@ function App() {
                     <Route path="/portal" element={<Suspense fallback={<LoadingFallback />}><PortalLayout /></Suspense>}>
                         <Route path="login" element={<PortalLoginPage />} />
                         <Route path="dashboard" element={<PortalDashboardPage />} />
+                        <Route path="projects/:projectId" element={<PortalProjectPage />} />
                         <Route path="invoices/:invoiceId" element={<PortalInvoiceViewPage />} />
                         <Route path="contracts/:contractId" element={<PortalContractViewPage />} />
                         <Route path="budgets/:budgetId" element={<PortalBudgetViewPage />} />
