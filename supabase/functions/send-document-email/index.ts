@@ -91,6 +91,56 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // FIX: `to` llegaba del navegador sin ninguna comprobación. Con una sesión
+    // válida — la tiene cualquier usuario registrado — esto era un relé de
+    // correo abierto: enviar HTML arbitrario, con adjunto arbitrario, a
+    // cualquier dirección, desde facturas@devfreelancer.app, el dominio
+    // verificado. Es decir, phishing con el remitente de la casa, y la
+    // reputación del dominio por medio.
+    //
+    // Los tres usos legítimos (factura, contrato y presupuesto) mandan siempre
+    // a `client.email`, un cliente del propio usuario. Así que se exige eso.
+    const destinatario = String(to).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(destinatario)) {
+      return new Response(JSON.stringify({ error: 'La dirección de destino no es válida' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const esSuPropioEmail =
+      destinatario === String(profile.email ?? '').toLowerCase() ||
+      destinatario === String(user.email ?? '').toLowerCase();
+
+    if (!esSuPropioEmail) {
+      const { data: cliente } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('user_id', user.id)
+        .ilike('email', destinatario)
+        .maybeSingle();
+
+      if (!cliente) {
+        console.error(`[send-document-email] destino no permitido para ${user.id}: ${destinatario}`);
+        return new Response(
+          JSON.stringify({
+            error: 'Solo puedes enviar documentos a tus clientes. Añade este correo a la ficha del cliente y vuelve a intentarlo.',
+          }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Un PDF de factura ronda los 50-300 kB. El tope existe para que nadie
+    // pueda usar esto para mover ficheros grandes a través de tu cuenta.
+    const MAX_ADJUNTO_BASE64 = 8 * 1024 * 1024; // ~6 MB reales
+    if (attachmentBase64 && attachmentBase64.length > MAX_ADJUNTO_BASE64) {
+      return new Response(JSON.stringify({ error: 'El adjunto es demasiado grande' }), {
+        status: 413,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     if ((attachmentBase64 && !attachmentFilename) || (!attachmentBase64 && attachmentFilename)) {
       return new Response(JSON.stringify({ error: 'Adjunto incompleto: faltan datos o nombre de archivo' }), {
         status: 400,
@@ -112,7 +162,7 @@ Deno.serve(async (req) => {
     const resendBody: Record<string, unknown> = {
       from: fromAddress,
       reply_to: replyToAddress,
-      to: [to],
+      to: [destinatario],
       subject,
       html,
     };
@@ -138,8 +188,9 @@ Deno.serve(async (req) => {
     const resendData = await resendResponse.json();
 
     if (!resendResponse.ok) {
+      // El cuerpo de error de Resend va al log, no al navegador.
       console.error('Error de Resend:', resendData);
-      return new Response(JSON.stringify({ error: resendData?.message || 'Error al enviar el email' }), {
+      return new Response(JSON.stringify({ error: 'No se pudo enviar el email. Inténtalo de nuevo.' }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

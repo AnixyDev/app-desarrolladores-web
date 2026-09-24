@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { costeDe } from "../_shared/creditos-ia.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -385,6 +386,51 @@ serve(async (req) => {
     }
 
     const { action, payload } = await req.json();
+
+    // ------------------------------------------------------------------
+    // COBRO DE CREDITOS — en el servidor, ANTES de gastar la cuota de Gemini.
+    //
+    // Esta funcion autenticaba al usuario y ejecutaba la accion sin mirar ni
+    // descontar creditos. Todo el control vivia en el navegador: cada pantalla
+    // comprobaba profile.ai_credits antes de llamar y descontaba despues. Un
+    // usuario que llamara aqui directamente tenia IA ilimitada y gratis.
+    //
+    // El coste sale del catalogo del servidor (_shared/creditos-ia.ts); del
+    // cliente solo se acepta QUE funcion dice estar usando, nunca cuanto vale.
+    // ------------------------------------------------------------------
+    const coste = costeDe(action, payload?.feature);
+    if (coste === null) {
+      return new Response(JSON.stringify({ error: "Unknown action" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Se cobra con el cliente del USUARIO, no con la clave de servicio:
+    // consume_credits_atomic exige que user_id coincida con auth.uid(), y con
+    // la clave de servicio auth.uid() es NULL y la llamada se rechazaria.
+    const { data: cobrado, error: errorCobro } = await supabase.rpc(
+      "consume_credits_atomic",
+      { user_id: user.id, amount_to_consume: coste }
+    );
+
+    if (errorCobro) {
+      console.error("[ai-gemini] error cobrando creditos:", errorCobro.message);
+      return new Response(
+        JSON.stringify({ error: "No se pudieron comprobar tus créditos. Inténtalo de nuevo." }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!cobrado) {
+      return new Response(
+        JSON.stringify({
+          error: `No tienes créditos suficientes: esta acción cuesta ${coste}.`,
+          credits_required: coste,
+        }),
+        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     switch (action) {
       case "getAIResponse": {
