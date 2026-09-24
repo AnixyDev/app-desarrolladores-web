@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import { BookIcon, PlusIcon, SearchIcon, EditIcon, TrashIcon, SparklesIcon, FileSignatureIcon, BrainCircuitIcon } from '../components/icons/Icon';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -7,7 +7,7 @@ import Modal from '@/components/ui/Modal';
 import { KnowledgeArticle } from '@/types';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { AI_CREDIT_COSTS, rankArticlesByRelevance } from '@/services/geminiService';
+import { AI_CREDIT_COSTS, rankArticlesByRelevance, getAIResponse } from '@/services/geminiService';
 import { useToast } from '@/hooks/useToast';
 
 const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
@@ -51,29 +51,55 @@ const KnowledgeBase: React.FC = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isBuyCreditsModalOpen, setIsBuyCreditsModalOpen] = useState(false);
     
+    // Último término que ya se ha buscado y cobrado. Ver el comentario del
+    // efecto de abajo: sin esto, la búsqueda se repetía sola.
+    const terminoYaBuscado = useRef('');
+
     useEffect(() => {
-        const performSearch = async () => {
-            if (debouncedSearchTerm.trim().length > 2) {
-                if(profile.ai_credits < AI_CREDIT_COSTS.searchKnowledgeBase) {
-                    addToast("No tienes suficientes créditos para la búsqueda IA.", "error");
-                    return;
-                }
-                setIsLoading(true);
-                try {
-                    const rankedIds = await rankArticlesByRelevance(debouncedSearchTerm, articles);
-                    setRankedArticleIds(rankedIds);
-                    consumeCredits(AI_CREDIT_COSTS.searchKnowledgeBase);
-                } catch(e) {
-                     addToast((e as Error).message, 'error');
-                } finally {
-                    setIsLoading(false);
-                }
-            } else {
-                setRankedArticleIds([]);
+        const termino = debouncedSearchTerm.trim();
+
+        if (termino.length <= 2) {
+            terminoYaBuscado.current = '';
+            setRankedArticleIds([]);
+            return;
+        }
+
+        // BUG CORREGIDO: este efecto dependía de `profile.ai_credits`, y su
+        // propio `consumeCredits` cambia justamente ese valor. Cada búsqueda
+        // disparaba el efecto otra vez, que volvía a buscar y a cobrar: 3
+        // créditos por vuelta, en bucle, hasta quedarse sin saldo. Ahora el
+        // saldo se lee del store en el momento (sin depender de él) y un ref
+        // impide repetir el mismo término.
+        if (terminoYaBuscado.current === termino) return;
+
+        const saldo = useAppStore.getState().profile?.ai_credits ?? 0;
+        if (saldo < AI_CREDIT_COSTS.searchKnowledgeBase) {
+            addToast('No tienes suficientes créditos para la búsqueda IA.', 'error');
+            return;
+        }
+
+        terminoYaBuscado.current = termino;
+        let cancelado = false;
+
+        (async () => {
+            setIsLoading(true);
+            try {
+                const rankedIds = await rankArticlesByRelevance(termino, articles);
+                if (cancelado) return;
+                setRankedArticleIds(rankedIds);
+                consumeCredits(AI_CREDIT_COSTS.searchKnowledgeBase);
+            } catch (e) {
+                if (cancelado) return;
+                // Si falló, no se ha cobrado: permitir reintentar el mismo texto.
+                terminoYaBuscado.current = '';
+                addToast((e as Error).message, 'error');
+            } finally {
+                if (!cancelado) setIsLoading(false);
             }
-        };
-        performSearch();
-    }, [debouncedSearchTerm, articles, profile.ai_credits, consumeCredits, addToast]);
+        })();
+
+        return () => { cancelado = true; };
+    }, [debouncedSearchTerm, articles, consumeCredits, addToast]);
 
 
     const displayedArticles = useMemo(() => {
@@ -120,39 +146,91 @@ const KnowledgeBase: React.FC = () => {
         }
     };
     
-    const handleGenerateDocument = () => {
-        if (profile?.ai_credits === undefined || profile.ai_credits < AI_CREDIT_COSTS.generateDocument) {
+    // El saldo que se ve en pantalla puede estar desfasado respecto al del
+    // servidor, que es el que manda. Este chequeo local solo sirve para
+    // ahorrarse el viaje de ida y vuelta cuando ya se sabe que no llega; si
+    // el servidor rechaza por saldo, se abre el mismo modal desde el catch.
+    const saldoInsuficiente = (coste: number) =>
+        profile?.ai_credits === undefined || profile.ai_credits < coste;
+
+    const esErrorDeCreditos = (e: unknown) =>
+        e instanceof Error && /cr[eé]dito/i.test(e.message);
+
+    const handleGenerateDocument = async () => {
+        const tema = generatorTopic.trim();
+        if (!tema) return;
+        if (saldoInsuficiente(AI_CREDIT_COSTS.generateDocument)) {
             setIsBuyCreditsModalOpen(true);
             return;
         }
+
         setIsLoading(true);
-        // Simulate AI call
-        setTimeout(() => {
-            const generatedContent = `Este es un documento generado por IA sobre "${generatorTopic}".\n\nSección 1: ...\nSección 2: ...`;
-            setCurrentArticle({ title: generatorTopic, content: generatedContent, tags: [generatorTopic.toLowerCase()] });
+        try {
+            // ANTES: esto era un setTimeout de 2 segundos con texto fijo
+            // ("Sección 1: ...") que no llamaba a ninguna IA, y aun así
+            // descontaba 10 créditos del contador. Ahora llama de verdad; el
+            // cobro lo hace el servidor dentro de ai-gemini.
+            const contenido = await getAIResponse(
+                `Redacta un documento interno de base de conocimiento sobre "${tema}".\n` +
+                `Usa Markdown, con un título de primer nivel, secciones con encabezados ` +
+                `y listas donde aporten claridad. Escribe en español, en tono profesional ` +
+                `y directo, sin introducción ni despedida.`,
+                [],
+                'generateDocument'
+            );
+
+            setCurrentArticle({
+                title: tema,
+                content: contenido,
+                tags: [tema.toLowerCase()],
+            });
             setIsGeneratorModalOpen(false);
             setIsModalOpen(true);
-            setIsLoading(false);
             consumeCredits(AI_CREDIT_COSTS.generateDocument);
             addToast('Documento generado con IA', 'success');
-        }, 2000);
+        } catch (e) {
+            if (esErrorDeCreditos(e)) {
+                setIsBuyCreditsModalOpen(true);
+            } else {
+                addToast((e as Error).message || 'No se pudo generar el documento', 'error');
+            }
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const handleGenerateQuiz = () => {
-        if (!currentArticle?.content) return;
-        if (profile?.ai_credits === undefined || profile.ai_credits < AI_CREDIT_COSTS.generateQuiz) {
+    const handleGenerateQuiz = async () => {
+        const contenido = currentArticle?.content?.trim();
+        if (!contenido) return;
+        if (saldoInsuficiente(AI_CREDIT_COSTS.generateQuiz)) {
             setIsBuyCreditsModalOpen(true);
             return;
         }
+
         setIsLoading(true);
-        setTimeout(() => {
-            const quiz = `Cuestionario sobre "${currentArticle.title}":\n\n1. ¿Cuál es el primer paso del despliegue?\n2. ...`;
-            setQuizResult(quiz);
+        try {
+            const cuestionario = await getAIResponse(
+                `Crea un cuestionario de 5 preguntas para comprobar que se ha entendido ` +
+                `el siguiente artículo. Numera las preguntas y añade al final la sección ` +
+                `"Respuestas" con la solución de cada una. Escribe en español.\n\n` +
+                `Título: ${currentArticle?.title ?? 'Sin título'}\n\n${contenido}`,
+                [],
+                'generateQuiz'
+            );
+
+            setQuizResult(cuestionario);
             setIsQuizModalOpen(true);
-            setIsLoading(false);
             consumeCredits(AI_CREDIT_COSTS.generateQuiz);
             addToast('Cuestionario generado', 'success');
-        }, 2000);
+        } catch (e) {
+            if (esErrorDeCreditos(e)) {
+                setIsBuyCreditsModalOpen(true);
+            } else {
+                addToast((e as Error).message || 'No se pudo generar el cuestionario', 'error');
+            }
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (

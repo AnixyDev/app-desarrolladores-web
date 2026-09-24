@@ -92,11 +92,13 @@ const ProfitabilityReportPage: React.FC = () => {
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     try {
-      const success = await consumeCredits(AI_CREDIT_COSTS.analyzeProfitability);
-      if (!success) {
-        setIsBuyCreditsOpen(true);
-        return;
-      }
+      // ANTES: se descontaban los 15 créditos AQUÍ, antes de llamar a la IA, y
+      // se usaba el resultado como permiso ("if (!success) return"). Desde que
+      // cobra el servidor dentro de ai-gemini, consumeCredits solo refleja el
+      // descuento en pantalla y siempre devuelve true: ese permiso ya no
+      // protegía nada, y si la llamada fallaba el contador bajaba igual. Ahora
+      // se descuenta después de que la llamada haya ido bien, como en el resto
+      // de la aplicación, y la falta de saldo la avisa el servidor.
       // Los importes deben viajar en campos *_cents: es la convención que usa
       // normalizeCentsFields() en la Edge Function para convertir céntimos a
       // euros antes de pasarlos a la IA. Sin el sufijo, la IA recibe el
@@ -119,9 +121,15 @@ const ProfitabilityReportPage: React.FC = () => {
         topPerformers: data.topPerformers || [],
         areasForImprovement: data.areasForImprovement || []
       });
+
+      consumeCredits(AI_CREDIT_COSTS.analyzeProfitability);
     } catch (error) {
       console.error('AI Analysis error:', error);
-      addToast('Error al analizar la rentabilidad. Intenta nuevamente.', 'error');
+      if (error instanceof Error && /cr[eé]dito/i.test(error.message)) {
+        setIsBuyCreditsOpen(true);
+      } else {
+        addToast('Error al analizar la rentabilidad. Intenta nuevamente.', 'error');
+      }
     } finally {
       setIsAnalyzing(false);
     }
