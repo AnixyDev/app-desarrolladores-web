@@ -267,7 +267,7 @@ const ProfitabilityReportPage: React.FC = () => {
 
       <Suspense fallback={null}>
         {isBuyCreditsOpen && (
-          <BuyCreditsModal isOpen onClose={() => setIsBuyCreditsOpen(false)} />
+          <BuyCreditsModal isOpen creditosNecesarios={AI_CREDIT_COSTS.analyzeProfitability} onClose={() => setIsBuyCreditsOpen(false)} />
         )}
       </Suspense>
     </div>

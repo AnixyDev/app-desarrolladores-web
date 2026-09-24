@@ -4,14 +4,23 @@ import Modal from '../ui/Modal';
 import { SparklesIcon, ZapIcon, CheckCircleIcon, StarIcon, RefreshCwIcon, ShieldIcon } from '../icons/Icon';
 import { STRIPE_ITEMS, redirectToCheckout, StripeItemKey } from '@/services/stripeService';
 import { useToast } from '@/hooks/useToast';
+import { useAppStore } from '@/hooks/useAppStore';
 
 interface BuyCreditsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * Cuántos créditos costaba la acción que no se ha podido hacer. Si se indica,
+   * el modal dice exactamente cuánto falta en vez de dar por hecho que el saldo
+   * es cero — que casi nunca lo es: la mayoría de las veces el usuario tiene
+   * créditos, pero menos de los que pide esa función en concreto.
+   */
+  creditosNecesarios?: number;
 }
 
-const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({ isOpen, onClose }) => {
+const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({ isOpen, onClose, creditosNecesarios }) => {
   const { addToast } = useToast();
+  const saldo = useAppStore(s => s.profile?.ai_credits ?? 0);
   const [isLoading, setIsLoading] = useState<string | null>(null);
 
   const handlePurchase = async (itemKey: StripeItemKey) => {
@@ -88,13 +97,26 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({ isOpen, onClose }) =>
     </div>
   );
 
+  const plural = (n: number) => (n === 1 ? '1 crédito' : `${n} créditos`);
+
+  const explicacion = (() => {
+    if (creditosNecesarios && saldo > 0) {
+      return `Esta función cuesta ${plural(creditosNecesarios)} y te ${saldo === 1 ? 'queda' : 'quedan'} ${plural(saldo)}. Recarga para poder usarla.`;
+    }
+    if (creditosNecesarios) {
+      return `Esta función cuesta ${plural(creditosNecesarios)} y te has quedado sin saldo. Selecciona un paquete de recarga.`;
+    }
+    if (saldo > 0) {
+      return `Te ${saldo === 1 ? 'queda' : 'quedan'} ${plural(saldo)} de IA, y no son suficientes para esta función. Selecciona un paquete de recarga.`;
+    }
+    return 'Has agotado tus créditos de IA. Para continuar utilizando las funciones de generación automática y análisis, selecciona un paquete de recarga.';
+  })();
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Necesitas más energía">
       <div className="space-y-6">
         <div className="text-center bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-            <p className="text-gray-300 text-sm">
-                Has agotado tus créditos de IA. Para continuar utilizando las funciones de generación automática y análisis, selecciona un paquete de recarga.
-            </p>
+            <p className="text-gray-300 text-sm">{explicacion}</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

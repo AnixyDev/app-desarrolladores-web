@@ -170,7 +170,7 @@ const ExpenseOcrModal: React.FC<ExpenseOcrModalProps> = ({ isOpen, onClose, onEx
 
             <Suspense fallback={null}>
                 {isBuyCreditsModalOpen && (
-                    <BuyCreditsModal isOpen={isBuyCreditsModalOpen} onClose={() => setIsBuyCreditsModalOpen(false)} />
+                    <BuyCreditsModal isOpen={isBuyCreditsModalOpen} creditosNecesarios={AI_CREDIT_COSTS.extractExpenseFromImage} onClose={() => setIsBuyCreditsModalOpen(false)} />
                 )}
             </Suspense>
         </>

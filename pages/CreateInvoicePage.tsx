@@ -389,6 +389,7 @@ const CreateInvoicePage: React.FC = () => {
         {isBuyCreditsModalOpen && (
           <BuyCreditsModal
             isOpen={isBuyCreditsModalOpen}
+            creditosNecesarios={AI_CREDIT_COSTS.generateInvoiceItems}
             onClose={() => setIsBuyCreditsModalOpen(false)}
           />
         )}

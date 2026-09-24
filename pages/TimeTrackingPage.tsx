@@ -517,7 +517,7 @@ const TimeTrackingPage: React.FC = () => {
             </Modal>
 
             <Suspense fallback={null}>
-                {isBuyCreditsModalOpen && <BuyCreditsModal isOpen={isBuyCreditsModalOpen} onClose={() => setIsBuyCreditsModalOpen(false)} />}
+                {isBuyCreditsModalOpen && <BuyCreditsModal isOpen={isBuyCreditsModalOpen} creditosNecesarios={AI_CREDIT_COSTS.enhanceTimeEntry} onClose={() => setIsBuyCreditsModalOpen(false)} />}
             </Suspense>
         </div>
     );

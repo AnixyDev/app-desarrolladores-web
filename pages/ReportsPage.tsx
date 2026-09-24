@@ -298,6 +298,7 @@ const ReportsPage: React.FC = () => {
         {isBuyCreditsModalOpen && (
           <BuyCreditsModal
             isOpen
+            creditosNecesarios={AI_CREDIT_COSTS.analyzeProfitability}
             onClose={() => setIsBuyCreditsModalOpen(false)}
           />
         )}
