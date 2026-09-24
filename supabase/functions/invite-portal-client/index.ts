@@ -1,332 +1,292 @@
-// Definiciones de TypeScript definitivas alineadas con el repositorio AnixyDev/app-desarrolladores-web
+// supabase/functions/invite-portal-client/index.ts
+//
+// Invita a un cliente al Portal de Cliente.
+//
+// POR QUE EXISTE: el portal estaba construido entero — proyectos, facturas,
+// presupuestos, contratos, propuestas y el chat del proyecto — y no habia
+// ninguna forma de que un cliente se enterase de que existia. Ni funcion, ni
+// boton, ni correo, en ninguna parte del codigo. La unica via era decirselo a
+// mano. "Portal de cliente" se anuncia en el plan Pro.
+//
+// EL CORREO NO LLEVA NINGUN ENLACE DE ACCESO. Lleva un boton a
+// /portal/login con la direccion ya escrita, y es el cliente quien pide su
+// enlace magico desde ahi. Dos motivos:
+//   - Un enlace magico caduca en una hora. Una invitacion se lee cuando se
+//     lee, y un enlace muerto en el correo parece que el portal esta roto.
+//   - Un correo reenviado o leido por otro no da acceso a nada.
+//
+// RECUERDA: esta funcion NO se despliega con `git push`. Hay que desplegarla
+// explicitamente cada vez que cambie este archivo.
 
-export type BudgetStatus = 'pending' | 'accepted' | 'rejected';
-export type ContractStatus = 'draft' | 'sent' | 'signed';
-export type JobApplicationStatus = 'sent' | 'viewed' | 'accepted' | 'rejected';
-export type ProjectStatus = 'planning' | 'in-progress' | 'completed' | 'on-hold';
-export type ProposalStatus = 'draft' | 'sent' | 'accepted' | 'rejected';
-export type ProjectPriority = 'Low' | 'Medium' | 'High';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  puedeInvitarAlPortal,
+  INVITACIONES_PORTAL_POR_DIA,
+} from '../_shared/limites-portal.ts';
 
-export interface Profile {
-  id: string;
-  full_name: string;
-  email: string;
-  business_name: string;
-  tax_id: string;
-  // NUEVO: reply-to configurable para emails de facturas/propuestas/presupuestos.
-  // Si es undefined/vacío, el backend usa 'email' como fallback.
-  invoice_reply_to_email?: string;
-  address?: string;
-  // NUEVO: domicilio fiscal completo — 'address' nunca llegó a
-  // implementarse en la base de datos pese a estar en el tipo; estos
-  // campos sí existen de verdad y son necesarios para una factura
-  // legalmente completa (RD 1619/2012).
-  fiscal_street?: string;
-  fiscal_postal_code?: string;
-  fiscal_city?: string;
-  fiscal_province?: string;
-  avatar_url: string;
-  plan: 'Free' | 'Pro' | 'Teams';
-  role: 'Admin' | 'Developer' | 'Manager' | string;
-  ai_credits: number;
-  signature_credits: number;
-  hourly_rate_cents: number;
-  pdf_color: string;
-  portal_logo_url?: string;
-  bio?: string;
-  skills?: string[];
-  portfolio_url?: string;
-  payment_reminders_enabled: boolean;
-  reminder_template_upcoming: string;
-  reminder_template_overdue: string;
-  affiliate_code: string;
-  stripe_account_id: string;
-  stripe_onboarding_complete: boolean;
-  stripe_customer_id?: string;
-  stripe_subscription_id?: string;
-  current_period_end?: string;
-  subscription_status?: string;
-  // NUEVO: cumplimiento Veri*Factu (RD 1007/2023). Desactivado por
-  // defecto — cada usuario lo activa cuando le corresponda según su
-  // fecha límite (autónomos: 1 julio 2027).
-  veri_factu_enabled?: boolean;
-  veri_factu_modality?: 'verifactu' | 'no_verifactu';
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+const RESEND_API_URL = 'https://api.resend.com/emails';
+const FROM_ADDRESS = 'DevFreelancer <alertas@devfreelancer.app>';
+
+const ORIGEN_POR_DEFECTO = 'https://devfreelancer.app';
+const ORIGENES_PERMITIDOS = [
+  'https://devfreelancer.app',
+  'https://www.devfreelancer.app',
+];
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/**
+ * El destino del enlace del correo no puede salir de una cabecera que fija
+ * quien llama: seria una URL sin validar dentro de un correo que sale con el
+ * dominio verificado de la aplicacion. Mismo criterio que invite-team-member.
+ */
+function origenSeguro(origen: string | null): string {
+  if (!origen) return ORIGEN_POR_DEFECTO;
+  try {
+    const parsed = new URL(origen);
+    if (parsed.protocol === 'http:' && parsed.hostname === 'localhost') return parsed.origin;
+    if (parsed.protocol === 'https:' && ORIGENES_PERMITIDOS.includes(parsed.origin)) {
+      return parsed.origin;
+    }
+  } catch { /* origen ilegible */ }
+  return ORIGEN_POR_DEFECTO;
 }
 
-export interface FiscalRecord {
-  id: string;
-  user_id: string;
-  invoice_id: string;
-  record_type: 'alta' | 'anulacion';
-  nif_emisor: string;
-  nombre_emisor: string;
-  numero_factura: string;
-  fecha_expedicion: string;
-  tipo_factura: string;
-  importe_total_cents: number;
-  hash_anterior: string | null;
-  hash: string;
-  hash_input: string;
-  modalidad: 'verifactu' | 'no_verifactu';
-  estado_envio: 'no_aplica' | 'pendiente' | 'enviado' | 'aceptado' | 'aceptado_con_errores' | 'rechazado';
-  csv_respuesta_aeat: string | null;
-  created_at: string;
+function escaparHtml(texto: string): string {
+  return texto
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-export interface Client {
-  id: string;
-  user_id: string;
-  name: string;
-  company: string;
-  tax_id?: string;
-  address?: string;
-  email: string;
-  phone: string;
-  created_at: string;
-  /**
-   * Cuándo se le envió la última invitación al Portal de Cliente.
-   * La escribe solo la Edge Function `invite-portal-client`; desde el
-   * navegador es de solo lectura.
-   */
-  portal_invitado_en?: string | null;
+function json(cuerpo: unknown, status = 200) {
+  return new Response(JSON.stringify(cuerpo), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 }
 
-export interface Project {
-  id: string;
-  user_id: string;
-  name: string;
-  client_id: string;
-  description?: string;
-  status: ProjectStatus;
-  start_date: string;
-  due_date: string;
-  budget_cents: number;
-  created_at: string;
-  category: string;
-  priority: ProjectPriority;
+/** Rechazo que el usuario debe ver. El frontend lee `success:false` + `message`. */
+function rechazo(message: string) {
+  return json({ success: false, message });
 }
 
-export type TaskStatus = 'todo' | 'in_progress' | 'completed' | 'done' | 'blocked';
+function cuerpoDelCorreo(
+  nombreCliente: string,
+  nombreFreelancer: string,
+  enlace: string,
+): string {
+  const cliente = escaparHtml(nombreCliente);
+  const freelancer = escaparHtml(nombreFreelancer);
 
-export interface Task {
-  id: string;
-  user_id: string;
-  project_id: string;
-  description: string;
-  status: TaskStatus; // Corregido: antes usaba 'completed: boolean'
-  created_at: string;
-  invoice_id: string | null;
-}
+  return `<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:24px;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1f2937;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;">
+      <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:#111827;">
+        ${freelancer} te ha dado acceso a tu portal
+      </h1>
 
-export interface InvoiceItem {
-  description: string;
-  quantity: number;
-  price_cents: number;
-}
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">
+        Hola ${cliente}:
+      </p>
 
-export interface Invoice {
-  id: string;
-  user_id: string;
-  invoice_number: string;
-  client_id: string;
-  project_id: string | null;
-  issue_date: string;
-  due_date: string;
-  items: InvoiceItem[];
-  subtotal_cents: number;
-  tax_percent: number;
-  total_cents: number;
-  paid: boolean;
-  payment_date?: string | null;
-  created_at: string;
-  irpf_percent?: number;
-  // NUEVO: cumplimiento Veri*Factu
-  fiscal_locked?: boolean;
-  rectifies_invoice_id?: string | null;
-  is_rectified?: boolean;
-}
+      <p style="margin:0 0 16px;font-size:15px;line-height:1.6;">
+        ${freelancer} trabaja contigo a través de DevFreelancer y te ha habilitado
+        un portal privado. Desde ahí puedes consultar, cuando quieras y sin tener
+        que pedirlo:
+      </p>
 
-export interface Receipt {
-  id: string;
-  user_id: string;
-  receipt_number: string;
-  client_id: string | null;
-  project_id: string | null;
-  concept: string;
-  amount_cents: number;
-  paid_at: string;
-  method: string | null;
-  notes: string | null;
-  created_at: string;
-}
+      <ul style="margin:0 0 20px;padding-left:20px;font-size:15px;line-height:1.8;">
+        <li>El estado de tus proyectos</li>
+        <li>Tus facturas y recibos</li>
+        <li>Presupuestos y propuestas, que puedes aprobar desde el propio portal</li>
+        <li>Tus contratos</li>
+        <li>Un canal de mensajes directo con ${freelancer} para cada proyecto</li>
+      </ul>
 
-export interface NewReceipt {
-  client_id: string | null;
-  project_id?: string | null;
-  concept: string;
-  amount_cents: number;
-  paid_at: string;
-  method?: string | null;
-  notes?: string | null;
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.6;">
+        No hay que crear ninguna contraseña. Pulsa el botón, confirma tu correo y
+        recibirás un enlace de acceso.
+      </p>
+
+      <p style="margin:0 0 24px;">
+        <a href="${enlace}"
+           style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:15px;font-weight:600;">
+          Entrar en mi portal
+        </a>
+      </p>
+
+      <p style="margin:0 0 8px;font-size:13px;line-height:1.6;color:#6b7280;">
+        Si el botón no funciona, copia esta dirección en tu navegador:<br>
+        <span style="word-break:break-all;">${escaparHtml(enlace)}</span>
+      </p>
+
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+
+      <p style="margin:0;font-size:13px;line-height:1.6;color:#6b7280;">
+        Si no esperabas este correo, puedes ignorarlo: no se ha creado ninguna
+        cuenta a tu nombre y este mensaje no da acceso a nada por sí mismo.
+      </p>
+    </div>
+  </body>
+</html>`;
 }
 
-export interface BankConnection {
-  id: string;
-  user_id: string;
-  gocardless_requisition_id: string;
-  institution_id: string;
-  institution_name: string;
-  status: 'pending' | 'linked' | 'expired' | 'error';
-  created_at: string;
-  expires_at: string | null;
-}
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
 
-export interface BankAccount {
-  id: string;
-  user_id: string;
-  connection_id: string;
-  gocardless_account_id: string;
-  iban: string | null;
-  account_name: string | null;
-  currency: string;
-  last_synced_at: string | null;
-  created_at: string;
-}
+  const authHeader = req.headers.get('Authorization') || '';
+  if (!authHeader) {
+    return json({ error: 'No autorizado' }, 401);
+  }
 
-export interface BankTransaction {
-  id: string;
-  user_id: string;
-  bank_account_id: string;
-  amount_cents: number;
-  currency: string;
-  booking_date: string;
-  counterparty_name: string | null;
-  description: string | null;
-  matched_invoice_id: string | null;
-  match_status: 'unmatched' | 'suggested' | 'confirmed' | 'ignored';
-  match_confidence: number | null;
-  created_at: string;
-}
+  const supabaseAuth = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_ANON_KEY')!,
+    { global: { headers: { Authorization: authHeader } } },
+  );
 
-export interface NewInvoice {
-  client_id: string;
-  project_id?: string | null;
-  items: InvoiceItem[];
-  tax_percent: number;
-  irpf_percent?: number;
-  due_date: string;
-  notes?: string;
-}
+  const { data: { user: freelancer }, error: authError } = await supabaseAuth.auth.getUser();
+  if (authError || !freelancer) {
+    return json({ error: 'Fallo al autenticar al usuario' }, 401);
+  }
 
-export interface Budget {
-  id: string;
-  user_id: string;
-  client_id: string;
-  description: string;
-  items: InvoiceItem[];
-  amount_cents: number;
-  status: BudgetStatus;
-  created_at: string;
-}
-export type NewBudget = Omit<Budget, 'id' | 'user_id' | 'amount_cents' | 'created_at'>;
+  const resendKey = Deno.env.get('RESEND_API_KEY');
+  if (!resendKey) {
+    console.error('Falta RESEND_API_KEY: no se puede enviar la invitación.');
+    return json({ error: 'Error interno' }, 500);
+  }
 
-export interface Proposal {
-  id: string;
-  user_id: string;
-  client_id: string;
-  title: string;
-  content: string;
-  amount_cents: number;
-  status: ProposalStatus;
-  items: InvoiceItem[];
-  valid_until: string | null;
-  created_at: string;
-}
+  try {
+    const { clientId } = await req.json();
+    if (!clientId || typeof clientId !== 'string') {
+      return json({ error: 'Falta el identificador del cliente' }, 400);
+    }
 
-export interface Contract {
-  id: string;
-  user_id: string;
-  client_id: string;
-  project_id: string;
-  content: string;
-  status: ContractStatus;
-  created_at: string;
-  signed_by?: string;
-  signed_at?: string;
-}
+    const origin = origenSeguro(req.headers.get('Origin'));
 
-export interface JobApplication {
-  id: string;
-  jobId: string;
-  userId: string;
-  applicantName: string;
-  jobTitle: string;
-  proposalText: string;
-  status: JobApplicationStatus;
-  appliedAt: string;
-}
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
 
-export interface Referral {
-  id: string;
-  name: string;
-  join_date: string;
-  created_at?: string;
-  status: 'Registered' | 'Subscribed';
-  commission_cents: number;
-}
+    // ── CONTROL 1: la ficha tiene que ser suya ────────────────────────────
+    //
+    // El destinatario NO viaja en la petición: se lee de la ficha, y la ficha
+    // tiene que pertenecer a quien llama. Asi, con una sesión válida solo se
+    // puede escribir a las direcciones que uno mismo ha dado de alta como
+    // clientes — nunca a una dirección arbitraria.
+    const { data: cliente, error: errorCliente } = await supabaseAdmin
+      .from('clients')
+      .select('id, name, email, portal_invitado_en')
+      .eq('id', clientId)
+      .eq('user_id', freelancer.id)
+      .maybeSingle();
 
-// Added missing types
-export interface UserData { id: string; name: string; email: string; role: 'Admin' | 'Manager' | 'Developer'; status: 'Activo' | 'Inactivo' | 'Pendiente'; hourly_rate_cents: number; invitedOn?: string; accepted_user_id?: string | null; }
-export interface Job {
-  id: string;
-  postedByUserId: string;
-  titulo: string;
-  descripcionCorta?: string;
-  descripcionLarga?: string;
-  presupuesto: number;
-  duracionSemanas?: number;
-  habilidades?: string[];
-  cliente?: string;
-  fechaPublicacion?: string;
-  isFeatured?: boolean;
-  compatibilidadIA?: number;
-  created_at: string;
-  email_contacto?: string;
-}
-export interface KnowledgeArticle { id: string; user_id?: string; title: string; content: string; tags?: string[]; created_at?: string; updated_at?: string; }
+    if (errorCliente) {
+      console.error('No se pudo leer la ficha del cliente:', errorCliente.message);
+      return json({ error: 'Error interno' }, 500);
+    }
 
-// Additional missing types
-export type IconName = string;
-export type PlanType = 'free' | 'pro' | 'teams';
-export type UserRole = 'admin' | 'user' | 'manager';
-export interface Expense { id: string; user_id: string; amount_cents: number; category: string; date: string; description: string; tax_percent: number; project_id?: string | null; }
-export interface RecurringExpense { id: string; user_id: string; amount_cents: number; category: string; frequency: string; start_date: string; next_date: string; description: string; project_id?: string | null; }
-export interface RecurringInvoice { id: string; user_id: string; client_id: string; project_id?: string | null; items: InvoiceItem[]; tax_percent: number; frequency: string; start_date: string; next_due_date: string; }
-export interface NewProject { name: string; client_id: string; status: string; description?: string; start_date?: string; due_date?: string; budget_cents?: number; category?: string; priority?: ProjectPriority; }
-export interface TimeEntry { id: string; user_id: string; project_id: string; task_id?: string; description?: string; duration_seconds: number; start_time: string; end_time?: string; invoice_id?: string | null; logged_by?: string | null; }
-export interface NewTimeEntry { project_id: string; task_id?: string; description?: string; duration_seconds: number; start_time: string; end_time?: string; invoice_id?: string | null; }
-// Mensaje del canal de proyecto. Refleja la tabla public.project_messages:
-// `author_name` y `author_role` NO los manda el navegador, los sella un
-// trigger leyendo quien es de verdad quien escribe — asi un cliente del
-// portal no puede firmar un mensaje como si fuera el freelancer.
-export type AutorDelChat = 'freelancer' | 'equipo' | 'cliente';
-export interface ProjectMessage {
-  id: string;
-  project_id: string;
-  author_id: string;
-  author_name: string;
-  author_role: AutorDelChat;
-  body: string;
-  created_at: string;
-}
-export interface Notification { id: string; message: string; link?: string; isRead: boolean; createdAt: string; }
-export interface NewClient { name: string; email: string; company?: string; phone?: string; tax_id?: string; address?: string; }
-export interface GoogleJwtPayload { email: string; name?: string; picture?: string; sub: string; }
-export interface TeamMembership {
-  membershipId: string;
-  role: string;
-  status: string;
-  ownerId: string;
-  ownerBusinessName: string | null;
-  ownerFullName: string | null;
-}
+    if (!cliente) {
+      return rechazo('Ese cliente no existe o no es tuyo.');
+    }
+
+    const destinatario = String(cliente.email ?? '').trim().toLowerCase();
+    if (!destinatario) {
+      return rechazo('Ese cliente no tiene email. Añádeselo a su ficha para poder invitarle.');
+    }
+    if (!EMAIL.test(destinatario)) {
+      return rechazo('El email de ese cliente no es una dirección válida. Corrígelo en su ficha.');
+    }
+
+    // ── CONTROL 2: tope diario y espera entre reenvíos ────────────────────
+    const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count: invitadosHoy, error: errorConteo } = await supabaseAdmin
+      .from('clients')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', freelancer.id)
+      .gte('portal_invitado_en', hace24h);
+
+    if (errorConteo) {
+      console.error('No se pudieron contar las invitaciones:', errorConteo.message);
+      return json({ error: 'Error interno' }, 500);
+    }
+
+    const veredicto = puedeInvitarAlPortal(
+      invitadosHoy ?? 0,
+      cliente.portal_invitado_en,
+    );
+
+    if (!veredicto.permitida) {
+      return rechazo(veredicto.motivo);
+    }
+
+    // ── El correo ─────────────────────────────────────────────────────────
+    const { data: perfil } = await supabaseAdmin
+      .from('profiles')
+      .select('business_name, full_name')
+      .eq('id', freelancer.id)
+      .maybeSingle();
+
+    const nombreFreelancer = perfil?.business_name || perfil?.full_name || 'Tu freelancer';
+
+    // Sin token. El cliente pide su propio enlace desde el portal; aquí solo
+    // se le lleva al formulario con su dirección ya puesta.
+    const enlace = `${origin}/portal/login?email=${encodeURIComponent(destinatario)}`;
+
+    const respuestaResend = await fetch(RESEND_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: FROM_ADDRESS,
+        to: [destinatario],
+        subject: `${nombreFreelancer} te ha dado acceso a tu portal de cliente`,
+        html: cuerpoDelCorreo(cliente.name ?? 'Hola', nombreFreelancer, enlace),
+      }),
+    });
+
+    if (!respuestaResend.ok) {
+      // El error crudo de Resend no se le devuelve al navegador: puede llevar
+      // detalles de la cuenta de correo.
+      const detalle = await respuestaResend.text();
+      console.error('Resend rechazó la invitación al portal:', respuestaResend.status, detalle);
+      return rechazo('No se pudo enviar la invitación. Inténtalo de nuevo en unos minutos.');
+    }
+
+    // Solo se marca si el correo ha salido: un fallo de Resend no debe gastar
+    // cupo ni activar la espera entre reenvíos.
+    const { error: errorMarca } = await supabaseAdmin
+      .from('clients')
+      .update({ portal_invitado_en: new Date().toISOString() })
+      .eq('id', cliente.id);
+
+    if (errorMarca) {
+      // No se deshace nada: el correo ya ha salido. Queda el aviso en los
+      // registros — si esto fallara siempre, el tope dejaría de contar.
+      console.error('Invitación enviada pero no registrada:', errorMarca.message);
+    }
+
+    return json({
+      success: true,
+      email: destinatario,
+      restantesHoy: INVITACIONES_PORTAL_POR_DIA - (invitadosHoy ?? 0) - 1,
+    });
+  } catch (error) {
+    console.error('Error enviando la invitación al portal:', error);
+    return rechazo((error as Error).message || 'Error interno');
+  }
+});

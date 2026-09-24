@@ -83,6 +83,12 @@ export interface Client {
   email: string;
   phone: string;
   created_at: string;
+  /**
+   * Cuándo se le envió la última invitación al Portal de Cliente.
+   * La escribe solo la Edge Function `invite-portal-client`; desde el
+   * navegador es de solo lectura.
+   */
+  portal_invitado_en?: string | null;
 }
 
 export interface Project {
