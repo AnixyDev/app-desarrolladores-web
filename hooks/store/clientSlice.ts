@@ -11,6 +11,7 @@ export interface ClientSlice {
   addClient: (client: NewClient) => Promise<Client | null>;
   updateClient: (client: Client) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
+  invitarAlPortal: (clientId: string) => Promise<{ success: boolean; message?: string }>;
 }
 
 export const createClientSlice: StateCreator<AppState, [], [], ClientSlice> = (set, get) => ({
@@ -92,6 +93,37 @@ export const createClientSlice: StateCreator<AppState, [], [], ClientSlice> = (s
         }
 
         set(state => ({ clients: state.clients.map(c => c.id === client.id ? client : c) }));
+    },
+
+    // Invita al cliente al Portal de Cliente.
+    //
+    // Aquí no se comprueba nada: quién puede invitar a quién, el tope diario y
+    // la espera entre reenvíos los decide la Edge Function, que es la única
+    // que ve la ficha con la clave de servicio. Desde el navegador solo viaja
+    // el identificador del cliente — nunca su dirección, que es lo que
+    // convertía a `send-document-email` en un relé de correo abierto.
+    invitarAlPortal: async (clientId) => {
+        const { data, error } = await supabase.functions.invoke('invite-portal-client', {
+            body: { clientId },
+        });
+
+        if (error || data?.success === false) {
+            return {
+                success: false,
+                message: data?.message || 'No se pudo enviar la invitación.',
+            };
+        }
+
+        // La fecha la fija el servidor; aquí solo se refleja para que el botón
+        // y el texto "invitado el …" no esperen a una recarga.
+        const ahora = new Date().toISOString();
+        set(state => ({
+            clients: state.clients.map(c =>
+                c.id === clientId ? { ...c, portal_invitado_en: ahora } : c
+            ),
+        }));
+
+        return { success: true, message: data?.email };
     },
 
     deleteClient: async (id) => {
