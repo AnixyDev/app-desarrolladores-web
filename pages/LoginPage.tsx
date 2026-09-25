@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -8,6 +8,8 @@ import Button from '@/components/ui/Button';
 import { supabase } from '@/lib/supabaseClient';
 import { MailIcon, LockIcon, EyeIcon, EyeOffIcon, AlertTriangleIcon } from '@/components/icons/Icon';
 import { GoogleIcon } from '@/components/icons/GoogleIcon';
+import CaptchaTurnstile, { type CaptchaTurnstileHandle } from '@/components/auth/CaptchaTurnstile';
+import { puedeEnviarConCaptcha } from '@/lib/captcha';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -27,6 +29,8 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captcha = useRef<CaptchaTurnstileHandle>(null);
 
   const { login } = useAppStore(useShallow(s => ({ login: s.login })));
   const navigate = useNavigate();
@@ -47,7 +51,7 @@ const LoginPage: React.FC = () => {
       // (email sin confirmar, demasiados intentos, servidor inaccesible), y el
       // motivo verdadero se perdía en un console.error que ya no existe en
       // producción.
-      const { success, message } = await login(email, password);
+      const { success, message } = await login(email, password, captchaToken);
       if (success) {
         navigate('/');
       } else {
@@ -56,6 +60,8 @@ const LoginPage: React.FC = () => {
     } catch (err) {
       setError('Error al conectar con el servidor.');
     } finally {
+      // El token ya se ha gastado, haya ido bien o mal: pedir otro.
+      captcha.current?.reiniciar();
       setLoading(false);
     }
   };
@@ -142,7 +148,9 @@ const LoginPage: React.FC = () => {
           </Link>
         </div>
 
-        <Button type="submit" className="w-full py-3 mt-2" disabled={loading} isLoading={loading}>
+        <CaptchaTurnstile ref={captcha} onToken={setCaptchaToken} />
+
+        <Button type="submit" className="w-full py-3 mt-2" disabled={loading || !puedeEnviarConCaptcha(captchaToken)} isLoading={loading}>
           {loading ? 'Entrando...' : 'Entrar'}
         </Button>
       </form>
