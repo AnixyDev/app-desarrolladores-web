@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AuthCard from '@/components/auth/AuthCard';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { supabase, getURL } from '@/lib/supabaseClient';
 import { MailIcon, AlertTriangleIcon, CheckCircleIcon } from '@/components/icons/Icon';
+import CaptchaTurnstile, { type CaptchaTurnstileHandle } from '@/components/auth/CaptchaTurnstile';
+import { opcionesCaptcha, puedeEnviarConCaptcha, esErrorDeCaptcha, MENSAJE_CAPTCHA_FALLIDO } from '@/lib/captcha';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -14,6 +16,8 @@ const ForgotPasswordPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captcha = useRef<CaptchaTurnstileHandle>(null);
 
   const emailInvalid = touched && !EMAIL_REGEX.test(email);
 
@@ -27,6 +31,7 @@ const ForgotPasswordPage: React.FC = () => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${getURL()}/auth/reset-password`,
+        ...opcionesCaptcha(captchaToken),
       });
       if (error) throw error;
       // Por seguridad, no revelamos si el email existe o no en el sistema:
@@ -34,8 +39,13 @@ const ForgotPasswordPage: React.FC = () => {
       setSent(true);
     } catch (err) {
       console.error(err);
-      setError('No se pudo enviar el email. Inténtalo de nuevo en unos minutos.');
+      setError(
+        esErrorDeCaptcha(err)
+          ? MENSAJE_CAPTCHA_FALLIDO
+          : 'No se pudo enviar el email. Inténtalo de nuevo en unos minutos.'
+      );
     } finally {
+      captcha.current?.reiniciar();
       setLoading(false);
     }
   };
@@ -98,7 +108,9 @@ const ForgotPasswordPage: React.FC = () => {
           )}
         </div>
 
-        <Button type="submit" className="w-full py-3 mt-2" disabled={loading} isLoading={loading}>
+        <CaptchaTurnstile ref={captcha} onToken={setCaptchaToken} />
+
+        <Button type="submit" className="w-full py-3 mt-2" disabled={loading || !puedeEnviarConCaptcha(captchaToken)} isLoading={loading}>
           {loading ? 'Enviando...' : 'Enviar enlace'}
         </Button>
       </form>

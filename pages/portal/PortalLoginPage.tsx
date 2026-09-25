@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { supabase } from '@/lib/supabaseClient';
+import CaptchaTurnstile, { type CaptchaTurnstileHandle } from '@/components/auth/CaptchaTurnstile';
+import { opcionesCaptcha, puedeEnviarConCaptcha, esErrorDeCaptcha, MENSAJE_CAPTCHA_FALLIDO } from '@/lib/captcha';
 
 const PortalLoginPage: React.FC = () => {
   // El correo de invitación trae la dirección puesta (`?email=`), para que el
@@ -15,26 +17,40 @@ const PortalLoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captcha = useRef<CaptchaTurnstileHandle>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        // Tras click en el enlace del email, vuelve al portal (no al login de la app principal)
-        emailRedirectTo: `${window.location.origin}/portal`,
-      },
-    });
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          // Tras click en el enlace del email, vuelve al portal (no al login de la app principal)
+          emailRedirectTo: `${window.location.origin}/portal`,
+          ...opcionesCaptcha(captchaToken),
+        },
+      });
 
-    if (error) {
+      if (error) {
+        setError(
+          esErrorDeCaptcha(error)
+            ? MENSAJE_CAPTCHA_FALLIDO
+            : 'No se pudo enviar el enlace. Inténtalo de nuevo.'
+        );
+      } else {
+        setSent(true);
+      }
+    } catch {
       setError('No se pudo enviar el enlace. Inténtalo de nuevo.');
-    } else {
-      setSent(true);
+    } finally {
+      // El token ya se ha gastado, haya ido bien o mal: pedir otro.
+      captcha.current?.reiniciar();
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
@@ -64,7 +80,8 @@ const PortalLoginPage: React.FC = () => {
                 required
               />
               {error && <p className="text-sm text-red-400">{error}</p>}
-              <Button type="submit" className="w-full" disabled={loading}>
+              <CaptchaTurnstile ref={captcha} onToken={setCaptchaToken} />
+              <Button type="submit" className="w-full" disabled={loading || !puedeEnviarConCaptcha(captchaToken)}>
                 {loading ? 'Enviando...' : 'Enviar enlace de acceso'}
               </Button>
             </form>

@@ -3,6 +3,7 @@ import { AppState } from '../useAppStore';
 import { Profile, GoogleJwtPayload } from '../../types';
 import { supabase } from '../../lib/supabaseClient';
 import { logger } from '../../lib/loggerService';
+import { opcionesCaptcha, esErrorDeCaptcha, MENSAJE_CAPTCHA_FALLIDO } from '../../lib/captcha';
 import type { Session } from '@supabase/supabase-js';
 
 // Estado inicial del perfil (valores por defecto antes de cargar datos reales)
@@ -73,6 +74,8 @@ const mensajeDeErrorDeLogin = (error: any): string => {
     const codigo = error?.code ?? '';
     const estado = error?.status ?? 0;
 
+    if (esErrorDeCaptcha(error)) return MENSAJE_CAPTCHA_FALLIDO;
+
     switch (codigo) {
         case 'invalid_credentials':
             return 'Credenciales incorrectas. Inténtalo de nuevo.';
@@ -108,10 +111,10 @@ export interface AuthSlice {
   // saber POR QUÉ había fallado y mostraba siempre "Credenciales incorrectas",
   // incluso cuando la causa era otra (email sin confirmar, rate limit, servidor
   // caído). Ahora devuelve el motivo, igual que `register`.
-  login: (email: string, password?: string) => Promise<{ success: boolean; message?: string }>;
+  login: (email: string, password?: string, captchaToken?: string | null) => Promise<{ success: boolean; message?: string }>;
   loginWithGoogle: (payload: GoogleJwtPayload) => Promise<void>;
   logout: () => Promise<void>;
-  register: (name: string, email: string, password?: string) => Promise<{ success: boolean; message?: string }>;
+  register: (name: string, email: string, password?: string, captchaToken?: string | null) => Promise<{ success: boolean; message?: string }>;
   updateProfile: (profileData: Partial<Profile>) => Promise<void>;
   refreshProfile: (knownSession?: Session | null) => Promise<void>;
   upgradePlan: (plan: 'Pro' | 'Teams') => void;
@@ -324,7 +327,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     },
 
     // Login con email/password tradicional
-    login: async (email, password) => {
+    login: async (email, password, captchaToken) => {
         // CAMBIO: aquí se hacía `set({ isProfileLoading: true })`, y eso impedía
         // que el usuario viera NUNCA el motivo de un fallo de login.
         //
@@ -341,7 +344,8 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         try {
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
-                password: password || ''
+                password: password || '',
+                options: opcionesCaptcha(captchaToken),
             });
 
             if (error) return { success: false, message: mensajeDeErrorDeLogin(error) };
@@ -384,16 +388,19 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     // `data.user.identities` vacío. Sin comprobar eso, el código interpretaba
     // la respuesta como "cuenta creada" y navegaba a "/" sin avisar de nada,
     // pareciendo que el registro no había hecho nada en absoluto.
-    register: async (name, email, password) => {
+    register: async (name, email, password, captchaToken) => {
         try {
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password: password || '',
-                options: { data: { full_name: name } }
+                options: { data: { full_name: name }, ...opcionesCaptcha(captchaToken) }
             });
 
             if (error) {
-                return { success: false, message: error.message };
+                return {
+                    success: false,
+                    message: esErrorDeCaptcha(error) ? MENSAJE_CAPTCHA_FALLIDO : error.message,
+                };
             }
 
             // Email ya registrado (con cualquier proveedor): Supabase devuelve

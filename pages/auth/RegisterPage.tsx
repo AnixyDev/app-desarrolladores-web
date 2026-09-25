@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AuthCard from '../../components/auth/AuthCard';
 import Input from '../../components/ui/Input';
@@ -8,6 +8,8 @@ import { useAppStore } from '../../hooks/useAppStore';
 import { supabase } from '../../lib/supabaseClient';
 import { UserIcon, MailIcon, LockIcon, EyeIcon, EyeOffIcon, AlertTriangleIcon, CheckCircleIcon } from '../../components/icons/Icon';
 import { GoogleIcon } from '../../components/icons/GoogleIcon';
+import CaptchaTurnstile, { type CaptchaTurnstileHandle } from '../../components/auth/CaptchaTurnstile';
+import { puedeEnviarConCaptcha } from '../../lib/captcha';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -21,6 +23,8 @@ const RegisterPage: React.FC = () => {
     const [error, setError] = useState('');
     const [infoMessage, setInfoMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+    const captcha = useRef<CaptchaTurnstileHandle>(null);
 
     const emailInvalid = emailTouched && email.length > 0 && !EMAIL_REGEX.test(email);
 
@@ -33,7 +37,7 @@ const RegisterPage: React.FC = () => {
 
         setLoading(true);
         try {
-            const result = await register(name, email, password);
+            const result = await register(name, email, password, captchaToken);
             if (result.success) {
                 // FIX: no navegamos directo a "/" en silencio. Si el proyecto tiene
                 // confirmación de email activada (lo habitual), signUp() no crea
@@ -47,6 +51,8 @@ const RegisterPage: React.FC = () => {
         } catch (err) {
             setError('Ocurrió un error durante el registro.');
         } finally {
+            // El token ya se ha gastado, haya ido bien o mal: pedir otro.
+            captcha.current?.reiniciar();
             setLoading(false);
         }
     };
@@ -139,7 +145,9 @@ const RegisterPage: React.FC = () => {
                         <span>{infoMessage}</span>
                     </div>
                 )}
-                <Button type="submit" className="w-full py-3 mt-2" disabled={loading} isLoading={loading}>
+                <CaptchaTurnstile ref={captcha} onToken={setCaptchaToken} />
+
+                <Button type="submit" className="w-full py-3 mt-2" disabled={loading || !puedeEnviarConCaptcha(captchaToken)} isLoading={loading}>
                     {loading ? 'Creando cuenta...' : 'Crear Cuenta'}
                 </Button>
             </form>
