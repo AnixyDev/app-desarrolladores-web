@@ -1,4 +1,4 @@
--- Cuentas de prueba a limpiar (todas menos admin@gmail.com, 9a3de704-ca0d-4333-a3a9-1e760bd863ac)
+-- Cuentas de prueba a limpiar (todas menos la cuenta de administración, 9a3de704-ca0d-4333-a3a9-1e760bd863ac)
 -- d73e6778, b2825236, 87e26180, d570b9d8, f8700a44, e85f45d5, 52755147, 19457591, c08ed9cb, 6d4ab741, 1745c336
 
 with test_users as (
