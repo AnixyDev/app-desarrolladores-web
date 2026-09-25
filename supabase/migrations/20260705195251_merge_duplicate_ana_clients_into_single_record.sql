@@ -1,5 +1,5 @@
 -- Cliente superviviente
--- 32ae96a9-c550-4333-8151-2741b28bebae (anixydev@gmail.com)
+-- 32ae96a9-c550-4333-8151-2741b28bebae (ficha de la propia dueña de la cuenta)
 
 -- Reasignar todo lo vinculado a los 3 duplicados hacia el superviviente
 update public.projects set client_id = '32ae96a9-c550-4333-8151-2741b28bebae'

@@ -100,7 +100,7 @@ const PortalDashboardPage: React.FC = () => {
             <ul className="divide-y divide-gray-800">
               {invoices.length > 0 ? invoices.map(i => (
                 <li key={i.id} className="p-4 hover:bg-gray-800/50">
-                  {/* 🆕 la ruta real definida en routes.tsx es /portal/invoices/:id (plural) */}
+                  {/* Ruta definida en App.tsx: /portal/invoices/:invoiceId (plural) */}
                   <Link to={`/portal/invoices/${i.id}`} className="flex justify-between items-center">
                     <div>
                       <p className="font-semibold text-white font-mono">{i.invoice_number}</p>
