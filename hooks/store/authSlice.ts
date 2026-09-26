@@ -70,6 +70,24 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 // Para cualquier caso no contemplado se muestra el código de Supabase, que es
 // lo que hace falta para diagnosticar. Antes ese dato solo iba a console.error,
 // y desde que se eliminan los console.* en producción se perdía del todo.
+/**
+ * El saldo de IA que hay que enseñar: el propio, o el del equipo si la cuenta
+ * es miembro activo de un plan Teams (ahí los créditos son compartidos y se
+ * cobran del dueño; ver saldo_creditos_ia() y consume_credits_atomic()).
+ * Si la consulta falla, se queda el saldo propio: mejor un número de menos
+ * que dejar la pantalla sin perfil.
+ */
+export const conSaldoDeCreditos = async (perfil: Profile): Promise<Profile> => {
+    try {
+        const { data, error } = await supabase.rpc('saldo_creditos_ia');
+        const fila = Array.isArray(data) ? data[0] : data;
+        if (error || !fila || typeof fila.saldo !== 'number') return perfil;
+        return { ...perfil, ai_credits: fila.saldo, creditos_compartidos: !!fila.compartido };
+    } catch {
+        return perfil;
+    }
+};
+
 export const RUTA_RESTABLECER = '/auth/reset-password';
 
 /** ¿Hay que llevar al usuario al formulario de contraseña nueva? */
@@ -123,8 +141,6 @@ export interface AuthSlice {
   register: (name: string, email: string, password?: string, captchaToken?: string | null) => Promise<{ success: boolean; message?: string }>;
   updateProfile: (profileData: Partial<Profile>) => Promise<void>;
   refreshProfile: (knownSession?: Session | null) => Promise<void>;
-  upgradePlan: (plan: 'Pro' | 'Teams') => void;
-  purchaseCredits: (amount: number) => void;
   consumeCredits: (amount: number) => Promise<boolean>;
   initializeAuth: () => Promise<void>;
 }
@@ -217,7 +233,7 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                     set({ profile: fallbackProfile, isAuthenticated: true });
                 } else {
                     logger.info("Perfil cargado correctamente");
-                    set({ profile: profileData as Profile, isAuthenticated: true });
+                    set({ profile: await conSaldoDeCreditos(profileData as Profile), isAuthenticated: true });
                 }
             } catch (error) {
                 console.error("💥 RefreshProfile Error:", error);
@@ -463,8 +479,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
         }
     },
 
-    upgradePlan: (plan) => get().updateProfile({ plan }),
-    purchaseCredits: (amount) => get().updateProfile({ ai_credits: (get().profile.ai_credits || 0) + amount }),
 
     // CAMBIO IMPORTANTE: el descuento de créditos ya NO se hace desde aquí.
     //

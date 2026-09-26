@@ -110,7 +110,7 @@ const DashboardPage: React.FC = () => {
         <div className="flex items-center gap-3 bg-primary-500/10 border border-primary-500/20 p-3 rounded-2xl">
           <Sparkles className="w-5 h-5 text-primary-400" />
           <span className="text-sm font-medium text-primary-100">
-            {profile.ai_credits} créditos de IA disponibles
+            {profile.ai_credits} créditos de IA disponibles{profile.creditos_compartidos ? ' (del equipo)' : ''}
           </span>
         </div>
       </div>
