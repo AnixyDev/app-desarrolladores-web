@@ -16,6 +16,9 @@ interface PortalClient {
 
 const DEFAULT_BRAND_COLOR = '#d9009f';
 
+export const esRutaDeLoginDelPortal = (ruta: string): boolean =>
+  ruta.replace(/\/+$/, '') === '/portal/login';
+
 const PortalLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -81,8 +84,28 @@ const PortalLayout: React.FC = () => {
     );
   }
 
+  // La página de login del portal cuelga de este mismo layout (App.tsx), así
+  // que sin sesión hay que DEJARLA PINTARSE. Antes se redirigía siempre a
+  // /portal/login, también estando ya en /portal/login: una redirección a sí
+  // misma que nunca llegaba a pintar el <Outlet />. Resultado, desde julio:
+  // pantalla negra para todo cliente sin sesión — justo a donde manda el
+  // correo de invitación al portal.
+  const enLogin = esRutaDeLoginDelPortal(location.pathname);
+
   if (!hasSession) {
+    if (enLogin) {
+      return (
+        <div className="min-h-screen bg-gray-900 text-gray-100">
+          <Outlet />
+        </div>
+      );
+    }
     return <Navigate to="/portal/login" replace />;
+  }
+
+  // Con sesión, el formulario de acceso no pinta nada: al panel.
+  if (enLogin) {
+    return <Navigate to="/portal/dashboard" replace />;
   }
 
   if (linkError) {
