@@ -113,7 +113,7 @@ const PricingPage: React.FC = () => {
             price={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.precio ?? ''}
             period={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.periodo ?? ''}
             description="Todo lo que necesitas para escalar tu negocio."
-            features={["Proyectos e Hitos ilimitados", "Facturación AEAT (TicketBAI ready)", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
+            features={["Proyectos e Hitos ilimitados", "Facturación AEAT (Veri*Factu) · TicketBAI próximamente", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
             ctaLabel="Empezar con Pro"
             onCta={() => navigate('/auth/register')}
             icon={CreditCard}
@@ -124,7 +124,7 @@ const PricingPage: React.FC = () => {
             period={precioDe(billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly')?.periodo ?? ''}
             recommended
             description="Para equipos y agencias en crecimiento."
-            features={["Hasta 5 miembros de equipo", "Roles y permisos avanzados", "Integraciones con Slack y Webhooks", "200 Créditos IA compartidos"]}
+            features={["Hasta 5 miembros de equipo", "Roles y permisos avanzados", "Integraciones con Slack y Webhooks", "200 Créditos IA mensuales compartidos"]}
             ctaLabel="Empezar con Team"
             onCta={() => navigate('/auth/register')}
             icon={Users}

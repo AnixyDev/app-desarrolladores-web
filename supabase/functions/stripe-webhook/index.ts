@@ -137,6 +137,21 @@ serve(async (req) => {
         if (userId) {
           const itemKey = session.metadata?.itemKey
 
+          // CAMBIO (plan sin cobrar): antes se entregaba el plan, los creditos
+          // o la oferta destacada en cuanto la sesion se completaba, sin mirar
+          // si el cobro habia entrado. Con una tarjeta que pide 3D Secure y
+          // despues falla, la sesion se completa con payment_status 'unpaid'
+          // y la suscripcion acaba en incomplete_expired: el usuario se
+          // quedaba con el plan sin haber pagado (habia uno asi en produccion
+          // el 26/09). Ahora solo se entrega si Stripe dice que esta cobrado,
+          // o que no hacia falta cobrar (cupon del 100 %). Si el cobro llega
+          // despues, customer.subscription.updated da el plan al activarse.
+          const cobrado = session.payment_status === 'paid' || session.payment_status === 'no_payment_required'
+          if (!cobrado) {
+            console.log(`⏸️ checkout ${session.id} completado sin cobrar (${session.payment_status}): no se entrega nada`)
+            break
+          }
+
           // FIX: se anaden los casos 'teamsPlan' y 'teamsPlanYearly', que
           // antes caian por defecto sin hacer nada aqui (solo se manejaba
           // 'proPlan' y 'aiCredits*'). Esto da feedback inmediato al
