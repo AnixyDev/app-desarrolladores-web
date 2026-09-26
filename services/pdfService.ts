@@ -32,25 +32,62 @@ export interface FiscalPdfData {
 }
 
 // URL de cotejo AEAT (producción). Formato y parámetros (nif, numserie,
-// fecha DD-MM-YYYY, importe con punto decimal) verificados contra la
-// Orden HAC/1177/2024 — antes de operar en modalidad Veri*Factu real,
-// reconfirmar contra el documento técnico oficial de la AEAT.
-const AEAT_QR_BASE_URL = 'https://www2.agenciatributaria.es/wlpl/TIKE-CONT/ValidarQR';
+// fecha DD-MM-AAAA, importe con punto decimal) según la Orden HAC/1177/2024.
+//
+// CAMBIO (26/09): cada modalidad tiene su propio servicio de cotejo. Antes se
+// usaba siempre ValidarQR, que es el de los sistemas Veri*Factu; las facturas
+// No Veri*Factu (la modalidad de Ana) apuntaban al servicio equivocado.
+// Confirmado en dos fuentes independientes que resumen el documento técnico
+// de la AEAT; el PDF oficial no se pudo descargar desde la sesión. Sobre el
+// dominio las fuentes no coinciden (agenciatributaria.es / .gob.es): se
+// mantiene el que ya se usaba. Reconfirmar contra el original antes de operar
+// en Veri*Factu real.
+const AEAT_QR_BASE = 'https://www2.agenciatributaria.es/wlpl/TIKE-CONT';
+export const AEAT_QR_SERVICIO: Record<FiscalPdfData['modalidad'], string> = {
+  verifactu: `${AEAT_QR_BASE}/ValidarQR`,
+  no_verifactu: `${AEAT_QR_BASE}/ValidarQRNoVerifactu`,
+};
 
-async function buildInvoiceQrDataUrl(profile: Profile, invoice: Invoice): Promise<string> {
-  const fecha = new Date(invoice.issue_date).toLocaleDateString('es-ES', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  }).replace(/\//g, '-');
-  const importe = (invoice.total_cents / 100).toFixed(2);
+/** Tamaño impreso del QR. La norma pide entre 30 y 40 mm (antes: 26). */
+export const QR_TRIBUTARIO_MM = 32;
+
+/**
+ * DD-MM-AAAA a partir de la fecha de emisión (AAAA-MM-DD), sin pasar por
+ * Date: new Date('2026-09-26') es medianoche UTC, y en un navegador con huso
+ * horario negativo (América) daba el día anterior en el QR.
+ */
+export const fechaParaQr = (fechaEmision: string): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(fechaEmision);
+  if (!m) throw new Error(`Fecha de emisión no válida para el QR: ${fechaEmision}`);
+  return `${m[3]}-${m[2]}-${m[1]}`;
+};
+
+export const construirUrlQrTributario = (datos: {
+  nif: string;
+  numeroFactura: string;
+  fechaEmision: string;
+  totalCents: number;
+  modalidad: FiscalPdfData['modalidad'];
+}): string => {
   const params = new URLSearchParams({
-    nif: profile.tax_id || '',
-    numserie: invoice.invoice_number,
-    fecha,
-    importe,
+    nif: datos.nif || '',
+    numserie: datos.numeroFactura,
+    fecha: fechaParaQr(datos.fechaEmision),
+    importe: (datos.totalCents / 100).toFixed(2),
   });
-  const qrUrl = `${AEAT_QR_BASE_URL}?${params.toString()}`;
+  return `${AEAT_QR_SERVICIO[datos.modalidad]}?${params.toString()}`;
+};
+
+async function buildInvoiceQrDataUrl(profile: Profile, invoice: Invoice, modalidad: FiscalPdfData['modalidad']): Promise<string> {
+  const qrUrl = construirUrlQrTributario({
+    nif: profile.tax_id || '',
+    numeroFactura: invoice.invoice_number,
+    fechaEmision: invoice.issue_date,
+    totalCents: invoice.total_cents,
+    modalidad,
+  });
   // Nivel de corrección M e ISO/IEC 18004, como exige la Orden HAC/1177/2024.
-  return QRCode.toDataURL(qrUrl, { errorCorrectionLevel: 'M', margin: 2, width: 300 });
+  return QRCode.toDataURL(qrUrl, { errorCorrectionLevel: 'M', margin: 2, width: 400 });
 }
 
 // CAMBIO: se extrae TODO el dibujo del PDF de factura a esta función interna,
@@ -79,19 +116,25 @@ async function buildInvoicePdfDocument(
     // activo) — según la norma debe ir arriba del todo, antes que el resto
     // del contenido, por eso se pinta primero y se desplaza el resto del
     // header a la derecha para dejarle sitio.
+    // CAMBIO (26/09): QR de 32 mm (la norma pide 30-40; antes 26) y textos a
+    // 10 pt, el mismo tamaño que el resto de datos de la factura (antes 6 pt;
+    // la norma pide igual o mayor). En Veri*Factu, la leyenda abreviada
+    // "VERI*FACTU" que admite la norma: la larga a 10 pt no cabe bajo el QR.
     let headerLeftX = 14;
     if (fiscalData) {
         try {
-            const qrDataUrl = await buildInvoiceQrDataUrl(profile, invoice);
-            doc.setFontSize(6);
+            const qrDataUrl = await buildInvoiceQrDataUrl(profile, invoice, fiscalData.modalidad);
+            doc.setFontSize(10);
             doc.setFont('helvetica', 'normal');
-            doc.text('QR tributario', 14, 10);
-            doc.addImage(qrDataUrl, 'PNG', 14, 12, 26, 26);
+            doc.text('QR tributario:', 14, 10);
+            doc.addImage(qrDataUrl, 'PNG', 14, 12, QR_TRIBUTARIO_MM, QR_TRIBUTARIO_MM);
             if (fiscalData.modalidad === 'verifactu') {
-                doc.setFontSize(6);
-                doc.text('Factura verificable en la sede electrónica de la AEAT', 14, 40, { maxWidth: 26 });
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'bold');
+                doc.text('VERI*FACTU', 14 + QR_TRIBUTARIO_MM / 2, 12 + QR_TRIBUTARIO_MM + 5, { align: 'center' });
+                doc.setFont('helvetica', 'normal');
             }
-            headerLeftX = 46;
+            headerLeftX = 14 + QR_TRIBUTARIO_MM + 6;
         } catch (e) {
             console.error('No se pudo generar el QR tributario:', e);
         }
