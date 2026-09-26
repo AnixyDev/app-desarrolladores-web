@@ -16,6 +16,13 @@
  *    revientan las interfaces, con .replace() sobre undefined o .map() sobre
  *    null. Sin esta pasada el test da una falsa sensacion de seguridad.
  *
+ * Y UNA TERCERA: "publicas", SIN SESION
+ * Las paginas a las que llega quien no ha entrado: login, registro, portal
+ * del cliente, precios, pago de facturas. Cada una tiene que ENSEÑAR un texto
+ * suyo concreto — no vale medir cuanto texto hay, porque el banner de cookies
+ * ya pasa de 40 caracteres. Asi es como /portal/login estuvo dos meses en
+ * negro sin que esta prueba lo viera: solo miraba paginas con sesion.
+ *
  * LO QUE NO PRUEBA
  * Que los numeros sean correctos ni que los formularios guarden. Solo que
  * ninguna pagina se cae al pintarse. Eso ya cubre la clase de fallo que
@@ -193,6 +200,75 @@ async function pasada(navegador, modo) {
   return { rotas, fallos };
 }
 
+// Paginas sin sesion y el texto que DEBEN mostrar. Una expresion regular por
+// si la pagina tiene varios estados validos (reset-password sin enlace de
+// recuperacion dice "Enlace no válido", y eso es correcto).
+const FACTURA_PUBLICA = ID(1);
+const PUBLICAS = {
+  '/auth/login':                         /Bienvenido de vuelta/,
+  '/auth/register':                      /Crear cuenta/,
+  '/auth/forgot-password':               /¿Olvidaste tu contraseña\?/,
+  '/auth/reset-password':                /Enlace no válido|Elige una nueva contraseña/,
+  '/portal/login':                       /Acceso al Portal/,
+  '/portal/login?email=c@ejemplo.com':   /Acceso al Portal/,
+  '/portal/dashboard':                   /Acceso al Portal/,   // sin sesion, al login
+  '/privacy':                            /Política de Privacidad/,
+  '/terms':                              /Términos del Servicio/,
+  '/pricing':                            /Precios Transparentes/,
+  [`/pay/${FACTURA_PUBLICA}`]:           /Factura F-PRUEBA-1/,
+};
+
+// Lo que devuelve get-public-invoice en produccion (ver la funcion: nunca
+// manda business_name vacio). Sin esto la pagina de pago recibe {} y revienta
+// por un dato que la funcion real siempre pone.
+const RESPUESTA_FACTURA_PUBLICA = {
+  id: FACTURA_PUBLICA, invoice_number: 'F-PRUEBA-1', issue_date: HOY, due_date: HOY,
+  items: [{ description: 'Desarrollo', quantity: 1, price_cents: 10000 }],
+  subtotal_cents: 10000, tax_percent: 21, total_cents: 12100, paid: false,
+  paid_cents: 0, remaining_cents: 12100, business_name: 'Estudio de prueba',
+  brand_color: null, client_name: 'Cliente de prueba',
+};
+
+async function pasadaPublica(navegador) {
+  const pg = await (await navegador.newContext({ viewport:{ width:1280, height:900 } })).newPage();
+  await pg.route('**/auth/v1/**', r => r.fulfill({ status:401, contentType:'application/json',
+    body: JSON.stringify({ code:'no_session', message:'sin sesion' }) }));
+  await pg.route('**/rest/v1/**', r => r.fulfill({ status:200, contentType:'application/json', body:'[]' }));
+  await pg.route('**/functions/v1/**', r => r.fulfill({ status:200, contentType:'application/json',
+    body: r.request().url().includes('get-public-invoice') ? JSON.stringify(RESPUESTA_FACTURA_PUBLICA) : '{}' }));
+
+  let ruta = '(arranque)';
+  const fallos = [];
+  pg.on('console', m => { if (m.type() !== 'error') return;
+    const t = m.text(); if (!RUIDO.test(t)) fallos.push({ ruta, texto: t.slice(0,200) }); });
+  pg.on('pageerror', e => fallos.push({ ruta, texto: 'EXCEPCION: ' + String(e).slice(0,200) }));
+
+  await pg.goto(`http://localhost:${PUERTO}/auth/login`, { waitUntil:'load' });
+  await pg.waitForTimeout(1000);
+  const aceptar = pg.getByRole('button', { name:/Aceptar/i }).first();
+  if (await aceptar.count()) { await aceptar.click(); await pg.waitForTimeout(200); }
+
+  const rotas = [];
+  for (const [r, esperado] of Object.entries(PUBLICAS)) {
+    ruta = r;
+    const antes = fallos.length;
+    try {
+      await pg.goto(`http://localhost:${PUERTO}${r}`, { waitUntil:'load', timeout:20000 });
+      await pg.waitForTimeout(1400);
+      const texto = await pg.evaluate(() => document.getElementById('root')?.innerText || '');
+      if (!esperado.test(texto)) {
+        fallos.push({ ruta:r, texto:`no aparece ${esperado} — se ve: "${texto.replace(/\s+/g,' ').trim().slice(0,80)}"` });
+      }
+      if (!esperado.test(texto) || fallos.length > antes) rotas.push(r);
+    } catch (e) {
+      fallos.push({ ruta:r, texto:'no cargo: ' + String(e).slice(0,120) });
+      rotas.push(r);
+    }
+  }
+  await pg.context().close();
+  return { rotas, fallos };
+}
+
 // CHROMIUM_PARA_PRUEBAS permite apuntar a un Chromium ya instalado en el
 // sistema. Sin esa variable usa el que descarga Playwright, que es lo que
 // pasa en CI (paso "playwright install chromium").
@@ -211,6 +287,18 @@ for (const modo of ['lleno','nulos']) {
     const porRuta = {};
     for (const f of fallos) (porRuta[f.ruta] ||= new Set()).add(f.texto);
     for (const [k, v] of Object.entries(porRuta)) for (const t of v) console.log(`    ${k} :: ${t}`);
+  }
+}
+
+{
+  const { rotas, fallos } = await pasadaPublica(navegador);
+  const total = Object.keys(PUBLICAS).length;
+  totalRotas += rotas.length;
+  if (rotas.length === 0) {
+    console.log(`[publicas] OK — las ${total} paginas sin sesion enseñan lo que deben.`);
+  } else {
+    console.log(`[publicas] ${rotas.length} de ${total} con problemas: ${rotas.join(', ')}`);
+    for (const f of fallos) console.log(`    ${f.ruta} :: ${f.texto}`);
   }
 }
 
