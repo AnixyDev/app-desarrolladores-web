@@ -51,10 +51,18 @@ export const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     : undefined
 });
 
+// La dirección a la que Supabase devuelve al usuario desde un correo (p. ej.
+// el de restablecer contraseña). En el navegador es SIEMPRE la de la página
+// en la que está: antes se tomaba VITE_VERCEL_URL, que en Vercel es la URL
+// interna de cada despliegue (app-desarrolladores-xxxx.vercel.app). Supabase
+// la rechazaba por no estar en su lista de direcciones permitidas y mandaba
+// al usuario a la portada, donde no había formulario de contraseña nueva.
 export const getURL = (): string => {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin.replace(/\/$/, '');
+  }
   let url =
     import.meta.env.VITE_SITE_URL ??
-    import.meta.env.VITE_VERCEL_URL ??
     'https://devfreelancer.app';
   url = url.includes('http') ? url : `https://${url}`;
   return url.replace(/\/$/, '');

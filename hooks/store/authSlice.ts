@@ -70,6 +70,12 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 // Para cualquier caso no contemplado se muestra el código de Supabase, que es
 // lo que hace falta para diagnosticar. Antes ese dato solo iba a console.error,
 // y desde que se eliminan los console.* en producción se perdía del todo.
+export const RUTA_RESTABLECER = '/auth/reset-password';
+
+/** ¿Hay que llevar al usuario al formulario de contraseña nueva? */
+export const debeIrARestablecer = (rutaActual: string): boolean =>
+    rutaActual.replace(/\/+$/, '') !== RUTA_RESTABLECER;
+
 const mensajeDeErrorDeLogin = (error: any): string => {
     const codigo = error?.code ?? '';
     const estado = error?.status ?? 0;
@@ -237,6 +243,17 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
 
         supabase.auth.onAuthStateChange((event, session) => {
             logger.info("AuthStateChange", { event });
+
+            // Enlace de restablecer contraseña que ha aterrizado fuera de su
+            // página (p. ej. en la portada, si Supabase no aceptó la dirección
+            // de vuelta): la sesión de recuperación ya está creada, pero sin
+            // este salto el usuario entraba en la aplicación y nunca veía el
+            // formulario de contraseña nueva. Solo navegación, ninguna llamada
+            // a Supabase, así que no hay riesgo con el lock de auth.
+            if (event === 'PASSWORD_RECOVERY' && debeIrARestablecer(window.location.pathname)) {
+                window.location.replace(RUTA_RESTABLECER);
+                return;
+            }
 
             // FIX CRÍTICO: todo el trabajo async se difiere con setTimeout(0).
             // No basta con evitar getSession() dentro de este callback (ya lo
