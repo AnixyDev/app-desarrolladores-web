@@ -29,6 +29,12 @@ export interface Profile {
   plan: 'Free' | 'Pro' | 'Teams';
   role: 'Admin' | 'Developer' | 'Manager' | string;
   ai_credits: number;
+  /**
+   * El saldo de ai_credits es el del equipo (miembro activo de una cuenta
+   * Teams), no el de esta cuenta. Lo calcula saldo_creditos_ia() al cargar.
+   * Solo para pantalla: nunca se escribe en la base de datos.
+   */
+  creditos_compartidos?: boolean;
   signature_credits: number;
   hourly_rate_cents: number;
   pdf_color: string;

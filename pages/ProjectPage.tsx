@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import { logger } from '@/lib/loggerService';
 import { useShallow } from 'zustand/react/shallow';
+import { puede } from '@/lib/permisosEquipo';
 import { LayoutGrid, List, Plus as PlusIcon, Search as SearchIcon } from 'lucide-react';
 import { ProjectCard } from '@/components/projects/ProjectCard';
 import Button from '@/components/ui/Button';
@@ -82,7 +83,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ id, label, color, projects,
 };
 
 const ProjectPage: React.FC = () => {
-    const { projects, tasks, clients, getClientById, addProject, updateProject } = useAppStore(useShallow(s => ({ projects: s.projects, tasks: s.tasks, clients: s.clients, getClientById: s.getClientById, addProject: s.addProject, updateProject: s.updateProject })));
+    const { projects, tasks, clients, getClientById, addProject, updateProject, profile, teamMembership } = useAppStore(useShallow(s => ({ projects: s.projects, tasks: s.tasks, clients: s.clients, getClientById: s.getClientById, addProject: s.addProject, updateProject: s.updateProject, profile: s.profile, teamMembership: s.teamMembership })));
     const { addToast } = useToast();
     const navigate = useNavigate();
 
@@ -162,7 +163,10 @@ const ProjectPage: React.FC = () => {
 
         logger.info('Kanban: soltar tarjeta', { activeId, overId: over?.id, finalStatus, currentStatus: draggedProject?.status });
 
-        if (finalStatus && draggedProject && draggedProject.status !== finalStatus) {
+        // Un Developer del equipo ve los proyectos pero no puede moverlos
+        // (la base de datos lo rechazaría): la tarjeta vuelve a su sitio.
+        if (finalStatus && draggedProject && draggedProject.status !== finalStatus
+            && puede('editarProyecto', draggedProject.user_id, profile?.id, teamMembership)) {
             updateProject(activeId, { status: finalStatus });
         }
 

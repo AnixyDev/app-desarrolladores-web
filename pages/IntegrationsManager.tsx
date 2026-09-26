@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/useToast';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
+import { urlDeWebhookValida, MENSAJE_URL_NO_VALIDA, esperarResultadoPrueba, pruebaCorrecta } from '@/lib/webhooks';
 
 // --- TYPES ---
 interface Integration {
@@ -105,13 +106,19 @@ const AddIntegrationForm: React.FC<{ onClose: () => void; onSave: (integration: 
   const [event, setEvent] = useState(availableEvents[0].id);
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !url || !event) return;
+    if (!urlDeWebhookValida(url.trim())) {
+      setUrlError(MENSAJE_URL_NO_VALIDA);
+      return;
+    }
+    setUrlError(null);
 
     setSaving(true);
-    await onSave({ name, url, event, isActive });
+    await onSave({ name, url: url.trim(), event, isActive });
     setSaving(false);
   };
 
@@ -121,7 +128,8 @@ const AddIntegrationForm: React.FC<{ onClose: () => void; onSave: (integration: 
         <h2 className="text-2xl font-bold mb-6 text-white border-b border-gray-700 pb-2">Añadir Nueva Integración</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} required className="w-full p-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-fuchsia-500 outline-none" placeholder="Nombre de la Integración"/>
-          <input id="url" type="url" value={url} onChange={(e) => setUrl(e.target.value)} required className="w-full p-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-fuchsia-500 outline-none" placeholder="URL del Webhook (Destino)"/>
+          <input id="url" type="url" value={url} onChange={(e) => setUrl(e.target.value)} required className="w-full p-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-fuchsia-500 outline-none" placeholder="https://hooks.slack.com/services/… o la URL de Zapier/Make"/>
+          {urlError && <p className="text-xs text-red-400 -mt-2">{urlError}</p>}
           <select id="event" value={event} onChange={(e) => setEvent(e.target.value)} required className="w-full p-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-fuchsia-500 outline-none">
             {availableEvents.map(e => (<option key={e.id} value={e.id}>{e.name}</option>))}
           </select>
@@ -205,7 +213,8 @@ const IntegrationsManager: React.FC = () => {
       .single();
 
     if (error || !data) {
-      addToast('No se pudo guardar la integración.', 'error');
+      // 23514: la base de datos ha rechazado la dirección (misma regla que el formulario).
+      addToast(error?.code === '23514' ? MENSAJE_URL_NO_VALIDA : 'No se pudo guardar la integración.', 'error');
       return;
     }
 
@@ -225,33 +234,41 @@ const IntegrationsManager: React.FC = () => {
     }
   };
   
+  // Prueba REAL: la base de datos envía un mensaje de prueba a la URL (con el
+  // mismo formato que los avisos de verdad) y aquí se espera a ver qué
+  // contestó el destino. Antes era un fetch sin cuerpo en modo no-cors desde
+  // el navegador, que daba "éxito" contra casi cualquier dirección.
   const handleTestIntegration = async (id: string) => {
     setTestingId(id);
     try {
-      // Comprobación real de alcanzabilidad del webhook (no simulada):
-      // 'no-cors' porque el destino puede no devolver cabeceras CORS, así
-      // que no podemos leer el código de estado — solo si la petición pudo
-      // completarse en absoluto.
-      const integration = integrations.find(i => i.id === id);
-      if (!integration) return;
+      const { data: requestId, error } = await supabase.rpc('probar_webhook', { p_integration: id });
+      if (error || typeof requestId !== 'number') {
+        addToast(error?.message || 'No se pudo lanzar la prueba.', 'error');
+        return;
+      }
 
-      let success = true;
-      try {
-        await fetch(integration.url, { method: 'POST', mode: 'no-cors' });
-      } catch {
-        success = false;
+      const resultado = await esperarResultadoPrueba(async () => {
+        const { data } = await supabase.rpc('resultado_prueba_webhook', { p_request_id: requestId });
+        const fila = Array.isArray(data) ? data[0] : data;
+        return fila ? { status_code: fila.status_code ?? null, error: fila.error ?? null } : null;
+      });
+      const success = pruebaCorrecta(resultado);
+
+      if (success) {
+        addToast(`Enviado: el destino respondió ${resultado.status}.`, 'success');
+      } else if (resultado.status !== null) {
+        addToast(`El destino respondió ${resultado.status}: revisa la URL.`, 'error');
+      } else if (resultado.error) {
+        addToast(`No se pudo entregar: ${resultado.error}`, 'error');
+      } else {
+        addToast('El destino no ha contestado a tiempo.', 'error');
       }
 
       const timestamp = new Date().toISOString();
-      const { error } = await supabase
+      await supabase
         .from('integrations')
         .update({ last_test_success: success, last_test_at: timestamp })
         .eq('id', id);
-
-      if (error) {
-        addToast('No se pudo guardar el resultado del test.', 'error');
-        return;
-      }
 
       setIntegrations(prev => prev.map(i =>
         i.id === id ? { ...i, lastTest: { success, timestamp: new Date(timestamp).toLocaleString() } } : i

@@ -97,7 +97,7 @@ const AIAssistantPage = () => {
           <p className="text-gray-400">Consultoría senior para tu negocio freelance</p>
         </div>
         <div className="bg-gray-800 px-4 py-2 rounded-lg border border-gray-700">
-          <span className="text-sm text-gray-400">Créditos disponibles:</span>
+          <span className="text-sm text-gray-400">{profile?.creditos_compartidos ? 'Créditos del equipo:' : 'Créditos disponibles:'}</span>
           <span className="ml-2 font-bold text-fuchsia-400">{profile?.ai_credits ?? 0}</span>
         </div>
       </div>

@@ -94,6 +94,7 @@ const ESQUEMA = {
  time_entries:"id=t,user_id=t,project_id=t,description=t?,start_time=d,end_time=d?,duration_seconds=i,invoice_id=t?,created_at=d?,logged_by=t?",
  fiscal_records:"id=t,user_id=t,invoice_id=t,record_type=t,nif_emisor=t,nombre_emisor=t,numero_factura=t,fecha_expedicion=d,tipo_factura=t,importe_total_cents=i,hash_anterior=t?,hash=t,hash_input=t,modalidad=t,estado_envio=t,created_at=d",
  job_applications:"id=t,job_id=t,applicant_id=t,status=t?,created_at=d?",
+ project_milestones:"id=t,user_id=t,project_id=t,title=t,due_date=d?,status=t,position=i,created_at=d,updated_at=d",
 };
 
 const PERFIL = { id:UID, user_id:UID, full_name:'Ana', email:'prueba@ejemplo.com', plan:'Pro',
@@ -106,7 +107,9 @@ const RUTAS = ['/','/clients','/projects','/invoices','/receipts','/fiscal','/ba
 '/time-tracking','/reports','/reports/profitability','/tax-ledger','/ai-assistant','/job-market',
 '/post-job','/my-job-posts','/public-profile','/my-applications','/saved-jobs','/team',
 '/knowledge-base','/inbox','/roles','/integrations','/forecasting','/affiliate','/billing',
-'/portal-branding','/settings','/admin'];
+'/portal-branding','/settings','/admin',
+// Detalle de un proyecto (con sus hitos). El id es el de la primera fila simulada.
+'/projects/00000000-0000-4000-8000-000000000001'];
 
 const RUIDO = /DevTools|Download the React|runtime\.lastError|preloaded using link|WebSocket|ERR_TUNNEL|Failed to load resource/i;
 

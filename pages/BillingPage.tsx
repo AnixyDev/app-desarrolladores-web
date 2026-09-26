@@ -150,7 +150,7 @@ const BillingPage: React.FC = () => {
                             price={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.precio ?? ''}
                             period={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.periodo ?? ''}
                             priceNote={isPro ? 'Ya tienes este plan. Cambia el ciclo de facturación desde el portal.' : undefined}
-                            features={["Proyectos e Hitos ilimitados", "Facturación AEAT (TicketBAI ready)", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
+                            features={["Proyectos e Hitos ilimitados", "Facturación AEAT (Veri*Factu) · TicketBAI próximamente", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
                             isCurrent={isPro}
                             itemKey={billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly'}
                             icon={CreditCard}
@@ -160,7 +160,7 @@ const BillingPage: React.FC = () => {
                             price={precioDe(billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly')?.precio ?? ''}
                             period={precioDe(billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly')?.periodo ?? ''}
                             priceNote={isTeams ? 'Ya tienes este plan. Cambia el ciclo de facturación desde el portal.' : undefined}
-                            features={["Hasta 5 miembros de equipo", "Roles y permisos avanzados", "Integraciones con Slack y Webhooks", "200 Créditos IA compartidos"]}
+                            features={["Hasta 5 miembros de equipo", "Roles y permisos avanzados", "Integraciones con Slack y Webhooks", "200 Créditos IA mensuales compartidos"]}
                             isCurrent={isTeams} itemKey={billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly'} icon={Users}
                         />
                     </>

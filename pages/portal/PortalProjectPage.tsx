@@ -1,6 +1,7 @@
 import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
+import HitosDelProyecto from '@/components/projects/HitosDelProyecto';
 import { BriefcaseIcon, MessageSquareIcon } from '@/components/icons/Icon';
 import { supabase } from '@/lib/supabaseClient';
 import { Project } from '@/types';
@@ -93,6 +94,15 @@ const PortalProjectPage: React.FC = () => {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <h2 className="text-lg font-semibold text-white">Hitos</h2>
+        </CardHeader>
+        <CardContent>
+          <HitosDelProyecto projectId={project.id} puedeEditar={false} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
