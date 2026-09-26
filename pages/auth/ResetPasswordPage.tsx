@@ -7,6 +7,22 @@ import PasswordStrengthMeter from '@/components/auth/PasswordStrengthMeter';
 import { supabase } from '@/lib/supabaseClient';
 import { LockIcon, EyeIcon, EyeOffIcon, AlertTriangleIcon, CheckCircleIcon } from '@/components/icons/Icon';
 
+/**
+ * Enlace del correo en formato `?token_hash=…&type=recovery` (plantilla
+ * "Reset Password" de Supabase). A diferencia del enlace PKCE por defecto
+ * (`?code=…`), este no depende de que se abra en el mismo navegador en el que
+ * se pidió: pedirlo en el ordenador y abrirlo en el móvil funciona.
+ */
+export const leerTokenDeRecuperacion = (search: string): string | null => {
+  const params = new URLSearchParams(search);
+  const tokenHash = params.get('token_hash');
+  return tokenHash && params.get('type') === 'recovery' ? tokenHash : null;
+};
+
+// Un token vale una sola vez. Si el efecto se ejecutara dos veces, el segundo
+// intento fallaría con "enlace caducado" aunque el primero hubiera ido bien.
+let tokenYaVerificado: string | null = null;
+
 const ResetPasswordPage: React.FC = () => {
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
@@ -22,13 +38,35 @@ const ResetPasswordPage: React.FC = () => {
   const [sessionMissing, setSessionMissing] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
-        setSessionReady(true);
-      } else {
-        setSessionMissing(true);
-      }
-    });
+    const tokenHash = leerTokenDeRecuperacion(window.location.search);
+
+    const comprobarSesion = () =>
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) {
+          setSessionReady(true);
+        } else {
+          setSessionMissing(true);
+        }
+      });
+
+    if (tokenHash && tokenYaVerificado !== tokenHash) {
+      tokenYaVerificado = tokenHash;
+      supabase.auth
+        .verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+        .then(({ data, error }) => {
+          // Quitar el token de la barra de direcciones: ya está gastado, y así
+          // no acaba en el historial ni en una captura de pantalla.
+          window.history.replaceState({}, '', window.location.pathname);
+          if (!error && data.session) {
+            setSessionReady(true);
+            setSessionMissing(false);
+          } else {
+            comprobarSesion();
+          }
+        });
+    } else {
+      comprobarSesion();
+    }
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY' || session) {
