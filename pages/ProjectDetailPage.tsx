@@ -10,6 +10,8 @@ import Input from '@/components/ui/Input';
 import { formatCurrency } from '@/lib/utils';
 import { Project, Task, InvoiceItem } from '@/types';
 import { PlusIcon, TrashIcon, ClockIcon, FileTextIcon, MessageSquareIcon, DollarSignIcon } from '@/components/icons/Icon';
+import { puede } from '@/lib/permisosEquipo';
+import HitosDelProyecto from '@/components/projects/HitosDelProyecto';
 import EmptyState from '@/components/ui/EmptyState';
 import { useToast } from '@/hooks/useToast';
 
@@ -21,7 +23,7 @@ const ProjectDetailPage: React.FC = () => {
     const navigate = useNavigate();
     const { addToast } = useToast();
 
-    const { datosDeTrabajoCargados, getProjectById, getClientById, getTasksByProjectId, timeEntries, expenses, profile, addTask, toggleTask, deleteTask, deleteProject, updateProjectStatus } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getProjectById: s.getProjectById, getClientById: s.getClientById, getTasksByProjectId: s.getTasksByProjectId, timeEntries: s.timeEntries, expenses: s.expenses, profile: s.profile, addTask: s.addTask, toggleTask: s.toggleTask, deleteTask: s.deleteTask, deleteProject: s.deleteProject, updateProjectStatus: s.updateProjectStatus })));
+    const { datosDeTrabajoCargados, getProjectById, getClientById, getTasksByProjectId, timeEntries, expenses, profile, addTask, toggleTask, deleteTask, deleteProject, updateProjectStatus, teamMembership } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getProjectById: s.getProjectById, getClientById: s.getClientById, getTasksByProjectId: s.getTasksByProjectId, timeEntries: s.timeEntries, expenses: s.expenses, profile: s.profile, addTask: s.addTask, toggleTask: s.toggleTask, deleteTask: s.deleteTask, deleteProject: s.deleteProject, updateProjectStatus: s.updateProjectStatus, teamMembership: s.teamMembership })));
 
     const [newTaskDescription, setNewTaskDescription] = useState('');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -169,6 +171,7 @@ const ProjectDetailPage: React.FC = () => {
                             <DollarSignIcon className="w-4 h-4 mr-2"/> Facturar Presupuesto
                         </Button>
                     )}
+                    {puede('borrarProyecto', project.user_id, profile?.id, teamMembership) && (
                     <Button
                         variant="secondary"
                         onClick={() => setIsDeleteProjectModalOpen(true)}
@@ -177,6 +180,7 @@ const ProjectDetailPage: React.FC = () => {
                     >
                         <TrashIcon className="w-4 h-4" />
                     </Button>
+                    )}
                 </div>
             </div>
 
@@ -191,6 +195,7 @@ const ProjectDetailPage: React.FC = () => {
                                 <label className="text-sm font-medium text-gray-400 block">Estado</label>
                                 <select 
                                     value={project.status} 
+                                    disabled={!puede('editarProyecto', project.user_id, profile?.id, teamMembership)}
                                     onChange={(e) => updateProjectStatus(project.id, e.target.value as Project['status'])}
                                     className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-600 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md bg-gray-800 text-white"
                                 >
@@ -237,6 +242,18 @@ const ProjectDetailPage: React.FC = () => {
                                 <p className="text-sm font-medium text-gray-400 flex items-center gap-2"><ClockIcon className="w-4 h-4"/> Horas Registradas</p>
                                 <p className="text-2xl font-bold text-white mt-1">{projectStats.hoursTracked.toFixed(2)}h</p>
                             </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <h2 className="text-lg font-semibold text-white">Hitos</h2>
+                        </CardHeader>
+                        <CardContent>
+                            <HitosDelProyecto
+                                projectId={project.id}
+                                puedeEditar={puede('editarProyecto', project.user_id, profile?.id, teamMembership)}
+                            />
                         </CardContent>
                     </Card>
 
@@ -301,9 +318,11 @@ const ProjectDetailPage: React.FC = () => {
                                             </button>
                                             <span className={` ${(task.status === 'done' || task.status === 'completed') ? 'line-through text-gray-500' : 'text-white'}`}>{task.description}</span>
                                         </div>
+                                        {puede('borrarTarea', task.user_id ?? project.user_id, profile?.id, teamMembership) && (
                                         <Button size="sm" variant="danger" onClick={() => handleDeleteClick(task)} aria-label={`Eliminar tarea '${task.description}'`}>
                                             <TrashIcon className="w-4 h-4"/>
                                         </Button>
+                                        )}
                                     </li>
                                 ))}
                             </ul>
