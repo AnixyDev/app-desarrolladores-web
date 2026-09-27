@@ -334,6 +334,44 @@ $$;
 ALTER FUNCTION "public"."consume_credits_atomic"("user_id" "uuid", "amount_to_consume" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."crear_referido"("p_referido" "uuid", "p_codigo" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_afiliado uuid;
+  v_nombre   text;
+begin
+  if p_referido is null or coalesce(btrim(p_codigo), '') = '' then
+    return false;
+  end if;
+
+  select id into v_afiliado
+    from public.profiles
+   where affiliate_code = lower(btrim(p_codigo))
+   limit 1;
+
+  if v_afiliado is null or v_afiliado = p_referido then
+    return false;
+  end if;
+
+  select split_part(btrim(coalesce(full_name, '')), ' ', 1) into v_nombre
+    from public.profiles where id = p_referido;
+
+  insert into public.referrals
+    (referrer_id, referred_user_id, referred_user_name, join_date, status, commission_cents, user_id)
+  values
+    (v_afiliado, p_referido, nullif(v_nombre, ''), current_date, 'Registered', 0, v_afiliado)
+  on conflict (referred_user_id) do nothing;
+
+  return found;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."crear_referido"("p_referido" "uuid", "p_codigo" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."creditos_mensuales_ajustar_ancla"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO 'public', 'pg_temp'
@@ -764,23 +802,25 @@ CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public'
     AS $$
-BEGIN
-  INSERT INTO public.profiles (
-    id,
-    email,
-    full_name,
-    avatar_url,
-    affiliate_code
-  ) VALUES (
-    NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
-    COALESCE(NEW.raw_user_meta_data->>'avatar_url', ''),
-    lower(substring(md5(NEW.id::text), 1, 8))
+begin
+  insert into public.profiles (id, email, full_name, avatar_url, affiliate_code)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
+    coalesce(new.raw_user_meta_data->>'avatar_url', ''),
+    lower(substring(md5(new.id::text), 1, 8))
   )
-  ON CONFLICT (id) DO NOTHING;
-  RETURN NEW;
-END;
+  on conflict (id) do nothing;
+
+  begin
+    perform public.crear_referido(new.id, new.raw_user_meta_data->>'ref');
+  exception when others then
+    raise warning 'No se pudo registrar el referido de %: %', new.id, sqlerrm;
+  end;
+
+  return new;
+end;
 $$;
 
 
@@ -867,6 +907,22 @@ $$;
 ALTER FUNCTION "public"."increment_email_open"("p_business_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."is_active_team_member"("p_owner_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.team_members tm
+    WHERE tm.user_id = p_owner_id
+      AND tm.accepted_user_id = auth.uid()
+      AND tm.status = 'Activo'
+  );
+$$;
+
+
+ALTER FUNCTION "public"."is_active_team_member"("p_owner_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."jobs_proteger_destacado"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO 'public', 'pg_temp'
@@ -897,22 +953,6 @@ $$;
 
 
 ALTER FUNCTION "public"."jobs_proteger_destacado"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."is_active_team_member"("p_owner_id" "uuid") RETURNS boolean
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO 'public', 'pg_temp'
-    AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.team_members tm
-    WHERE tm.user_id = p_owner_id
-      AND tm.accepted_user_id = auth.uid()
-      AND tm.status = 'Activo'
-  );
-$$;
-
-
-ALTER FUNCTION "public"."is_active_team_member"("p_owner_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."link_portal_client"() RETURNS TABLE("client_id" "uuid", "client_name" "text", "owner_business_name" "text", "owner_full_name" "text", "owner_logo_url" "text", "owner_brand_color" "text")
@@ -1222,6 +1262,48 @@ $$;
 ALTER FUNCTION "public"."recargar_creditos_mensuales"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."registrar_comision_afiliado"("p_referido" "uuid", "p_stripe_invoice_id" "text", "p_base_cents" integer) RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_ref      public.referrals%rowtype;
+  v_comision integer;
+begin
+  if p_base_cents is null or p_base_cents <= 0 or coalesce(p_stripe_invoice_id, '') = '' then
+    return 0;
+  end if;
+
+  select * into v_ref from public.referrals where referred_user_id = p_referido;
+  if not found then
+    return 0;
+  end if;
+
+  v_comision := round(p_base_cents * 0.20);
+
+  insert into public.comisiones_afiliado
+    (referral_id, referrer_id, stripe_invoice_id, base_cents, comision_cents)
+  values
+    (v_ref.id, v_ref.referrer_id, p_stripe_invoice_id, p_base_cents, v_comision)
+  on conflict (stripe_invoice_id) do nothing;
+
+  if not found then
+    return 0;
+  end if;
+
+  update public.referrals
+     set commission_cents = coalesce(commission_cents, 0) + v_comision,
+         status = 'Subscribed'
+   where id = v_ref.id;
+
+  return v_comision;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."registrar_comision_afiliado"("p_referido" "uuid", "p_stripe_invoice_id" "text", "p_base_cents" integer) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."resultado_prueba_webhook"("p_request_id" bigint) RETURNS TABLE("status_code" integer, "error" "text")
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public', 'extensions', 'pg_temp'
@@ -1435,6 +1517,30 @@ $$;
 
 
 ALTER FUNCTION "public"."verify_fiscal_chain"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."vincular_referido"("p_codigo" "text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_creado timestamptz;
+begin
+  if auth.uid() is null then
+    return false;
+  end if;
+
+  select created_at into v_creado from auth.users where id = auth.uid();
+  if v_creado is null or v_creado < now() - interval '7 days' then
+    return false;
+  end if;
+
+  return public.crear_referido(auth.uid(), p_codigo);
+end;
+$$;
+
+
+ALTER FUNCTION "public"."vincular_referido"("p_codigo" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."webhook_documento_nuevo"() RETURNS "trigger"
@@ -1740,6 +1846,22 @@ COMMENT ON COLUMN "public"."clients"."address" IS 'Dirección postal del cliente
 
 COMMENT ON COLUMN "public"."clients"."portal_invitado_en" IS 'Cuando se envio la ultima invitacion al Portal de Cliente. La escribe solo la Edge Function invite-portal-client con la clave de servicio; sirve ademas de contador para el tope diario y para la espera entre reenvios.';
 
+
+
+CREATE TABLE IF NOT EXISTS "public"."comisiones_afiliado" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "referral_id" "uuid" NOT NULL,
+    "referrer_id" "uuid" NOT NULL,
+    "stripe_invoice_id" "text" NOT NULL,
+    "base_cents" integer NOT NULL,
+    "comision_cents" integer NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "comisiones_afiliado_base_cents_check" CHECK (("base_cents" > 0)),
+    CONSTRAINT "comisiones_afiliado_comision_cents_check" CHECK (("comision_cents" >= 0))
+);
+
+
+ALTER TABLE "public"."comisiones_afiliado" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."contract_templates" (
@@ -2379,8 +2501,8 @@ CREATE TABLE IF NOT EXISTS "public"."referrals" (
     "referred_user_id" "uuid" NOT NULL,
     "referred_user_name" "text",
     "join_date" "date",
-    "status" "text" DEFAULT 'pending'::"text",
-    "commission_cents" integer,
+    "status" "text" DEFAULT 'Registered'::"text",
+    "commission_cents" integer DEFAULT 0,
     "created_at" timestamp with time zone DEFAULT "now"(),
     "user_id" "uuid",
     "stripe_session_id" "text"
@@ -2698,6 +2820,16 @@ ALTER TABLE ONLY "public"."clients"
 
 
 
+ALTER TABLE ONLY "public"."comisiones_afiliado"
+    ADD CONSTRAINT "comisiones_afiliado_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."comisiones_afiliado"
+    ADD CONSTRAINT "comisiones_afiliado_stripe_invoice_id_key" UNIQUE ("stripe_invoice_id");
+
+
+
 ALTER TABLE ONLY "public"."contract_templates"
     ADD CONSTRAINT "contract_templates_pkey" PRIMARY KEY ("id");
 
@@ -2888,6 +3020,11 @@ ALTER TABLE ONLY "public"."referrals"
 
 
 
+ALTER TABLE ONLY "public"."referrals"
+    ADD CONSTRAINT "referrals_referred_user_id_key" UNIQUE ("referred_user_id");
+
+
+
 ALTER TABLE ONLY "public"."saved_jobs"
     ADD CONSTRAINT "saved_jobs_pkey" PRIMARY KEY ("id");
 
@@ -2977,6 +3114,14 @@ CREATE INDEX "bank_transactions_user_status_idx" ON "public"."bank_transactions"
 
 
 CREATE INDEX "clients_portal_invitado_en_idx" ON "public"."clients" USING "btree" ("user_id", "portal_invitado_en") WHERE ("portal_invitado_en" IS NOT NULL);
+
+
+
+CREATE INDEX "comisiones_afiliado_referral_idx" ON "public"."comisiones_afiliado" USING "btree" ("referral_id");
+
+
+
+CREATE INDEX "comisiones_afiliado_referrer_idx" ON "public"."comisiones_afiliado" USING "btree" ("referrer_id", "created_at" DESC);
 
 
 
@@ -3521,6 +3666,16 @@ ALTER TABLE ONLY "public"."clients"
 
 
 
+ALTER TABLE ONLY "public"."comisiones_afiliado"
+    ADD CONSTRAINT "comisiones_afiliado_referral_id_fkey" FOREIGN KEY ("referral_id") REFERENCES "public"."referrals"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."comisiones_afiliado"
+    ADD CONSTRAINT "comisiones_afiliado_referrer_id_fkey" FOREIGN KEY ("referrer_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."contract_templates"
     ADD CONSTRAINT "contract_templates_user_fk" FOREIGN KEY ("user_id") REFERENCES "public"."profiles"("id") ON DELETE CASCADE;
 
@@ -3998,10 +4153,6 @@ CREATE POLICY "Users can view own time entries" ON "public"."time_entries" FOR S
 
 
 
-CREATE POLICY "Users can view their own referrals" ON "public"."referrals" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id")) WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
-
-
-
 CREATE POLICY "Users manage own business profile" ON "public"."business_profile" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id")) WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
 
@@ -4085,6 +4236,13 @@ CREATE POLICY "clients_select" ON "public"."clients" FOR SELECT TO "authenticate
 
 
 CREATE POLICY "clients_update_own" ON "public"."clients" FOR UPDATE TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id")) WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
+ALTER TABLE "public"."comisiones_afiliado" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "comisiones_ver_las_mias" ON "public"."comisiones_afiliado" FOR SELECT TO "authenticated" USING (("referrer_id" = ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -4495,6 +4653,10 @@ CREATE POLICY "recurring_invoices_owner_all" ON "public"."recurring_invoices" TO
 ALTER TABLE "public"."referrals" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE POLICY "referrals_ver_los_mios" ON "public"."referrals" FOR SELECT TO "authenticated" USING (("referrer_id" = ( SELECT "auth"."uid"() AS "uid")));
+
+
+
 ALTER TABLE "public"."saved_jobs" ENABLE ROW LEVEL SECURITY;
 
 
@@ -4886,6 +5048,11 @@ GRANT ALL ON FUNCTION "public"."consume_credits_atomic"("user_id" "uuid", "amoun
 
 
 
+REVOKE ALL ON FUNCTION "public"."crear_referido"("p_referido" "uuid", "p_codigo" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."crear_referido"("p_referido" "uuid", "p_codigo" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."creditos_mensuales_ajustar_ancla"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."creditos_mensuales_ajustar_ancla"() TO "service_role";
 
@@ -4982,15 +5149,15 @@ GRANT ALL ON FUNCTION "public"."increment_email_open"("p_business_id" "uuid") TO
 
 
 
-GRANT ALL ON FUNCTION "public"."jobs_proteger_destacado"() TO "anon";
-GRANT ALL ON FUNCTION "public"."jobs_proteger_destacado"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."jobs_proteger_destacado"() TO "service_role";
-
-
-
 GRANT ALL ON FUNCTION "public"."is_active_team_member"("p_owner_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."is_active_team_member"("p_owner_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_active_team_member"("p_owner_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."jobs_proteger_destacado"() TO "anon";
+GRANT ALL ON FUNCTION "public"."jobs_proteger_destacado"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."jobs_proteger_destacado"() TO "service_role";
 
 
 
@@ -5023,6 +5190,11 @@ GRANT ALL ON FUNCTION "public"."proteger_columnas_de_pago_del_perfil"() TO "serv
 
 REVOKE ALL ON FUNCTION "public"."recargar_creditos_mensuales"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."recargar_creditos_mensuales"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."registrar_comision_afiliado"("p_referido" "uuid", "p_stripe_invoice_id" "text", "p_base_cents" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."registrar_comision_afiliado"("p_referido" "uuid", "p_stripe_invoice_id" "text", "p_base_cents" integer) TO "service_role";
 
 
 
@@ -5074,6 +5246,12 @@ GRANT ALL ON FUNCTION "public"."url_de_webhook_valida"("p_url" "text") TO "servi
 REVOKE ALL ON FUNCTION "public"."verify_fiscal_chain"("p_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."verify_fiscal_chain"("p_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."verify_fiscal_chain"("p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."vincular_referido"("p_codigo" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."vincular_referido"("p_codigo" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."vincular_referido"("p_codigo" "text") TO "service_role";
 
 
 
@@ -5158,6 +5336,12 @@ GRANT ALL ON TABLE "public"."businesses" TO "service_role";
 GRANT ALL ON TABLE "public"."clients" TO "anon";
 GRANT ALL ON TABLE "public"."clients" TO "authenticated";
 GRANT ALL ON TABLE "public"."clients" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."comisiones_afiliado" TO "anon";
+GRANT ALL ON TABLE "public"."comisiones_afiliado" TO "authenticated";
+GRANT ALL ON TABLE "public"."comisiones_afiliado" TO "service_role";
 
 
 
