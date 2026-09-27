@@ -63,3 +63,15 @@ export const estadisticasDeReferidos = (referidos: Referral[]) => ({
     activeSubscriptions: referidos.filter(r => r.status === 'Subscribed').length,
     totalEarnings: referidos.reduce((suma, r) => suma + (r.commission_cents ?? 0), 0),
 });
+
+/** Lo ganado, separado en pendiente de cobro y ya cobrado (pagos marcados por la administración). */
+export const repartoDeCobro = (comisiones: { comision_cents: number; pago_id: string | null }[]) => ({
+    pendiente: comisiones.filter(c => !c.pago_id).reduce((s, c) => s + (c.comision_cents ?? 0), 0),
+    cobrado: comisiones.filter(c => !!c.pago_id).reduce((s, c) => s + (c.comision_cents ?? 0), 0),
+});
+
+export const cargarReparto = async () => {
+    const { data, error } = await supabase.from('comisiones_afiliado').select('comision_cents, pago_id');
+    if (error) throw error;
+    return repartoDeCobro((data ?? []) as { comision_cents: number; pago_id: string | null }[]);
+};
