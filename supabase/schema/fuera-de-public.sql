@@ -111,18 +111,24 @@ CREATE POLICY portal_files_delete_own_folder ON storage.objects
 
 
 -- ─────────────────────────────────────────────────────────────────────────
--- 4. Las dos tareas programadas
+-- 4. Las cuatro tareas programadas
 -- ─────────────────────────────────────────────────────────────────────────
 --
 -- Viven en el esquema `cron`. La clave de servicio NO está escrita aquí: se
 -- lee del vault, del secreto llamado `cron_service_role_key`. Si reconstruyes
--- el proyecto desde cero, ese secreto hay que crearlo ANTES, o las dos tareas
--- se ejecutarán y fallarán en silencio todos los días:
+-- el proyecto desde cero, ese secreto hay que crearlo ANTES, o las tres tareas
+-- que llaman a funciones se ejecutarán y fallarán en silencio todos los días:
 --
 --   select vault.create_secret('<clave service_role>', 'cron_service_role_key');
 --
--- La primera emite las facturas recurrentes que vencen cada día. La segunda
--- manda el aviso semanal de rentabilidad.
+-- 1. Emite las facturas recurrentes que vencen cada día.
+-- 2. Manda el aviso semanal de rentabilidad.
+-- 3. Avisa de los certificados digitales a punto de caducar (añadida al
+--    volcado el 26/09: existía en producción pero no estaba en este archivo
+--    ni en ninguna migración).
+-- 4. Recarga mensual de créditos IA. No usa la clave: llama a una función de
+--    la base de datos. También está en la migración
+--    20260926174820_recarga_mensual_de_creditos.sql.
 
 create extension if not exists pg_cron with schema extensions;
 create extension if not exists pg_net with schema extensions;
@@ -169,4 +175,35 @@ select cron.schedule(
       )
     ) as request_id;
   $$
+);
+
+select cron.unschedule('certificate-expiry-alert-daily')
+where exists (select 1 from cron.job where jobname = 'certificate-expiry-alert-daily');
+
+select cron.schedule(
+  'certificate-expiry-alert-daily',
+  '30 6 * * *',
+  $$
+  select
+    net.http_post(
+      url := 'https://umqsjycqypxvhbhmidma.supabase.co/functions/v1/certificate-expiry-alert',
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'Authorization', 'Bearer ' || (
+          select decrypted_secret
+          from vault.decrypted_secrets
+          where name = 'cron_service_role_key'
+        )
+      )
+    ) as request_id;
+  $$
+);
+
+select cron.unschedule('recarga-mensual-creditos')
+where exists (select 1 from cron.job where jobname = 'recarga-mensual-creditos');
+
+select cron.schedule(
+  'recarga-mensual-creditos',
+  '15 5 * * *',
+  $$select public.recargar_creditos_mensuales();$$
 );
