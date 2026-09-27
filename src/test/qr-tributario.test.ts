@@ -25,6 +25,8 @@ describe('QR tributario de las facturas', () => {
     it('lleva los cuatro parámetros con el formato de la orden', () => {
         const u = new URL(construirUrlQrTributario({ ...base, modalidad: 'no_verifactu' }));
         expect(u.protocol).toBe('https:');
+        // Dominio de producción según el documento técnico oficial (v0.5.0).
+        expect(u.host).toBe('www2.agenciatributaria.gob.es');
         expect(u.searchParams.get('nif')).toBe('B12345678');
         expect(u.searchParams.get('numserie')).toBe('INV-2026-0005');
         expect(u.searchParams.get('fecha')).toBe('26-09-2026');
