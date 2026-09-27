@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import AuthCard from '../../components/auth/AuthCard';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
@@ -10,6 +10,7 @@ import { UserIcon, MailIcon, LockIcon, EyeIcon, EyeOffIcon, AlertTriangleIcon, C
 import { GoogleIcon } from '../../components/icons/GoogleIcon';
 import CaptchaTurnstile, { type CaptchaTurnstileHandle } from '../../components/auth/CaptchaTurnstile';
 import { puedeEnviarConCaptcha } from '../../lib/captcha';
+import { codigoDeLaUrl, guardarCodigoPendiente, leerCodigoPendiente } from '../../lib/afiliados';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -25,6 +26,14 @@ const RegisterPage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
     const captcha = useRef<CaptchaTurnstileHandle>(null);
+    const location = useLocation();
+
+    // Enlace de afiliado (/register?ref=CODIGO): se guarda para usarlo en el
+    // alta, y para vincularlo después si la cuenta se crea con Google.
+    useEffect(() => {
+        const codigo = codigoDeLaUrl(location.search);
+        if (codigo) guardarCodigoPendiente(codigo);
+    }, [location.search]);
 
     const emailInvalid = emailTouched && email.length > 0 && !EMAIL_REGEX.test(email);
 
@@ -37,7 +46,7 @@ const RegisterPage: React.FC = () => {
 
         setLoading(true);
         try {
-            const result = await register(name, email, password, captchaToken);
+            const result = await register(name, email, password, captchaToken, codigoDeLaUrl(location.search) ?? leerCodigoPendiente());
             if (result.success) {
                 // FIX: no navegamos directo a "/" en silencio. Si el proyecto tiene
                 // confirmación de email activada (lo habitual), signUp() no crea

@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { AppState } from '../useAppStore';
 import { Profile, GoogleJwtPayload } from '../../types';
 import { supabase } from '../../lib/supabaseClient';
+import { vincularReferidoPendiente } from '../../lib/afiliados';
 import { logger } from '../../lib/loggerService';
 import { opcionesCaptcha, esErrorDeCaptcha, MENSAJE_CAPTCHA_FALLIDO } from '../../lib/captcha';
 import type { Session } from '@supabase/supabase-js';
@@ -138,7 +139,7 @@ export interface AuthSlice {
   login: (email: string, password?: string, captchaToken?: string | null) => Promise<{ success: boolean; message?: string }>;
   loginWithGoogle: (payload: GoogleJwtPayload) => Promise<void>;
   logout: () => Promise<void>;
-  register: (name: string, email: string, password?: string, captchaToken?: string | null) => Promise<{ success: boolean; message?: string }>;
+  register: (name: string, email: string, password?: string, captchaToken?: string | null, codigoAfiliado?: string | null) => Promise<{ success: boolean; message?: string }>;
   updateProfile: (profileData: Partial<Profile>) => Promise<void>;
   refreshProfile: (knownSession?: Session | null) => Promise<void>;
   consumeCredits: (amount: number) => Promise<boolean>;
@@ -234,6 +235,9 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                 } else {
                     logger.info("Perfil cargado correctamente");
                     set({ profile: await conSaldoDeCreditos(profileData as Profile), isAuthenticated: true });
+                    // Alta con Google desde un enlace de afiliado: se vincula ahora.
+                    // En segundo plano: nunca debe retrasar ni romper el acceso.
+                    vincularReferidoPendiente().catch(() => {});
                 }
             } catch (error) {
                 console.error("💥 RefreshProfile Error:", error);
@@ -421,12 +425,13 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
     // `data.user.identities` vacío. Sin comprobar eso, el código interpretaba
     // la respuesta como "cuenta creada" y navegaba a "/" sin avisar de nada,
     // pareciendo que el registro no había hecho nada en absoluto.
-    register: async (name, email, password, captchaToken) => {
+    register: async (name, email, password, captchaToken, codigoAfiliado) => {
         try {
             const { data, error } = await supabase.auth.signUp({
                 email,
                 password: password || '',
-                options: { data: { full_name: name }, ...opcionesCaptcha(captchaToken) }
+                // ref: código del enlace de afiliado; handle_new_user crea el referido.
+                options: { data: { full_name: name, ...(codigoAfiliado ? { ref: codigoAfiliado } : {}) }, ...opcionesCaptcha(captchaToken) }
             });
 
             if (error) {
