@@ -2571,19 +2571,6 @@ CREATE OR REPLACE VIEW "public"."view_public_jobs" WITH ("security_invoker"='on'
 ALTER VIEW "public"."view_public_jobs" OWNER TO "postgres";
 
 
-CREATE TABLE IF NOT EXISTS "public"."webhook_configs" (
-    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
-    "user_id" "uuid" NOT NULL,
-    "url" "text" NOT NULL,
-    "enabled" boolean DEFAULT true NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
-);
-
-
-ALTER TABLE "public"."webhook_configs" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."webhooks_enviados" (
     "id" bigint NOT NULL,
     "integration_id" "uuid" NOT NULL,
@@ -2931,16 +2918,6 @@ ALTER TABLE ONLY "public"."user_api_keys"
 
 ALTER TABLE ONLY "public"."user_secrets"
     ADD CONSTRAINT "user_secrets_pkey" PRIMARY KEY ("user_id");
-
-
-
-ALTER TABLE ONLY "public"."webhook_configs"
-    ADD CONSTRAINT "webhook_configs_pkey" PRIMARY KEY ("id");
-
-
-
-ALTER TABLE ONLY "public"."webhook_configs"
-    ADD CONSTRAINT "webhook_configs_user_id_key" UNIQUE ("user_id");
 
 
 
@@ -3433,10 +3410,6 @@ CREATE OR REPLACE TRIGGER "trg_user_api_keys_updated_at" BEFORE UPDATE ON "publi
 
 
 
-CREATE OR REPLACE TRIGGER "trg_webhook_configs_updated_at" BEFORE UPDATE ON "public"."webhook_configs" FOR EACH ROW EXECUTE FUNCTION "public"."set_updated_at"();
-
-
-
 ALTER TABLE ONLY "public"."ai_usage"
     ADD CONSTRAINT "ai_usage_business_id_fkey" FOREIGN KEY ("business_id") REFERENCES "public"."businesses"("id") ON DELETE SET NULL;
 
@@ -3832,11 +3805,6 @@ ALTER TABLE ONLY "public"."user_secrets"
 
 
 
-ALTER TABLE ONLY "public"."webhook_configs"
-    ADD CONSTRAINT "webhook_configs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
-
-
-
 ALTER TABLE ONLY "public"."webhooks_enviados"
     ADD CONSTRAINT "webhooks_enviados_integration_id_fkey" FOREIGN KEY ("integration_id") REFERENCES "public"."integrations"("id") ON DELETE CASCADE;
 
@@ -3925,10 +3893,6 @@ CREATE POLICY "Users can insert their own payments" ON "public"."platform_paymen
 
 
 CREATE POLICY "Users can insert their own proposals" ON "public"."proposals" FOR INSERT WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
-
-
-
-CREATE POLICY "Users can manage own webhook config" ON "public"."webhook_configs" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id")) WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
 
 
@@ -4641,9 +4605,6 @@ ALTER TABLE "public"."user_secrets" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "user_secrets_owner_select" ON "public"."user_secrets" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
-
-
-ALTER TABLE "public"."webhook_configs" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."webhooks_enviados" ENABLE ROW LEVEL SECURITY;
@@ -5430,12 +5391,6 @@ GRANT ALL ON TABLE "public"."user_secrets" TO "service_role";
 GRANT ALL ON TABLE "public"."view_public_jobs" TO "anon";
 GRANT ALL ON TABLE "public"."view_public_jobs" TO "authenticated";
 GRANT ALL ON TABLE "public"."view_public_jobs" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."webhook_configs" TO "anon";
-GRANT ALL ON TABLE "public"."webhook_configs" TO "authenticated";
-GRANT ALL ON TABLE "public"."webhook_configs" TO "service_role";
 
 
 
