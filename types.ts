@@ -274,10 +274,11 @@ export interface JobApplication {
 
 export interface Referral {
   id: string;
-  name: string;
-  join_date: string;
+  /** Solo el nombre de pila del invitado. */
+  referred_user_name: string | null;
+  join_date: string | null;
   created_at?: string;
-  status: 'Registered' | 'Subscribed';
+  status: 'Registered' | 'Subscribed' | 'Cancelled';
   commission_cents: number;
 }
 

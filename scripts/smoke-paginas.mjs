@@ -94,6 +94,8 @@ const ESQUEMA = {
  time_entries:"id=t,user_id=t,project_id=t,description=t?,start_time=d,end_time=d?,duration_seconds=i,invoice_id=t?,created_at=d?,logged_by=t?",
  fiscal_records:"id=t,user_id=t,invoice_id=t,record_type=t,nif_emisor=t,nombre_emisor=t,numero_factura=t,fecha_expedicion=d,tipo_factura=t,importe_total_cents=i,hash_anterior=t?,hash=t,hash_input=t,modalidad=t,estado_envio=t,created_at=d",
  job_applications:"id=t,job_id=t,applicant_id=t,status=t?,created_at=d?",
+ referrals:"id=t,referrer_id=t,referred_user_id=t,referred_user_name=t?,join_date=d?,status=t?,commission_cents=i?,created_at=d?,user_id=t?,stripe_session_id=t?",
+ comisiones_afiliado:"id=t,referral_id=t,referrer_id=t,stripe_invoice_id=t,base_cents=i,comision_cents=i,created_at=d",
  project_milestones:"id=t,user_id=t,project_id=t,title=t,due_date=d?,status=t,position=i,created_at=d,updated_at=d",
 };
 

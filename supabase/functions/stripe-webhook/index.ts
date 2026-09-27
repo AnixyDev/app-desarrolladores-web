@@ -132,7 +132,6 @@ serve(async (req) => {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
         const userId = session.metadata?.supabase_user_id
-        const clientReferenceId = session.client_reference_id
 
         if (userId) {
           const itemKey = session.metadata?.itemKey
@@ -232,24 +231,10 @@ serve(async (req) => {
             await supabase.from('profiles').update({ stripe_customer_id: session.customer }).eq('id', userId)
           }
 
-          if (clientReferenceId && session.amount_total) {
-            const { data: affiliate } = await supabase
-              .from('profiles')
-              .select('id')
-              .eq('affiliate_code', clientReferenceId)
-              .single()
-
-            if (affiliate) {
-              const commissionCents = Math.round(session.amount_total * 0.20)
-              await supabase.from('referrals').insert({
-                affiliate_id: affiliate.id,
-                referred_id: userId,
-                amount_cents: commissionCents,
-                status: 'Subscribed',
-                stripe_session_id: session.id
-              })
-            }
-          }
+          // CAMBIO (27/09): aqui habia un registro de comisiones de afiliado
+          // que nunca funciono (columnas inexistentes en referrals, error sin
+          // mirar, y solo el primer pago). Las comisiones se registran ahora
+          // en 'invoice.paid', una por cada factura pagada de la suscripcion.
         }
         break;
       }
@@ -299,6 +284,36 @@ serve(async (req) => {
         break;
       }
 
+      // Programa de afiliados: 20% de cada factura PAGADA de una suscripcion
+      // (primer pago y renovaciones) de un usuario que llego con un enlace de
+      // afiliado. La base es sin impuestos. registrar_comision_afiliado es
+      // idempotente por factura, asi que un reintento de Stripe no duplica.
+      // Requiere que el endpoint del webhook en Stripe tenga el evento
+      // invoice.paid activado.
+      case 'invoice.paid': {
+        const invoice = event.data.object as Stripe.Invoice
+        if (!invoice.subscription || !invoice.amount_paid || invoice.amount_paid <= 0) break
+
+        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
+        if (!customerId) break
+        const userId = await findUserIdByCustomer(customerId)
+        if (!userId) {
+          console.error(`⚠️ invoice.paid sin perfil para el customer ${customerId}`)
+          break
+        }
+
+        const baseCents = invoice.total_excluding_tax ?? invoice.amount_paid
+        const { data: comision, error: comisionError } = await supabase.rpc('registrar_comision_afiliado', {
+          p_referido: userId,
+          p_stripe_invoice_id: invoice.id,
+          p_base_cents: baseCents,
+        })
+        // Si falla se lanza: el catch libera la reserva y Stripe reintenta.
+        if (comisionError) throw new Error(`No se pudo registrar la comision de afiliado: ${comisionError.message}`)
+        if (comision) console.log(`🤝 Comision de afiliado registrada: ${comision} centimos (factura ${invoice.id})`)
+        break;
+      }
+
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription
         const customerId = subscription.customer as string
@@ -309,6 +324,12 @@ serve(async (req) => {
             subscription_status: 'canceled',
             plan: 'Free',
           }).eq('id', userId)
+
+          // Programa de afiliados: el referido deja de estar suscrito. Las
+          // comisiones ya registradas se quedan.
+          await supabase.from('referrals')
+            .update({ status: 'Cancelled' })
+            .eq('referred_user_id', userId)
         }
         break;
       }

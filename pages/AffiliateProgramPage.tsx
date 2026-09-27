@@ -1,16 +1,36 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import { useAppStore } from '@/hooks/useAppStore';
-import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { Share2Icon as Share2, CopyIcon as Copy, Users, DollarSignIcon as DollarSign, CheckCircleIcon as CheckCircle } from '@/components/icons/Icon';
 import { formatCurrency } from '@/lib/utils';
+import { cargarReferidos, estadisticasDeReferidos } from '@/lib/afiliados';
+import type { Referral } from '@/types';
 
 const AffiliateProgramPage = () => {
-  const { profile, referrals } = useAppStore(useShallow(s => ({ profile: s.profile, referrals: s.referrals })));
+  const profile = useAppStore(s => s.profile);
   const { addToast } = useToast();
+  const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(false);
+
+  // CAMBIO (27/09): antes la página leía referrals del store, que nadie
+  // rellenaba: siempre mostraba 0. Ahora los carga ella (la RLS solo deja
+  // ver los referidos propios).
+  useEffect(() => {
+    let vigente = true;
+    cargarReferidos()
+      .then(r => { if (vigente) setReferrals(r); })
+      .catch(() => { if (vigente) setErrorCarga(true); })
+      .finally(() => { if (vigente) setCargando(false); });
+    return () => { vigente = false; };
+  }, []);
+
+  // Los hooks van antes de cualquier return: antes había un useMemo después
+  // del "Cargando…", y React lo ejecutaba unas veces sí y otras no.
+  const stats = useMemo(() => estadisticasDeReferidos(referrals), [referrals]);
 
   if (!profile) {
     return <div className="p-8 text-center text-gray-400">Cargando programa de afiliados...</div>;
@@ -23,27 +43,16 @@ const AffiliateProgramPage = () => {
     addToast('Enlace de referido copiado!', 'success');
   };
 
-  const stats = useMemo(() => {
-    return {
-      totalReferrals: referrals.length,
-      activeSubscriptions: referrals.filter(
-        (r) => r.status === 'Subscribed'
-      ).length,
-      totalEarnings: referrals.reduce(
-        (sum, r) => sum + r.commission_cents,
-        0
-      ),
-    };
-  }, [referrals]);
-
   const statusLabels: Record<string, string> = {
     Registered: 'Registrado',
     Subscribed: 'Suscripción activa',
+    Cancelled: 'Suscripción cancelada',
   };
 
   const statusClasses: Record<string, string> = {
     Registered: 'bg-gray-800 text-gray-300 border-gray-700',
     Subscribed: 'bg-green-500/10 text-green-400 border-green-500/30',
+    Cancelled: 'bg-red-500/10 text-red-300 border-red-500/30',
   };
 
   const StatCard = ({
@@ -102,6 +111,7 @@ const AffiliateProgramPage = () => {
                 Tu Enlace de Referido
               </h3>
               <p className="text-sm text-gray-400">Comparte este enlace y gana un 20% de comisión recurrente por cada suscripción</p>
+              <p className="text-xs text-gray-500">La comisión se calcula sobre cada pago de la suscripción de tus invitados, sin impuestos. El pago de las comisiones se gestiona de forma manual.</p>
             </div>
             <div className="flex w-full md:w-auto gap-2">
               <div className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-sm text-gray-300 font-mono truncate max-w-[300px]">
@@ -121,7 +131,11 @@ const AffiliateProgramPage = () => {
           <h3 className="text-lg font-bold text-white">Tus Referidos</h3>
         </CardHeader>
         <CardContent className="p-0">
-          {referrals.length === 0 ? (
+          {cargando ? (
+            <div className="p-12 text-center text-gray-400">Cargando tus referidos…</div>
+          ) : errorCarga ? (
+            <div className="p-12 text-center text-red-300">No se pudieron cargar tus referidos. Recarga la página para intentarlo de nuevo.</div>
+          ) : referrals.length === 0 ? (
             <div className="p-12">
               <EmptyState
                 title="Aún no tienes referidos"
@@ -134,6 +148,7 @@ const AffiliateProgramPage = () => {
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-gray-800 text-gray-400 text-sm">
+                    <th className="px-6 py-4 font-medium">Invitado</th>
                     <th className="px-6 py-4 font-medium">Fecha</th>
                     <th className="px-6 py-4 font-medium">Estado</th>
                     <th className="px-6 py-4 font-medium">Comisión Acumulada</th>
@@ -142,13 +157,14 @@ const AffiliateProgramPage = () => {
                 <tbody className="divide-y divide-gray-800">
                   {referrals.map((r) => (
                     <tr key={r.id} className="text-sm text-gray-300 hover:bg-gray-800/50 transition-colors">
-                      <td className="px-6 py-4">{new Date(r.created_at || r.join_date).toLocaleDateString()}</td>
+                      <td className="px-6 py-4">{r.referred_user_name || 'Invitado'}</td>
+                      <td className="px-6 py-4">{new Date(r.created_at || r.join_date || '').toLocaleDateString('es-ES')}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold border ${statusClasses[r.status]}`}>
                           {statusLabels[r.status]}
                         </span>
                       </td>
-                      <td className="px-6 py-4 font-medium text-white">{formatCurrency(r.commission_cents)}</td>
+                      <td className="px-6 py-4 font-medium text-white">{formatCurrency(r.commission_cents ?? 0)}</td>
                     </tr>
                   ))}
                 </tbody>
