@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@13.10.0?target=deno'
+import { suscripcionDeLaFactura } from '../_shared/stripe-facturas.ts'
 
 declare const Deno: any;
 
@@ -292,7 +293,12 @@ serve(async (req) => {
       // invoice.paid activado.
       case 'invoice.paid': {
         const invoice = event.data.object as Stripe.Invoice
-        if (!invoice.subscription || !invoice.amount_paid || invoice.amount_paid <= 0) break
+        // Los eventos llegan con la version de API del ENDPOINT en Stripe
+        // (2025-09-30.clover), no con la del SDK de arriba. Desde basil
+        // (2025-03-31) invoice.subscription ya no existe: el dato esta en
+        // invoice.parent.subscription_details.subscription. Se leen las dos
+        // formas por si algun dia se cambia la version del endpoint.
+        if (!suscripcionDeLaFactura(invoice) || !invoice.amount_paid || invoice.amount_paid <= 0) break
 
         const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id
         if (!customerId) break
