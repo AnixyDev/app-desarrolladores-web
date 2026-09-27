@@ -6,6 +6,8 @@ import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 
 import { formatCurrency } from '@/lib/utils';
+import { useAppStore } from '@/hooks/useAppStore';
+import ComisionesAfiliados from '@/components/admin/ComisionesAfiliados';
 import {
   DollarSignIcon,
   Users as UsersIcon,
@@ -36,7 +38,7 @@ const STRIPE_FIXED_FEE_CENTS = 25;
 const STRIPE_PERCENT_FEE = 0.015;
 const MONTHLY_INFRA_COST_CENTS = 82;
 
-const AdminDashboard = () => {
+const PanelAdmin = () => {
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -302,8 +304,36 @@ const AdminDashboard = () => {
           </table>
         </CardContent>
       </Card>
+
+      <ComisionesAfiliados />
     </div>
   );
+};
+
+/**
+ * CAMBIO (27/09): la ruta /admin no comprobaba nada: cualquier cuenta podía
+ * abrir el panel. Los datos ya estaban protegidos en la base de datos (cada
+ * usuario solo veía lo suyo, y las funciones admin_* exigen el rol), pero la
+ * pantalla se mostraba igual, con cifras vacías o engañosas. Ahora solo se
+ * pinta para el rol Admin, que no se puede cambiar desde el navegador.
+ */
+const AdminDashboard = () => {
+  const profile = useAppStore(s => s.profile);
+  const isProfileLoading = useAppStore(s => s.isProfileLoading);
+
+  if (isProfileLoading && !profile?.id) {
+    return <div className="p-8 text-center text-gray-400">Cargando…</div>;
+  }
+  if ((profile?.role || '').toLowerCase() !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <AlertTriangleIcon className="w-14 h-14 text-gray-500 mb-4" />
+        <h2 className="text-xl font-bold text-white mb-2">Zona de administración</h2>
+        <p className="text-gray-400 max-w-md">Esta página solo está disponible para la administración de DevFreelancer.</p>
+      </div>
+    );
+  }
+  return <PanelAdmin />;
 };
 
 export default AdminDashboard;

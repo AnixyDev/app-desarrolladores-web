@@ -6,7 +6,7 @@ import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';
 import { Share2Icon as Share2, CopyIcon as Copy, Users, DollarSignIcon as DollarSign, CheckCircleIcon as CheckCircle } from '@/components/icons/Icon';
 import { formatCurrency } from '@/lib/utils';
-import { cargarReferidos, estadisticasDeReferidos } from '@/lib/afiliados';
+import { cargarReferidos, cargarReparto, estadisticasDeReferidos } from '@/lib/afiliados';
 import type { Referral } from '@/types';
 
 const AffiliateProgramPage = () => {
@@ -15,14 +15,15 @@ const AffiliateProgramPage = () => {
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [cargando, setCargando] = useState(true);
   const [errorCarga, setErrorCarga] = useState(false);
+  const [reparto, setReparto] = useState({ pendiente: 0, cobrado: 0 });
 
   // CAMBIO (27/09): antes la página leía referrals del store, que nadie
   // rellenaba: siempre mostraba 0. Ahora los carga ella (la RLS solo deja
   // ver los referidos propios).
   useEffect(() => {
     let vigente = true;
-    cargarReferidos()
-      .then(r => { if (vigente) setReferrals(r); })
+    Promise.all([cargarReferidos(), cargarReparto()])
+      .then(([r, rep]) => { if (vigente) { setReferrals(r); setReparto(rep); } })
       .catch(() => { if (vigente) setErrorCarga(true); })
       .finally(() => { if (vigente) setCargando(false); });
     return () => { vigente = false; };
@@ -84,7 +85,7 @@ const AffiliateProgramPage = () => {
         <p className="text-gray-400">Invita a otros freelancers y gana comisiones recurrentes</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           icon={Users}
           title="Total Referidos"
@@ -97,8 +98,13 @@ const AffiliateProgramPage = () => {
         />
         <StatCard
           icon={DollarSign}
-          title="Ganancias Totales"
-          value={formatCurrency(stats.totalEarnings)}
+          title="Pendiente de cobro"
+          value={formatCurrency(reparto.pendiente)}
+        />
+        <StatCard
+          icon={DollarSign}
+          title="Cobrado"
+          value={formatCurrency(reparto.cobrado)}
         />
       </div>
 
