@@ -34,15 +34,14 @@ export interface FiscalPdfData {
 // URL de cotejo AEAT (producción). Formato y parámetros (nif, numserie,
 // fecha DD-MM-AAAA, importe con punto decimal) según la Orden HAC/1177/2024.
 //
-// CAMBIO (26/09): cada modalidad tiene su propio servicio de cotejo. Antes se
-// usaba siempre ValidarQR, que es el de los sistemas Veri*Factu; las facturas
-// No Veri*Factu (la modalidad de Ana) apuntaban al servicio equivocado.
-// Confirmado en dos fuentes independientes que resumen el documento técnico
-// de la AEAT; el PDF oficial no se pudo descargar desde la sesión. Sobre el
-// dominio las fuentes no coinciden (agenciatributaria.es / .gob.es): se
-// mantiene el que ya se usaba. Reconfirmar contra el original antes de operar
-// en Veri*Factu real.
-const AEAT_QR_BASE = 'https://www2.agenciatributaria.es/wlpl/TIKE-CONT';
+// Cada modalidad tiene su propio servicio de cotejo (ValidarQR para
+// Veri*Factu, ValidarQRNoVerifactu para No Veri*Factu).
+//
+// Confirmado el 27/09 contra el documento oficial de la AEAT "Detalle de las
+// especificaciones técnicas del código QR de la factura y de la URL del
+// servicio de cotejo", versión 0.5.0 (10/12/2025), apartado de URLs: el
+// dominio de producción es www2.agenciatributaria.gob.es (antes aquí .es).
+const AEAT_QR_BASE = 'https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT';
 export const AEAT_QR_SERVICIO: Record<FiscalPdfData['modalidad'], string> = {
   verifactu: `${AEAT_QR_BASE}/ValidarQR`,
   no_verifactu: `${AEAT_QR_BASE}/ValidarQRNoVerifactu`,
@@ -126,7 +125,8 @@ async function buildInvoicePdfDocument(
             const qrDataUrl = await buildInvoiceQrDataUrl(profile, invoice, fiscalData.modalidad);
             doc.setFontSize(10);
             doc.setFont('helvetica', 'normal');
-            doc.text('QR tributario:', 14, 10);
+            // Encima del QR y centrado respecto a él, como recomienda la AEAT.
+            doc.text('QR tributario:', 14 + QR_TRIBUTARIO_MM / 2, 10, { align: 'center' });
             doc.addImage(qrDataUrl, 'PNG', 14, 12, QR_TRIBUTARIO_MM, QR_TRIBUTARIO_MM);
             if (fiscalData.modalidad === 'verifactu') {
                 doc.setFontSize(10);
