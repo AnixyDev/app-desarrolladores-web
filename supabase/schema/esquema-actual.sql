@@ -280,18 +280,23 @@ CREATE OR REPLACE FUNCTION "public"."consume_credits_atomic"("p_amount" integer)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public', 'pg_temp'
     AS $$
-BEGIN
-  RETURN QUERY
-  UPDATE public.profiles p
-  SET ai_credits = p.ai_credits - p_amount
-  WHERE p.id = auth.uid()
-    AND p.ai_credits >= p_amount
-  RETURNING p.id, p.ai_credits;
+begin
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Cantidad de creditos no valida: %', p_amount
+      using errcode = '22023';
+  end if;
 
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Créditos insuficientes' USING ERRCODE = 'P0001';
-  END IF;
-END;
+  return query
+  update public.profiles p
+  set ai_credits = p.ai_credits - p_amount
+  where p.id = auth.uid()
+    and p.ai_credits >= p_amount
+  returning p.id, p.ai_credits;
+
+  if not found then
+    raise exception 'Créditos insuficientes' using errcode = 'P0001';
+  end if;
+end;
 $$;
 
 
@@ -307,6 +312,11 @@ declare
 begin
   if user_id is distinct from auth.uid() then
     raise exception 'No autorizado: user_id no coincide con el usuario autenticado';
+  end if;
+
+  if amount_to_consume is null or amount_to_consume <= 0 then
+    raise exception 'Cantidad de creditos no valida: %', amount_to_consume
+      using errcode = '22023';
   end if;
 
   v_cuenta := public.cuenta_de_creditos_ia(user_id);
