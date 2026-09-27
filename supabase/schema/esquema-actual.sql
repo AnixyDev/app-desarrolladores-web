@@ -195,6 +195,37 @@ $$;
 ALTER FUNCTION "public"."check_and_increment_rate_limit"("p_user_id" "uuid", "p_action" "text", "p_max_calls" integer, "p_window_seconds" integer) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."clients_desenlazar_portal_si_cambia_email"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_email_de_la_cuenta text;
+begin
+  if new.portal_user_id is null then
+    return new;
+  end if;
+
+  select lower(u.email) into v_email_de_la_cuenta
+    from auth.users u
+   where u.id = new.portal_user_id;
+
+  -- Cuenta inexistente o correo que ya no coincide: el enlace no es cierto
+  -- y once políticas RLS se fían de él, así que no se queda.
+  if v_email_de_la_cuenta is null
+     or v_email_de_la_cuenta is distinct from lower(new.email)
+  then
+    new.portal_user_id := null;
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."clients_desenlazar_portal_si_cambia_email"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."consume_ai_credits"("p_user_id" "uuid", "p_cost" integer) RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public', 'pg_temp'
@@ -271,22 +302,81 @@ CREATE OR REPLACE FUNCTION "public"."consume_credits_atomic"("user_id" "uuid", "
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public', 'pg_temp'
     AS $$
-BEGIN
-  IF user_id IS DISTINCT FROM auth.uid() THEN
-    RAISE EXCEPTION 'No autorizado: user_id no coincide con el usuario autenticado';
-  END IF;
+declare
+  v_cuenta uuid;
+begin
+  if user_id is distinct from auth.uid() then
+    raise exception 'No autorizado: user_id no coincide con el usuario autenticado';
+  end if;
 
-  UPDATE public.profiles p
-  SET ai_credits = p.ai_credits - amount_to_consume
-  WHERE p.id = user_id
-    AND p.ai_credits >= amount_to_consume;
+  v_cuenta := public.cuenta_de_creditos_ia(user_id);
 
-  RETURN FOUND;
-END;
+  update public.profiles p
+     set ai_credits = p.ai_credits - amount_to_consume
+   where p.id = v_cuenta
+     and p.ai_credits >= amount_to_consume;
+
+  return found;
+end;
 $$;
 
 
 ALTER FUNCTION "public"."consume_credits_atomic"("user_id" "uuid", "amount_to_consume" integer) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."creditos_mensuales_ajustar_ancla"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_de_pago boolean := new.plan in ('Pro', 'Teams')
+                       and coalesce(new.subscription_status, '') in ('active', 'trialing');
+begin
+  if not v_de_pago then
+    new.creditos_mensuales_proxima := null;
+  elsif new.creditos_mensuales_proxima is null then
+    new.creditos_mensuales_proxima := now() + interval '1 month';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."creditos_mensuales_ajustar_ancla"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."creditos_mensuales_del_plan"("p_plan" "text") RETURNS integer
+    LANGUAGE "sql" IMMUTABLE
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+  select case p_plan when 'Pro' then 50 when 'Teams' then 200 else 0 end;
+$$;
+
+
+ALTER FUNCTION "public"."creditos_mensuales_del_plan"("p_plan" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."cuenta_de_creditos_ia"("p_usuario" "uuid") RETURNS "uuid"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+  select coalesce(
+    (select tm.user_id
+       from public.team_members tm
+       join public.profiles dueno on dueno.id = tm.user_id
+      where tm.accepted_user_id = p_usuario
+        and tm.status = 'Activo'
+        and tm.user_id <> p_usuario
+        and dueno.plan = 'Teams'
+        and coalesce(dueno.subscription_status, '') in ('active', 'trialing')
+      order by tm.created_at
+      limit 1),
+    p_usuario
+  );
+$$;
+
+
+ALTER FUNCTION "public"."cuenta_de_creditos_ia"("p_usuario" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."enforce_invoice_fiscal_lock"() RETURNS "trigger"
@@ -330,6 +420,82 @@ $$;
 
 
 ALTER FUNCTION "public"."enforce_invoice_fiscal_lock"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."enviar_webhooks"("p_dueno" "uuid", "p_evento" "text", "p_texto" "text", "p_datos" "jsonb") RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'extensions', 'pg_temp'
+    AS $$
+declare
+  v_int  record;
+  v_req  bigint;
+  v_n    integer := 0;
+begin
+  -- Solo cuentas Teams con la suscripción viva: es lo que se vende.
+  if not exists (
+    select 1 from public.profiles
+     where id = p_dueno
+       and plan = 'Teams'
+       and coalesce(subscription_status, '') in ('active', 'trialing')
+  ) then
+    return 0;
+  end if;
+
+  for v_int in
+    select id, url
+      from public.integrations
+     where user_id = p_dueno
+       and is_active
+       and event = p_evento
+  loop
+    if not public.url_de_webhook_valida(v_int.url) then
+      continue;
+    end if;
+
+    v_req := net.http_post(
+      url := v_int.url,
+      body := jsonb_build_object(
+        'text',        p_texto,
+        'event',       p_evento,
+        'occurred_at', now(),
+        'data',        coalesce(p_datos, '{}'::jsonb),
+        'source',      'devfreelancer.app'
+      ),
+      headers := jsonb_build_object(
+        'Content-Type', 'application/json',
+        'User-Agent',   'DevFreelancer-Webhooks/1.0'
+      ),
+      timeout_milliseconds := 5000
+    );
+
+    insert into public.webhooks_enviados (integration_id, user_id, event, request_id)
+    values (v_int.id, p_dueno, p_evento, v_req);
+
+    update public.integrations set last_sent_at = now() where id = v_int.id;
+    v_n := v_n + 1;
+  end loop;
+
+  return v_n;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."enviar_webhooks"("p_dueno" "uuid", "p_evento" "text", "p_texto" "text", "p_datos" "jsonb") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."enviar_webhooks_sin_fallar"("p_dueno" "uuid", "p_evento" "text", "p_texto" "text", "p_datos" "jsonb") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+begin
+  perform public.enviar_webhooks(p_dueno, p_evento, p_texto, p_datos);
+exception when others then
+  raise warning 'webhooks: no se pudo enviar % de %: %', p_evento, p_dueno, sqlerrm;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."enviar_webhooks_sin_fallar"("p_dueno" "uuid", "p_evento" "text", "p_texto" "text", "p_datos" "jsonb") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."exigir_nif_emisor"("p_user_id" "uuid") RETURNS "text"
@@ -611,6 +777,43 @@ $$;
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."hitos_fijar_dueno"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+begin
+  select p.user_id into new.user_id from public.projects p where p.id = new.project_id;
+  if new.user_id is null then
+    raise exception 'Proyecto no encontrado' using errcode = '23503';
+  end if;
+  if tg_op = 'UPDATE' then
+    new.updated_at := now();
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."hitos_fijar_dueno"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."impedir_cambio_de_dueno"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+begin
+  if current_user in ('anon', 'authenticated')
+     and new.user_id is distinct from old.user_id then
+    raise exception 'No se puede cambiar el dueño de este registro.' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."impedir_cambio_de_dueno"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."increment_credits"("user_id" "uuid", "amount" integer) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public', 'pg_temp'
@@ -677,37 +880,52 @@ CREATE OR REPLACE FUNCTION "public"."link_portal_client"() RETURNS TABLE("client
 declare
   v_email text;
   v_client record;
+  v_enlazado boolean := false;
 begin
   v_email := lower(auth.jwt() ->> 'email');
   if v_email is null then
     return;
   end if;
 
-  select id, name, user_id into v_client from public.clients where portal_user_id = auth.uid();
-  if found then
-    client_id := v_client.id;
-    client_name := v_client.name;
-    select p.business_name, p.full_name, p.portal_logo_url, p.pdf_color
-      into owner_business_name, owner_full_name, owner_logo_url, owner_brand_color
-      from public.profiles p where p.id = v_client.user_id;
-    return next;
-    return;
-  end if;
-
-  select id, name, user_id into v_client from public.clients
-    where lower(email) = v_email and portal_user_id is null
+  -- ¿Hay ya una ficha enlazada a esta cuenta? Solo vale si su correo sigue
+  -- siendo el de esta cuenta: si el freelancer lo cambió, el enlace caducó.
+  select id, name, user_id, lower(email) as email into v_client
+    from public.clients
+    where portal_user_id = auth.uid()
     limit 1;
 
   if found then
-    update public.clients set portal_user_id = auth.uid() where id = v_client.id;
-    client_id := v_client.id;
-    client_name := v_client.name;
-    select p.business_name, p.full_name, p.portal_logo_url, p.pdf_color
-      into owner_business_name, owner_full_name, owner_logo_url, owner_brand_color
-      from public.profiles p where p.id = v_client.user_id;
-    return next;
+    if v_client.email is not distinct from v_email then
+      v_enlazado := true;
+    else
+      update public.clients set portal_user_id = null where id = v_client.id;
+    end if;
   end if;
 
+  -- Si no, se enlaza una ficha libre que tenga este correo.
+  if not v_enlazado then
+    select id, name, user_id, lower(email) as email into v_client
+      from public.clients
+      where lower(email) = v_email and portal_user_id is null
+      limit 1;
+
+    if found then
+      update public.clients set portal_user_id = auth.uid() where id = v_client.id;
+      v_enlazado := true;
+    end if;
+  end if;
+
+  if not v_enlazado then
+    return;
+  end if;
+
+  client_id := v_client.id;
+  client_name := v_client.name;
+  select p.business_name, p.full_name, p.portal_logo_url, p.pdf_color
+    into owner_business_name, owner_full_name, owner_logo_url, owner_brand_color
+    from public.profiles p
+    where p.id = v_client.user_id;
+  return next;
   return;
 end;
 $$;
@@ -773,6 +991,215 @@ $$;
 ALTER FUNCTION "public"."link_team_membership"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."probar_webhook"("p_integration" "uuid") RETURNS bigint
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'extensions', 'pg_temp'
+    AS $$
+declare
+  v_int record;
+  v_req bigint;
+  v_recientes int;
+begin
+  select id, user_id, url, event into v_int
+    from public.integrations
+   where id = p_integration and user_id = auth.uid();
+  if not found then
+    raise exception 'Integración no encontrada' using errcode = '42501';
+  end if;
+  if not public.url_de_webhook_valida(v_int.url) then
+    raise exception 'La dirección debe ser https:// y de un dominio público.' using errcode = '22023';
+  end if;
+
+  -- Tope: 10 pruebas por hora y cuenta. Es una petición saliente desde
+  -- nuestro servidor; sin tope, el botón sirve para bombardear una URL.
+  select count(*) into v_recientes
+    from public.webhooks_enviados
+   where user_id = auth.uid() and es_prueba and created_at > now() - interval '1 hour';
+  if v_recientes >= 10 then
+    raise exception 'Demasiadas pruebas. Espera un rato.' using errcode = '54000';
+  end if;
+
+  v_req := net.http_post(
+    url := v_int.url,
+    body := jsonb_build_object(
+      'text', '🔔 Prueba de DevFreelancer: la integración funciona.',
+      'event', v_int.event, 'occurred_at', now(), 'test', true,
+      'data', '{}'::jsonb, 'source', 'devfreelancer.app'
+    ),
+    headers := jsonb_build_object('Content-Type', 'application/json',
+                                  'User-Agent', 'DevFreelancer-Webhooks/1.0'),
+    timeout_milliseconds := 5000
+  );
+
+  insert into public.webhooks_enviados (integration_id, user_id, event, request_id, es_prueba)
+  values (v_int.id, v_int.user_id, v_int.event, v_req, true);
+
+  return v_req;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."probar_webhook"("p_integration" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."project_messages_sellar_autor"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_owner_id uuid;
+  v_client_id uuid;
+  v_nombre text;
+begin
+  select p.user_id, p.client_id into v_owner_id, v_client_id
+  from public.projects p where p.id = new.project_id;
+
+  if v_owner_id is null then
+    raise exception 'El proyecto no existe' using errcode = '23503';
+  end if;
+
+  new.author_id := auth.uid();
+  new.created_at := now();
+
+  if v_owner_id = auth.uid() then
+    select coalesce(nullif(btrim(pr.business_name), ''), nullif(btrim(pr.full_name), ''), 'Freelancer')
+      into v_nombre from public.profiles pr where pr.id = auth.uid();
+    new.author_name := coalesce(v_nombre, 'Freelancer');
+    new.author_role := 'freelancer';
+    return new;
+  end if;
+
+  if public.is_active_team_member(v_owner_id) then
+    select coalesce(nullif(btrim(tm.name), ''), 'Miembro del equipo')
+      into v_nombre from public.team_members tm
+      where tm.user_id = v_owner_id and tm.accepted_user_id = auth.uid() and tm.status = 'Activo'
+      limit 1;
+    new.author_name := coalesce(v_nombre, 'Miembro del equipo');
+    new.author_role := 'equipo';
+    return new;
+  end if;
+
+  if v_client_id is not null then
+    select coalesce(nullif(btrim(c.name), ''), 'Cliente')
+      into v_nombre from public.clients c
+      where c.id = v_client_id and c.portal_user_id = auth.uid();
+    if v_nombre is not null then
+      new.author_name := v_nombre;
+      new.author_role := 'cliente';
+      return new;
+    end if;
+  end if;
+
+  -- RLS deberia haber cortado antes de llegar aqui.
+  raise exception 'No puedes escribir en este proyecto' using errcode = '42501';
+end;
+$$;
+
+
+ALTER FUNCTION "public"."project_messages_sellar_autor"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."proteger_columnas_de_pago_del_perfil"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+begin
+  if current_user not in ('anon', 'authenticated') then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    -- Una fila creada desde el navegador nace como cualquier alta nueva.
+    new.plan := 'Free';
+    new.ai_credits := 10;
+    new.signature_credits := 0;
+    new.subscription_status := null;
+    new.stripe_subscription_id := null;
+    new.stripe_customer_id := null;
+    new.stripe_account_id := null;
+    new.stripe_onboarding_complete := false;
+    new.role := 'Developer';
+    new.affiliate_code := null;
+    new.creditos_mensuales_proxima := null;
+    return new;
+  end if;
+
+  if new.plan                        is distinct from old.plan
+  or new.ai_credits                  is distinct from old.ai_credits
+  or new.signature_credits           is distinct from old.signature_credits
+  or new.subscription_status         is distinct from old.subscription_status
+  or new.stripe_subscription_id      is distinct from old.stripe_subscription_id
+  or new.stripe_customer_id          is distinct from old.stripe_customer_id
+  or new.stripe_account_id           is distinct from old.stripe_account_id
+  or new.stripe_onboarding_complete  is distinct from old.stripe_onboarding_complete
+  or new.role                        is distinct from old.role
+  or new.affiliate_code              is distinct from old.affiliate_code
+  or new.email                       is distinct from old.email
+  or new.creditos_mensuales_proxima  is distinct from old.creditos_mensuales_proxima
+  then
+    raise exception 'El plan, los créditos, la suscripción, Stripe, el rol, el código de afiliado y el correo solo los cambia el servidor.'
+      using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."proteger_columnas_de_pago_del_perfil"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."recargar_creditos_mensuales"() RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_recargadas integer;
+begin
+  with vencidas as (
+    select id
+      from public.profiles
+     where plan in ('Pro', 'Teams')
+       and coalesce(subscription_status, '') in ('active', 'trialing')
+       and creditos_mensuales_proxima is not null
+       and creditos_mensuales_proxima <= now()
+     for update
+  )
+  update public.profiles p
+     set ai_credits = coalesce(p.ai_credits, 0) + public.creditos_mensuales_del_plan(p.plan),
+         creditos_mensuales_proxima = p.creditos_mensuales_proxima + interval '1 month'
+    from vencidas v
+   where p.id = v.id;
+
+  get diagnostics v_recargadas = row_count;
+  return v_recargadas;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."recargar_creditos_mensuales"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."resultado_prueba_webhook"("p_request_id" bigint) RETURNS TABLE("status_code" integer, "error" "text")
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public', 'extensions', 'pg_temp'
+    AS $$
+begin
+  if not exists (select 1 from public.webhooks_enviados
+                  where request_id = p_request_id and user_id = auth.uid()) then
+    return;
+  end if;
+  return query
+    select r.status_code, r.error_msg
+      from net._http_response r
+     where r.id = p_request_id;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."resultado_prueba_webhook"("p_request_id" bigint) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."rls_auto_enable"() RETURNS "event_trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'pg_catalog'
@@ -803,6 +1230,46 @@ $$;
 
 
 ALTER FUNCTION "public"."rls_auto_enable"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."rol_en_equipo"("p_dueno" "uuid") RETURNS "text"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+  select tm.role
+    from public.team_members tm
+   where tm.user_id = p_dueno
+     and tm.accepted_user_id = auth.uid()
+     and tm.status = 'Activo'
+   order by tm.created_at
+   limit 1;
+$$;
+
+
+ALTER FUNCTION "public"."rol_en_equipo"("p_dueno" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."saldo_creditos_ia"() RETURNS TABLE("saldo" integer, "compartido" boolean)
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_yo uuid := auth.uid();
+  v_cuenta uuid;
+begin
+  if v_yo is null then
+    return;
+  end if;
+  v_cuenta := public.cuenta_de_creditos_ia(v_yo);
+  return query
+    select coalesce(p.ai_credits, 0), v_cuenta <> v_yo
+      from public.profiles p
+     where p.id = v_cuenta;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."saldo_creditos_ia"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."set_updated_at"() RETURNS "trigger"
@@ -865,6 +1332,38 @@ $$;
 ALTER FUNCTION "public"."sync_invoice_paid_status"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."url_de_webhook_valida"("p_url" "text") RETURNS boolean
+    LANGUAGE "plpgsql" IMMUTABLE
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $_$
+declare
+  v_host text;
+begin
+  if p_url is null or length(p_url) > 2048 or p_url !~* '^https://' then
+    return false;
+  end if;
+  -- Nada de usuario:contraseña@ en la URL (sirve para disfrazar el destino).
+  v_host := lower(substring(p_url from '^https://([^/?#]+)'));
+  if v_host is null or v_host like '%@%' then
+    return false;
+  end if;
+  v_host := regexp_replace(v_host, ':\d+$', '');           -- sin puerto
+  if v_host like '[%'                                        -- IPv6 literal
+     or v_host ~ '^[0-9.]+$'                                 -- IPv4 literal
+     or v_host !~ '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+     or v_host = 'localhost'
+     or v_host ~ '\.(localhost|local|internal|intranet|lan|home|corp|localdomain)$'
+  then
+    return false;
+  end if;
+  return true;
+end;
+$_$;
+
+
+ALTER FUNCTION "public"."url_de_webhook_valida"("p_url" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."verify_fiscal_chain"("p_user_id" "uuid") RETURNS TABLE("record_id" "uuid", "numero_factura" "text", "created_at" timestamp with time zone, "is_valid" boolean, "expected_hash" "text", "stored_hash" "text")
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO 'public', 'extensions', 'pg_temp'
@@ -894,6 +1393,111 @@ $$;
 
 
 ALTER FUNCTION "public"."verify_fiscal_chain"("p_user_id" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."webhook_documento_nuevo"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_cliente text;
+  v_tipo    text;
+  v_titulo  text;
+  v_importe bigint;
+  v_fila    jsonb := to_jsonb(new);
+begin
+  select coalesce(company, name) into v_cliente
+    from public.clients where id = (v_fila->>'client_id')::uuid;
+
+  case tg_table_name
+    when 'invoices' then
+      v_tipo := 'Factura';
+      v_titulo := v_fila->>'invoice_number';
+      v_importe := (v_fila->>'total_cents')::bigint;
+    when 'budgets' then
+      v_tipo := 'Presupuesto';
+      v_titulo := v_fila->>'description';
+      v_importe := (v_fila->>'amount_cents')::bigint;
+    when 'proposals' then
+      v_tipo := 'Propuesta';
+      v_titulo := v_fila->>'title';
+      v_importe := (v_fila->>'amount_cents')::bigint;
+    when 'contracts' then
+      v_tipo := 'Contrato';
+      v_titulo := null;
+      v_importe := null;
+  end case;
+
+  perform public.enviar_webhooks_sin_fallar(
+    (v_fila->>'user_id')::uuid,
+    'NEW_DOCUMENT',
+    format('📄 %s nuevo%s%s%s', v_tipo,
+           coalesce(': ' || v_titulo, ''),
+           coalesce(' para ' || v_cliente, ''),
+           coalesce(' — ' || replace(to_char(v_importe / 100.0, 'FM999999990.00'), '.', ',') || ' €', '')),
+    jsonb_build_object('document_type', tg_table_name, 'document_id', v_fila->>'id',
+                       'title', v_titulo, 'client_name', v_cliente, 'amount_cents', v_importe)
+  );
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."webhook_documento_nuevo"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."webhook_horas_registradas"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_proyecto text;
+  v_horas    numeric := round(coalesce(new.duration_seconds, 0) / 3600.0, 2);
+begin
+  select name into v_proyecto from public.projects where id = new.project_id;
+  perform public.enviar_webhooks_sin_fallar(
+    new.user_id,
+    'TIMESHEET_SUBMITTED',
+    format('⏱️ %s h registradas%s%s', replace(v_horas::text, '.', ','),
+           coalesce(' en ' || v_proyecto, ''),
+           coalesce(': ' || nullif(new.description, ''), '')),
+    jsonb_build_object('time_entry_id', new.id, 'project_id', new.project_id,
+                       'project_name', v_proyecto, 'hours', v_horas,
+                       'description', new.description, 'logged_by', new.logged_by)
+  );
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."webhook_horas_registradas"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."webhook_tarea_completada"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+declare
+  v_proyecto text;
+begin
+  if new.status::text in ('completed', 'done')
+     and (tg_op = 'INSERT' or old.status::text not in ('completed', 'done')) then
+    select name into v_proyecto from public.projects where id = new.project_id;
+    perform public.enviar_webhooks_sin_fallar(
+      new.user_id,
+      'TASK_COMPLETED',
+      format('✅ Tarea completada: %s%s', new.description,
+             coalesce(' — ' || v_proyecto, '')),
+      jsonb_build_object('task_id', new.id, 'description', new.description,
+                         'project_id', new.project_id, 'project_name', v_proyecto)
+    );
+  end if;
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."webhook_tarea_completada"() OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."ai_usage" (
@@ -1076,7 +1680,8 @@ CREATE TABLE IF NOT EXISTS "public"."clients" (
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "portal_user_id" "uuid",
     "tax_id" "text",
-    "address" "text"
+    "address" "text",
+    "portal_invitado_en" timestamp with time zone
 );
 
 
@@ -1088,6 +1693,10 @@ COMMENT ON COLUMN "public"."clients"."tax_id" IS 'NIF/CIF del cliente';
 
 
 COMMENT ON COLUMN "public"."clients"."address" IS 'Dirección postal del cliente';
+
+
+
+COMMENT ON COLUMN "public"."clients"."portal_invitado_en" IS 'Cuando se envio la ultima invitacion al Portal de Cliente. La escribe solo la Edge Function invite-portal-client con la clave de servicio; sirve ademas de contador para el tope diario y para la espera entre reenvios.';
 
 
 
@@ -1152,6 +1761,7 @@ CREATE TABLE IF NOT EXISTS "public"."profiles" (
     "invoice_reply_to_email" "text",
     "profitability_alerts_enabled" boolean DEFAULT true NOT NULL,
     "signature_credits" integer DEFAULT 0 NOT NULL,
+    "creditos_mensuales_proxima" timestamp with time zone,
     CONSTRAINT "profiles_veri_factu_modality_check" CHECK (("veri_factu_modality" = ANY (ARRAY['verifactu'::"text", 'no_verifactu'::"text"])))
 );
 
@@ -1168,6 +1778,10 @@ COMMENT ON COLUMN "public"."profiles"."profitability_alerts_enabled" IS 'Alertas
 
 
 COMMENT ON COLUMN "public"."profiles"."signature_credits" IS 'Créditos de firma electrónica eIDAS comprados aparte de la suscripción (mismo patrón que ai_credits). Ítem 5 del roadmap de monetización.';
+
+
+
+COMMENT ON COLUMN "public"."profiles"."creditos_mensuales_proxima" IS 'Cuándo toca la próxima recarga mensual de créditos de IA (Pro 50, Teams 200). NULL = sin plan de pago activo.';
 
 
 
@@ -1249,7 +1863,8 @@ CREATE TABLE IF NOT EXISTS "public"."integrations" (
     "is_active" boolean DEFAULT true NOT NULL,
     "last_test_success" boolean,
     "last_test_at" timestamp with time zone,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "last_sent_at" timestamp with time zone
 );
 
 
@@ -1527,6 +2142,48 @@ CREATE TABLE IF NOT EXISTS "public"."project_files" (
 
 
 ALTER TABLE "public"."project_files" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."project_messages" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "project_id" "uuid" NOT NULL,
+    "author_id" "uuid" NOT NULL,
+    "author_name" "text" DEFAULT ''::"text" NOT NULL,
+    "author_role" "text" DEFAULT ''::"text" NOT NULL,
+    "body" "text" NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "project_messages_author_role_check" CHECK (("author_role" = ANY (ARRAY['freelancer'::"text", 'equipo'::"text", 'cliente'::"text", ''::"text"]))),
+    CONSTRAINT "project_messages_body_check" CHECK ((("length"("btrim"("body")) >= 1) AND ("length"("btrim"("body")) <= 4000)))
+);
+
+
+ALTER TABLE "public"."project_messages" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."project_messages" IS 'Chat por proyecto entre el freelancer, su equipo y el cliente del portal. author_name y author_role los sella un trigger: no se aceptan del cliente.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."project_milestones" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "project_id" "uuid" NOT NULL,
+    "title" "text" NOT NULL,
+    "due_date" "date",
+    "status" "text" DEFAULT 'pendiente'::"text" NOT NULL,
+    "position" integer DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "project_milestones_status_check" CHECK (("status" = ANY (ARRAY['pendiente'::"text", 'en_curso'::"text", 'entregado'::"text"]))),
+    CONSTRAINT "project_milestones_title_check" CHECK ((("length"("btrim"("title")) >= 1) AND ("length"("btrim"("title")) <= 200)))
+);
+
+
+ALTER TABLE "public"."project_milestones" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."project_milestones" IS 'Hitos de seguimiento de un proyecto (nombre, fecha, estado). Visibles para el equipo y para el cliente en el portal.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."projects" (
@@ -1880,7 +2537,9 @@ CREATE TABLE IF NOT EXISTS "public"."user_secrets" (
     "gocardless_configured_at" timestamp with time zone,
     "enablebanking_app_id" "text",
     "enablebanking_private_key_encrypted" "text",
-    "enablebanking_configured_at" timestamp with time zone
+    "enablebanking_configured_at" timestamp with time zone,
+    "veri_factu_cert_alert_tramo" smallint,
+    "veri_factu_cert_alert_para" "date"
 );
 
 
@@ -1888,6 +2547,14 @@ ALTER TABLE "public"."user_secrets" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."user_secrets"."gocardless_secret_id_encrypted" IS 'OBSOLETO: GoCardless cerró altas nuevas en julio 2025. Usar enablebanking_* en su lugar.';
+
+
+
+COMMENT ON COLUMN "public"."user_secrets"."veri_factu_cert_alert_tramo" IS 'Ultimo tramo de aviso enviado por caducidad del certificado: 60, 30, 7 o 0 (ya caducado). NULL = ninguno.';
+
+
+
+COMMENT ON COLUMN "public"."user_secrets"."veri_factu_cert_alert_para" IS 'Fecha de caducidad a la que corresponde veri_factu_cert_alert_tramo. Si no coincide con veri_factu_cert_expires_at, el certificado es otro y el aviso se reinicia.';
 
 
 
@@ -1915,6 +2582,31 @@ CREATE TABLE IF NOT EXISTS "public"."webhook_configs" (
 
 
 ALTER TABLE "public"."webhook_configs" OWNER TO "postgres";
+
+
+CREATE TABLE IF NOT EXISTS "public"."webhooks_enviados" (
+    "id" bigint NOT NULL,
+    "integration_id" "uuid" NOT NULL,
+    "user_id" "uuid" NOT NULL,
+    "event" "text" NOT NULL,
+    "request_id" bigint,
+    "es_prueba" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."webhooks_enviados" OWNER TO "postgres";
+
+
+ALTER TABLE "public"."webhooks_enviados" ALTER COLUMN "id" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."webhooks_enviados_id_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
 
 
 ALTER TABLE ONLY "public"."ai_usage"
@@ -2002,8 +2694,18 @@ ALTER TABLE ONLY "public"."fiscal_records"
 
 
 
+ALTER TABLE "public"."integrations"
+    ADD CONSTRAINT "integrations_evento_conocido" CHECK (("event" = ANY (ARRAY['TASK_COMPLETED'::"text", 'NEW_DOCUMENT'::"text", 'TIMESHEET_SUBMITTED'::"text"]))) NOT VALID;
+
+
+
 ALTER TABLE ONLY "public"."integrations"
     ADD CONSTRAINT "integrations_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE "public"."integrations"
+    ADD CONSTRAINT "integrations_url_segura" CHECK ("public"."url_de_webhook_valida"("url")) NOT VALID;
 
 
 
@@ -2104,6 +2806,16 @@ ALTER TABLE ONLY "public"."project_comments"
 
 ALTER TABLE ONLY "public"."project_files"
     ADD CONSTRAINT "project_files_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."project_messages"
+    ADD CONSTRAINT "project_messages_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."project_milestones"
+    ADD CONSTRAINT "project_milestones_pkey" PRIMARY KEY ("id");
 
 
 
@@ -2232,11 +2944,20 @@ ALTER TABLE ONLY "public"."webhook_configs"
 
 
 
+ALTER TABLE ONLY "public"."webhooks_enviados"
+    ADD CONSTRAINT "webhooks_enviados_pkey" PRIMARY KEY ("id");
+
+
+
 CREATE INDEX "bank_transactions_matched_invoice_idx" ON "public"."bank_transactions" USING "btree" ("matched_invoice_id");
 
 
 
 CREATE INDEX "bank_transactions_user_status_idx" ON "public"."bank_transactions" USING "btree" ("user_id", "match_status");
+
+
+
+CREATE INDEX "clients_portal_invitado_en_idx" ON "public"."clients" USING "btree" ("user_id", "portal_invitado_en") WHERE ("portal_invitado_en" IS NOT NULL);
 
 
 
@@ -2612,6 +3333,14 @@ CREATE INDEX "project_files_project_id_idx" ON "public"."project_files" USING "b
 
 
 
+CREATE INDEX "project_messages_proyecto_fecha_idx" ON "public"."project_messages" USING "btree" ("project_id", "created_at");
+
+
+
+CREATE INDEX "project_milestones_proyecto_idx" ON "public"."project_milestones" USING "btree" ("project_id", "position", "due_date");
+
+
+
 CREATE INDEX "proposal_templates_user_id_idx" ON "public"."proposal_templates" USING "btree" ("user_id");
 
 
@@ -2621,6 +3350,66 @@ CREATE INDEX "shadow_income_user_id_idx" ON "public"."shadow_income" USING "btre
 
 
 CREATE INDEX "team_users_invited_by_idx" ON "public"."team_users" USING "btree" ("invited_by");
+
+
+
+CREATE INDEX "webhooks_enviados_integracion_idx" ON "public"."webhooks_enviados" USING "btree" ("integration_id", "created_at" DESC);
+
+
+
+CREATE OR REPLACE TRIGGER "a_profiles_proteger_columnas_de_pago" BEFORE INSERT OR UPDATE ON "public"."profiles" FOR EACH ROW EXECUTE FUNCTION "public"."proteger_columnas_de_pago_del_perfil"();
+
+
+
+CREATE OR REPLACE TRIGGER "budgets_webhook_documento" AFTER INSERT ON "public"."budgets" FOR EACH ROW EXECUTE FUNCTION "public"."webhook_documento_nuevo"();
+
+
+
+CREATE OR REPLACE TRIGGER "clients_desenlazar_portal" BEFORE INSERT OR UPDATE ON "public"."clients" FOR EACH ROW EXECUTE FUNCTION "public"."clients_desenlazar_portal_si_cambia_email"();
+
+
+
+CREATE OR REPLACE TRIGGER "contracts_webhook_documento" AFTER INSERT ON "public"."contracts" FOR EACH ROW EXECUTE FUNCTION "public"."webhook_documento_nuevo"();
+
+
+
+CREATE OR REPLACE TRIGGER "invoices_webhook_documento" AFTER INSERT ON "public"."invoices" FOR EACH ROW EXECUTE FUNCTION "public"."webhook_documento_nuevo"();
+
+
+
+CREATE OR REPLACE TRIGGER "profiles_creditos_mensuales_ancla" BEFORE INSERT OR UPDATE OF "plan", "subscription_status" ON "public"."profiles" FOR EACH ROW EXECUTE FUNCTION "public"."creditos_mensuales_ajustar_ancla"();
+
+
+
+CREATE OR REPLACE TRIGGER "project_messages_sellar_autor_trg" BEFORE INSERT ON "public"."project_messages" FOR EACH ROW EXECUTE FUNCTION "public"."project_messages_sellar_autor"();
+
+
+
+CREATE OR REPLACE TRIGGER "project_milestones_fijar_dueno" BEFORE INSERT OR UPDATE OF "project_id", "user_id", "title", "due_date", "status", "position" ON "public"."project_milestones" FOR EACH ROW EXECUTE FUNCTION "public"."hitos_fijar_dueno"();
+
+
+
+CREATE OR REPLACE TRIGGER "projects_impedir_cambio_de_dueno" BEFORE UPDATE OF "user_id" ON "public"."projects" FOR EACH ROW EXECUTE FUNCTION "public"."impedir_cambio_de_dueno"();
+
+
+
+CREATE OR REPLACE TRIGGER "proposals_webhook_documento" AFTER INSERT ON "public"."proposals" FOR EACH ROW EXECUTE FUNCTION "public"."webhook_documento_nuevo"();
+
+
+
+CREATE OR REPLACE TRIGGER "tasks_impedir_cambio_de_dueno" BEFORE UPDATE OF "user_id" ON "public"."tasks" FOR EACH ROW EXECUTE FUNCTION "public"."impedir_cambio_de_dueno"();
+
+
+
+CREATE OR REPLACE TRIGGER "tasks_webhook_completada" AFTER INSERT OR UPDATE OF "status" ON "public"."tasks" FOR EACH ROW EXECUTE FUNCTION "public"."webhook_tarea_completada"();
+
+
+
+CREATE OR REPLACE TRIGGER "time_entries_impedir_cambio_de_dueno" BEFORE UPDATE OF "user_id" ON "public"."time_entries" FOR EACH ROW EXECUTE FUNCTION "public"."impedir_cambio_de_dueno"();
+
+
+
+CREATE OR REPLACE TRIGGER "time_entries_webhook_horas" AFTER INSERT ON "public"."time_entries" FOR EACH ROW EXECUTE FUNCTION "public"."webhook_horas_registradas"();
 
 
 
@@ -2863,6 +3652,21 @@ ALTER TABLE ONLY "public"."project_files"
 
 
 
+ALTER TABLE ONLY "public"."project_messages"
+    ADD CONSTRAINT "project_messages_author_id_fkey" FOREIGN KEY ("author_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."project_messages"
+    ADD CONSTRAINT "project_messages_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."project_milestones"
+    ADD CONSTRAINT "project_milestones_project_id_fkey" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."projects"
     ADD CONSTRAINT "projects_client_fk" FOREIGN KEY ("client_id") REFERENCES "public"."clients"("id") ON DELETE CASCADE;
 
@@ -3030,6 +3834,11 @@ ALTER TABLE ONLY "public"."user_secrets"
 
 ALTER TABLE ONLY "public"."webhook_configs"
     ADD CONSTRAINT "webhook_configs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "auth"."users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."webhooks_enviados"
+    ADD CONSTRAINT "webhooks_enviados_integration_id_fkey" FOREIGN KEY ("integration_id") REFERENCES "public"."integrations"("id") ON DELETE CASCADE;
 
 
 
@@ -3344,6 +4153,33 @@ CREATE POLICY "fiscal_records_owner_select" ON "public"."fiscal_records" FOR SEL
 
 
 
+CREATE POLICY "hitos_cliente_portal_ver" ON "public"."project_milestones" FOR SELECT TO "authenticated" USING (("project_id" IN ( SELECT "p"."id"
+   FROM ("public"."projects" "p"
+     JOIN "public"."clients" "c" ON (("c"."id" = "p"."client_id")))
+  WHERE ("c"."portal_user_id" = ( SELECT "auth"."uid"() AS "uid")))));
+
+
+
+CREATE POLICY "hitos_dueno_todo" ON "public"."project_milestones" TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id")) WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
+CREATE POLICY "hitos_equipo_gestores_borrar" ON "public"."project_milestones" FOR DELETE TO "authenticated" USING (("public"."rol_en_equipo"("user_id") = ANY (ARRAY['Manager'::"text", 'Admin'::"text"])));
+
+
+
+CREATE POLICY "hitos_equipo_gestores_editar" ON "public"."project_milestones" FOR UPDATE TO "authenticated" USING (("public"."rol_en_equipo"("user_id") = ANY (ARRAY['Manager'::"text", 'Admin'::"text"]))) WITH CHECK (("public"."rol_en_equipo"("user_id") = ANY (ARRAY['Manager'::"text", 'Admin'::"text"])));
+
+
+
+CREATE POLICY "hitos_equipo_gestores_insertar" ON "public"."project_milestones" FOR INSERT TO "authenticated" WITH CHECK (("public"."rol_en_equipo"("user_id") = ANY (ARRAY['Manager'::"text", 'Admin'::"text"])));
+
+
+
+CREATE POLICY "hitos_equipo_ver" ON "public"."project_milestones" FOR SELECT TO "authenticated" USING ("public"."is_active_team_member"("user_id"));
+
+
+
 CREATE POLICY "insert_own" ON "public"."contract_templates" FOR INSERT WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
 
@@ -3549,6 +4385,34 @@ ALTER TABLE "public"."project_comments" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."project_files" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."project_messages" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "project_messages_delete_owner" ON "public"."project_messages" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."projects" "p"
+  WHERE (("p"."id" = "project_messages"."project_id") AND ("p"."user_id" = ( SELECT "auth"."uid"() AS "uid"))))));
+
+
+
+CREATE POLICY "project_messages_insert" ON "public"."project_messages" FOR INSERT TO "authenticated" WITH CHECK ((("author_id" = ( SELECT "auth"."uid"() AS "uid")) AND (EXISTS ( SELECT 1
+   FROM "public"."projects" "p"
+  WHERE (("p"."id" = "project_messages"."project_id") AND (("p"."user_id" = ( SELECT "auth"."uid"() AS "uid")) OR "public"."is_active_team_member"("p"."user_id") OR ("p"."client_id" IN ( SELECT "c"."id"
+           FROM "public"."clients" "c"
+          WHERE ("c"."portal_user_id" = ( SELECT "auth"."uid"() AS "uid"))))))))));
+
+
+
+CREATE POLICY "project_messages_select" ON "public"."project_messages" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."projects" "p"
+  WHERE (("p"."id" = "project_messages"."project_id") AND (("p"."user_id" = ( SELECT "auth"."uid"() AS "uid")) OR "public"."is_active_team_member"("p"."user_id") OR ("p"."client_id" IN ( SELECT "c"."id"
+           FROM "public"."clients" "c"
+          WHERE ("c"."portal_user_id" = ( SELECT "auth"."uid"() AS "uid")))))))));
+
+
+
+ALTER TABLE "public"."project_milestones" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."projects" ENABLE ROW LEVEL SECURITY;
 
 
@@ -3571,6 +4435,10 @@ CREATE POLICY "projects_select_team_member" ON "public"."projects" FOR SELECT US
 
 
 CREATE POLICY "projects_update_own" ON "public"."projects" FOR UPDATE TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id")) WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
+CREATE POLICY "projects_update_team_gestores" ON "public"."projects" FOR UPDATE TO "authenticated" USING (("public"."rol_en_equipo"("user_id") = ANY (ARRAY['Manager'::"text", 'Admin'::"text"]))) WITH CHECK (("public"."rol_en_equipo"("user_id") = ANY (ARRAY['Manager'::"text", 'Admin'::"text"])));
 
 
 
@@ -3698,6 +4566,10 @@ ALTER TABLE "public"."shadow_income" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."tasks" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE POLICY "tasks_delete_team_admin" ON "public"."tasks" FOR DELETE TO "authenticated" USING (("public"."rol_en_equipo"("user_id") = 'Admin'::"text"));
+
+
+
 CREATE POLICY "tasks_insert_team_member" ON "public"."tasks" FOR INSERT TO "authenticated" WITH CHECK ("public"."is_active_team_member"("user_id"));
 
 
@@ -3737,6 +4609,10 @@ CREATE POLICY "time_entries_select_logged_by_team_member" ON "public"."time_entr
 
 
 
+CREATE POLICY "time_entries_select_team_gestores" ON "public"."time_entries" FOR SELECT TO "authenticated" USING (("public"."rol_en_equipo"("user_id") = ANY (ARRAY['Manager'::"text", 'Admin'::"text"])));
+
+
+
 CREATE POLICY "update_own" ON "public"."contract_templates" FOR UPDATE USING ((( SELECT "auth"."uid"() AS "uid") = "user_id")) WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
 
@@ -3770,6 +4646,13 @@ CREATE POLICY "user_secrets_owner_select" ON "public"."user_secrets" FOR SELECT 
 ALTER TABLE "public"."webhook_configs" ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE "public"."webhooks_enviados" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "webhooks_enviados_select_own" ON "public"."webhooks_enviados" FOR SELECT TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
 
 
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
@@ -3780,6 +4663,10 @@ ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
 
 
 ALTER PUBLICATION "supabase_realtime" ADD TABLE ONLY "public"."contracts";
+
+
+
+ALTER PUBLICATION "supabase_realtime" ADD TABLE ONLY "public"."project_messages";
 
 
 
@@ -3969,6 +4856,12 @@ GRANT ALL ON FUNCTION "public"."check_and_increment_rate_limit"("p_user_id" "uui
 
 
 
+GRANT ALL ON FUNCTION "public"."clients_desenlazar_portal_si_cambia_email"() TO "anon";
+GRANT ALL ON FUNCTION "public"."clients_desenlazar_portal_si_cambia_email"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."clients_desenlazar_portal_si_cambia_email"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."consume_ai_credits"("p_user_id" "uuid", "p_cost" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."consume_ai_credits"("p_user_id" "uuid", "p_cost" integer) TO "service_role";
 
@@ -3990,8 +4883,34 @@ GRANT ALL ON FUNCTION "public"."consume_credits_atomic"("user_id" "uuid", "amoun
 
 
 
+REVOKE ALL ON FUNCTION "public"."creditos_mensuales_ajustar_ancla"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."creditos_mensuales_ajustar_ancla"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."creditos_mensuales_del_plan"("p_plan" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."creditos_mensuales_del_plan"("p_plan" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."creditos_mensuales_del_plan"("p_plan" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."cuenta_de_creditos_ia"("p_usuario" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."cuenta_de_creditos_ia"("p_usuario" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."enforce_invoice_fiscal_lock"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."enforce_invoice_fiscal_lock"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."enviar_webhooks"("p_dueno" "uuid", "p_evento" "text", "p_texto" "text", "p_datos" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."enviar_webhooks"("p_dueno" "uuid", "p_evento" "text", "p_texto" "text", "p_datos" "jsonb") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."enviar_webhooks_sin_fallar"("p_dueno" "uuid", "p_evento" "text", "p_texto" "text", "p_datos" "jsonb") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."enviar_webhooks_sin_fallar"("p_dueno" "uuid", "p_evento" "text", "p_texto" "text", "p_datos" "jsonb") TO "service_role";
 
 
 
@@ -4035,6 +4954,16 @@ GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."hitos_fijar_dueno"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."hitos_fijar_dueno"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."impedir_cambio_de_dueno"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."impedir_cambio_de_dueno"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."increment_credits"("user_id" "uuid", "amount" integer) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."increment_credits"("user_id" "uuid", "amount" integer) TO "service_role";
 
@@ -4068,8 +4997,46 @@ GRANT ALL ON FUNCTION "public"."link_team_membership"() TO "service_role";
 
 
 
+REVOKE ALL ON FUNCTION "public"."probar_webhook"("p_integration" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."probar_webhook"("p_integration" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."probar_webhook"("p_integration" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."project_messages_sellar_autor"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."proteger_columnas_de_pago_del_perfil"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."proteger_columnas_de_pago_del_perfil"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."recargar_creditos_mensuales"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."recargar_creditos_mensuales"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."resultado_prueba_webhook"("p_request_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."resultado_prueba_webhook"("p_request_id" bigint) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."resultado_prueba_webhook"("p_request_id" bigint) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."rls_auto_enable"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."rls_auto_enable"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."rol_en_equipo"("p_dueno" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."rol_en_equipo"("p_dueno" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."rol_en_equipo"("p_dueno" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."saldo_creditos_ia"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."saldo_creditos_ia"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."saldo_creditos_ia"() TO "service_role";
 
 
 
@@ -4089,9 +5056,30 @@ GRANT ALL ON FUNCTION "public"."sync_invoice_paid_status"() TO "service_role";
 
 
 
+GRANT ALL ON FUNCTION "public"."url_de_webhook_valida"("p_url" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."url_de_webhook_valida"("p_url" "text") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."url_de_webhook_valida"("p_url" "text") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."verify_fiscal_chain"("p_user_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."verify_fiscal_chain"("p_user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."verify_fiscal_chain"("p_user_id" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."webhook_documento_nuevo"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."webhook_documento_nuevo"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."webhook_horas_registradas"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."webhook_horas_registradas"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."webhook_tarea_completada"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."webhook_tarea_completada"() TO "service_role";
 
 
 
@@ -4304,6 +5292,17 @@ GRANT ALL ON TABLE "public"."project_files" TO "service_role";
 
 
 
+GRANT ALL ON TABLE "public"."project_messages" TO "anon";
+GRANT ALL ON TABLE "public"."project_messages" TO "authenticated";
+GRANT ALL ON TABLE "public"."project_messages" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."project_milestones" TO "authenticated";
+GRANT ALL ON TABLE "public"."project_milestones" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."projects" TO "anon";
 GRANT ALL ON TABLE "public"."projects" TO "authenticated";
 GRANT ALL ON TABLE "public"."projects" TO "service_role";
@@ -4437,6 +5436,18 @@ GRANT ALL ON TABLE "public"."view_public_jobs" TO "service_role";
 GRANT ALL ON TABLE "public"."webhook_configs" TO "anon";
 GRANT ALL ON TABLE "public"."webhook_configs" TO "authenticated";
 GRANT ALL ON TABLE "public"."webhook_configs" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."webhooks_enviados" TO "anon";
+GRANT ALL ON TABLE "public"."webhooks_enviados" TO "authenticated";
+GRANT ALL ON TABLE "public"."webhooks_enviados" TO "service_role";
+
+
+
+GRANT ALL ON SEQUENCE "public"."webhooks_enviados_id_seq" TO "anon";
+GRANT ALL ON SEQUENCE "public"."webhooks_enviados_id_seq" TO "authenticated";
+GRANT ALL ON SEQUENCE "public"."webhooks_enviados_id_seq" TO "service_role";
 
 
 
