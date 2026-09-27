@@ -1,7 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@13.10.0?target=deno'
-import { suscripcionDeLaFactura } from '../_shared/stripe-facturas.ts'
+import { suscripcionDeLaFactura, precioDeLaFactura } from '../_shared/stripe-facturas.ts'
+import { articulo } from '../_shared/catalogo-stripe.ts'
 
 declare const Deno: any;
 
@@ -128,6 +129,22 @@ serve(async (req) => {
     return null
   }
 
+  // Ingresos de la plataforma para el panel de administración. Cada cobro
+  // real se apunta una vez: la referencia de Stripe (factura o sesión) es
+  // única en platform_payments y un reintento no lo duplica. Si falla, se
+  // lanza: el catch libera la reserva y Stripe reintenta.
+  async function apuntarIngreso(p: { userId: string | null; email: string | null; producto: string; importeCents: number; referencia: string }) {
+    if (!p.importeCents || p.importeCents <= 0) return
+    const { error } = await supabase.from('platform_payments').upsert({
+      user_id: p.userId,
+      user_email: p.email,
+      plan_name: p.producto,
+      amount_cents: p.importeCents,
+      stripe_session_id: p.referencia,
+    }, { onConflict: 'stripe_session_id', ignoreDuplicates: true })
+    if (error) throw new Error(`No se pudo apuntar el ingreso ${p.referencia}: ${error.message}`)
+  }
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -232,6 +249,19 @@ serve(async (req) => {
             await supabase.from('profiles').update({ stripe_customer_id: session.customer }).eq('id', userId)
           }
 
+          // Compras sueltas (créditos, oferta destacada). Las suscripciones
+          // se apuntan en invoice.paid, que llega también con el primer pago:
+          // apuntarlas aquí las contaría dos veces.
+          if (session.mode === 'payment') {
+            await apuntarIngreso({
+              userId,
+              email: session.customer_details?.email ?? null,
+              producto: articulo(itemKey ?? '')?.name ?? itemKey ?? 'Compra',
+              importeCents: session.amount_total ?? 0,
+              referencia: session.id,
+            })
+          }
+
           // CAMBIO (27/09): aqui habia un registro de comisiones de afiliado
           // que nunca funciono (columnas inexistentes en referrals, error sin
           // mirar, y solo el primer pago). Las comisiones se registran ahora
@@ -307,6 +337,15 @@ serve(async (req) => {
           console.error(`⚠️ invoice.paid sin perfil para el customer ${customerId}`)
           break
         }
+
+        const plan = resolvePlanFromPriceId(precioDeLaFactura(invoice))
+        await apuntarIngreso({
+          userId,
+          email: invoice.customer_email ?? null,
+          producto: plan === 'Teams' ? 'Plan de equipos' : plan === 'Pro' ? 'Freelancer Pro' : 'Suscripción',
+          importeCents: invoice.amount_paid,
+          referencia: invoice.id,
+        })
 
         const baseCents = invoice.total_excluding_tax ?? invoice.amount_paid
         const { data: comision, error: comisionError } = await supabase.rpc('registrar_comision_afiliado', {

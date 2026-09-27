@@ -7,7 +7,7 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { NewInvoice } from '@/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient';
 import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon, LinkIcon, ExternalLinkIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
@@ -485,7 +485,7 @@ const handleSelectBudget = (budgetId: string) => {
                         )}
                       </td>
                           <td className="px-6 py-4">{getClientName(inv.client_id)}</td>
-                          <td className="px-6 py-4">{new Date(inv.due_date).toLocaleDateString()}</td>
+                          <td className="px-6 py-4">{formatearFecha(inv.due_date)}</td>
                           <td className="px-6 py-4 text-right font-bold text-white">{formatCurrency(inv.total_cents)}</td>
 
                           <td className="px-6 py-4 min-w-[140px]">
@@ -582,7 +582,7 @@ const handleSelectBudget = (budgetId: string) => {
                         </div>
 
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-500">Vence: {new Date(inv.due_date).toLocaleDateString()}</span>
+                          <span className="text-gray-500">Vence: {formatearFecha(inv.due_date)}</span>
                           <span className="font-bold text-white">{formatCurrency(inv.total_cents)}</span>
                         </div>
 
@@ -716,7 +716,7 @@ const handleSelectBudget = (budgetId: string) => {
         <option value="">Sin contrato vinculado</option>
         {availableContracts.map(c => (
           <option key={c.id} value={c.id}>
-            Contrato firmado el {c.signed_at ? new Date(c.signed_at).toLocaleDateString() : '—'}
+            Contrato firmado el {c.signed_at ? formatearFecha(c.signed_at) : '—'}
           </option>
         ))}
       </select>

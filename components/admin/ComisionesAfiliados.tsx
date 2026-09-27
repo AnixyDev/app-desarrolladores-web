@@ -4,7 +4,7 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Skeleton from '@/components/ui/Skeleton';
 import { useToast } from '@/hooks/useToast';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { Users as UsersIcon, CheckCircleIcon, AlertTriangleIcon } from '@/components/icons/Icon';
 import {
     cargarResumenAfiliados,
@@ -16,7 +16,7 @@ import {
     type ComisionPendiente,
 } from '@/lib/adminAfiliados';
 
-const fecha = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('es-ES') : '—');
+const fecha = (iso: string | null) => formatearFecha(iso);
 
 /**
  * Comisiones de afiliados pendientes de pagar, y el botón para marcarlas como

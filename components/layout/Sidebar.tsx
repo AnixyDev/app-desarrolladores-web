@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { SIDEBAR_STRUCTURE } from '@/constants';
+import { SIDEBAR_STRUCTURE, type SidebarItem } from '@/constants';
 import { Logo } from '../icons/Logo';
 import { ChevronDown, X, LogOut } from 'lucide-react';
 import { DynamicIcon } from '../icons/Icon';
@@ -15,6 +15,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const [openGroup, setOpenGroup] = useState<string | null>(null);
   const navigate = useNavigate();
   const logout = useAppStore(state => state.logout);
+  // El enlace a /admin solo aparece para el rol Admin (que no se puede
+  // cambiar desde el navegador). La página también lo comprueba.
+  const esAdmin = useAppStore(state => (state.profile?.role || '').toLowerCase() === 'admin');
+  const elementos: SidebarItem[] = esAdmin
+    ? [...SIDEBAR_STRUCTURE, { type: 'link', href: '/admin', label: 'Administración', icon: 'ShieldCheck' }]
+    : SIDEBAR_STRUCTURE;
 
   const handleGroupClick = (label: string) => {
     setOpenGroup(openGroup === label ? null : label);
@@ -72,7 +78,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
         {/* Navigation */}
         <nav className="flex-1 px-4 py-6 space-y-1.5 overflow-y-auto custom-scrollbar">
-          {SIDEBAR_STRUCTURE.map(item => {
+          {elementos.map(item => {
             if (item.type === 'link') {
               const base =
                 'flex items-center px-4 py-3 text-sm font-semibold rounded-xl transition';

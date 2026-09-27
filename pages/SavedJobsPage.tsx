@@ -75,7 +75,7 @@ const SavedJobsPage: React.FC = () => {
                 <p className="text-sm text-gray-300">
                   Presupuesto:{' '}
                   <span className="font-semibold text-white">
-                    €{Number(job.presupuesto).toLocaleString()}
+                    €{Number(job.presupuesto).toLocaleString('es-ES')}
                   </span>
                 </p>
 

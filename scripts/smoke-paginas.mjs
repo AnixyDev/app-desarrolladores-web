@@ -98,6 +98,7 @@ const ESQUEMA = {
  comisiones_afiliado:"id=t,referral_id=t,referrer_id=t,stripe_invoice_id=t,base_cents=i,comision_cents=i,created_at=d,pago_id=t?",
  pagos_afiliado:"id=t,referrer_id=t,importe_cents=i,num_comisiones=i,nota=t?,pagado_en=d,creado_por=t?",
  // Funciones del panel de administración (se piden por /rest/v1/rpc/...).
+ 'rpc/admin_metricas':"usuarios_total=i,usuarios_nuevos_30d=i,suscriptores_pro=i,suscriptores_teams=i,ingresos_total_cents=i,ingresos_30d_cents=i,cobros_total=i,cobros_30d=i",
  'rpc/admin_resumen_afiliados':"referrer_id=t,nombre=t,email=t,referidos=i,suscritos=i,pendiente_cents=i,pagado_cents=i,ultima_comision=d?,ultimo_pago=d?",
  project_milestones:"id=t,user_id=t,project_id=t,title=t,due_date=d?,status=t,position=i,created_at=d,updated_at=d",
 };

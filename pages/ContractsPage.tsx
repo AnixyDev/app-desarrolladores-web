@@ -16,6 +16,7 @@ import ContractActionsMenu from '@/components/contracts/ContractActionsMenu';
 import BuySignatureCreditsModal from '@/components/modals/BuySignatureCreditsModal';
 import { FileSignatureIcon } from '@/components/icons/Icon';
 
+import { formatearFecha } from '@/lib/utils';
 const ContractsPage: React.FC = () => {
   const { profile, contracts, clients, projects, addContract, updateContract, deleteContract, sendContract, getClientById, getProjectById, subscribeToContractsRealtime } = useAppStore(useShallow(s => ({ profile: s.profile, contracts: s.contracts, clients: s.clients, projects: s.projects, addContract: s.addContract, updateContract: s.updateContract, deleteContract: s.deleteContract, sendContract: s.sendContract, getClientById: s.getClientById, getProjectById: s.getProjectById, subscribeToContractsRealtime: s.subscribeToContractsRealtime })));
   // CAMBIO: NUEVO. Activa la suscripción de Realtime al montar la página,
@@ -174,12 +175,12 @@ const ContractsPage: React.FC = () => {
                   <div className="text-sm space-y-2 text-gray-400 border-t border-gray-700 pt-3 mt-3">
                     <p className="flex justify-between">
                       <span>Creado:</span>
-                      <span className="text-gray-200">{new Date(contract.created_at).toLocaleDateString()}</span>
+                      <span className="text-gray-200">{formatearFecha(contract.created_at)}</span>
                     </p>
                     {contract.status === 'signed' && (
                       <p className="flex justify-between">
                         <span>Firmado:</span>
-                        <span className="text-green-400">{new Date(contract.signed_at || '').toLocaleDateString()}</span>
+                        <span className="text-green-400">{formatearFecha(contract.signed_at || '')}</span>
                       </p>
                     )}
                   </div>
@@ -219,10 +220,10 @@ const ContractsPage: React.FC = () => {
                       <td className="p-4 text-white">{project?.name}</td>
                       <td className="p-4 text-gray-300">{client?.name}</td>
                       <td className="p-4 text-gray-300">
-                        <div>{new Date(contract.created_at).toLocaleDateString()}</div>
+                        <div>{formatearFecha(contract.created_at)}</div>
                         {contract.status === 'signed' && (
                           <div className="text-xs text-green-500">
-                            Firmado: {new Date(contract.signed_at || '').toLocaleDateString()}
+                            Firmado: {formatearFecha(contract.signed_at || '')}
                           </div>
                         )}
                       </td>

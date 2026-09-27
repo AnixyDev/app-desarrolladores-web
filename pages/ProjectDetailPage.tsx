@@ -7,7 +7,7 @@ import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { Project, Task, InvoiceItem } from '@/types';
 import { PlusIcon, TrashIcon, ClockIcon, FileTextIcon, MessageSquareIcon, DollarSignIcon } from '@/components/icons/Icon';
 import { puede } from '@/lib/permisosEquipo';
@@ -208,17 +208,17 @@ const ProjectDetailPage: React.FC = () => {
                              <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <p className="text-sm font-medium text-gray-400">Categoría</p>
-                                    <p className="text-white">{project.category || 'N/A'}</p>
+                                    <p className="text-white">{project.category || 'Sin definir'}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-gray-400">Prioridad</p>
-                                    <p className="text-white">{project.priority || 'N/A'}</p>
+                                    <p className="text-white">{project.priority || 'Sin definir'}</p>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <p className="text-sm font-medium text-gray-400">Fecha de Inicio</p>
-                                    <p className="text-white">{project.start_date || 'N/A'}</p>
+                                    <p className="text-white">{project.start_date ? formatearFecha(project.start_date) : 'Sin definir'}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-gray-400">Fecha de Entrega</p>

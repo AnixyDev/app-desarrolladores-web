@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
+import { formatearFecha } from '@/lib/utils';
 import {
   MenuIcon as Menu,
   BellIcon as Bell,
@@ -150,7 +151,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                               {String(n.message)}
                             </p>
                             <p className="text-xs text-gray-500 mt-1">
-                              {new Date(n.createdAt).toLocaleDateString()}
+                              {formatearFecha(n.createdAt)}
                             </p>
                           </div>
                         </div>

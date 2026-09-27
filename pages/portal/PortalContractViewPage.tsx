@@ -14,6 +14,7 @@ import { SignatureIcon, CheckCircleIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 import { Contract } from '@/types';
 
+import { formatearFecha } from '@/lib/utils';
 interface PortalContext {
     clientId: string;
 }
@@ -122,7 +123,7 @@ const PortalContractViewPage: React.FC = () => {
                 {contract.status === 'signed' && (
                     <div className="flex items-center gap-2 text-green-400 text-sm">
                         <CheckCircleIcon className="w-5 h-5" />
-                        <span>Firmado por {contract.signed_by} el {new Date(contract.signed_at || '').toLocaleDateString()}</span>
+                        <span>Firmado por {contract.signed_by} el {formatearFecha(contract.signed_at || '')}</span>
                     </div>
                 )}
             </CardFooter>

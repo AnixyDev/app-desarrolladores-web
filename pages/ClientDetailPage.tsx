@@ -4,7 +4,7 @@ import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 // FIX: Remove .tsx extensions from imports to resolve module resolution errors.
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { BriefcaseIcon, FileTextIcon, EditIcon, TrashIcon, PhoneIcon, MailIcon } from '../components/icons/Icon';
 import { Receipt as ReceiptIcon, Wallet } from 'lucide-react';
 import Button from '@/components/ui/Button';
@@ -231,7 +231,7 @@ const ClientDetailPage: React.FC = () => {
                                     <Link to={`/projects/${p.id}`} className="flex justify-between items-center">
                                         <div>
                                             <p className="font-semibold text-white">{p.name}</p>
-                                            <p className="text-sm text-gray-400">Vence: {p.due_date}</p>
+                                            <p className="text-sm text-gray-400">Vence: {formatearFecha(p.due_date)}</p>
                                         </div>
                                         <span className="px-2 py-0.5 rounded-full text-xs capitalize bg-purple-500/20 text-purple-400">{p.status}</span>
                                     </Link>
@@ -249,7 +249,7 @@ const ClientDetailPage: React.FC = () => {
                                     <div className="flex justify-between items-center">
                                         <div>
                                             <p className="font-semibold text-white font-mono">{i.invoice_number}</p>
-                                            <p className="text-sm text-gray-400">Emitida: {i.issue_date}</p>
+                                            <p className="text-sm text-gray-400">Emitida: {formatearFecha(i.issue_date)}</p>
                                         </div>
                                         <div className="text-right">
                                             <p className="font-semibold text-white">{formatCurrency(i.total_cents)}</p>

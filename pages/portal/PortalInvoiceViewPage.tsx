@@ -10,7 +10,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useParams, useOutletContext } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
 import Card, { CardHeader, CardContent, CardFooter } from '@/components/ui/Card';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import { useToast } from '@/hooks/useToast';
 import { Invoice, Client } from '@/types';
@@ -85,8 +85,8 @@ const PortalInvoiceViewPage: React.FC = () => {
             <CardHeader className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4'>
                 <div>
                     <h2 className="text-2xl font-bold text-white">Factura {invoice.invoice_number}</h2>
-                    <p className="text-gray-400">Fecha de emisión: {invoice.issue_date}</p>
-                    <p className="text-gray-400">Fecha de vencimiento: {invoice.due_date}</p>
+                    <p className="text-gray-400">Fecha de emisión: {formatearFecha(invoice.issue_date)}</p>
+                    <p className="text-gray-400">Fecha de vencimiento: {formatearFecha(invoice.due_date)}</p>
                 </div>
                 {!invoice.paid && (
                      <Button onClick={() => setIsPaymentModalOpen(true)}>
@@ -151,7 +151,7 @@ const PortalInvoiceViewPage: React.FC = () => {
                  <span className={`px-3 py-1 rounded-full text-sm ${
                     invoice.paid ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
                  }`}>
-                    {invoice.paid ? `Pagada el ${invoice.payment_date ? new Date(invoice.payment_date).toLocaleDateString() : 'fecha desconocida'}` : 'Pendiente de Pago'}
+                    {invoice.paid ? `Pagada el ${invoice.payment_date ? formatearFecha(invoice.payment_date) : 'fecha desconocida'}` : 'Pendiente de Pago'}
                 </span>
             </CardFooter>
 

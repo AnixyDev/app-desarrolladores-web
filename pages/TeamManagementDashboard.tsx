@@ -7,6 +7,7 @@ import { UserData } from '@/types';
 import Modal from '@/components/ui/Modal';
 import { useToast } from '@/hooks/useToast';
 
+import { formatearFecha } from '@/lib/utils';
 const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
 const roles: UserData['role'][] = [
@@ -200,7 +201,7 @@ const TeamManagementDashboard: React.FC = () => {
                         {member.status}
                       </span>
                     </td>
-                    <td className="p-4 text-gray-300">{member.invitedOn || 'N/A'}</td>
+                    <td className="p-4 text-gray-300">{formatearFecha(member.invitedOn)}</td>
                     <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                       <button onClick={() => handleDelete(member)} className="text-gray-400 hover:text-red-500 p-2 rounded-full transition duration-200">
                         <Trash2 className="w-5 h-5" />

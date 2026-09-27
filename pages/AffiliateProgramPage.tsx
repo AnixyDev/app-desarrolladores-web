@@ -5,7 +5,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useToast } from '@/hooks/useToast';
 import { Share2Icon as Share2, CopyIcon as Copy, Users, DollarSignIcon as DollarSign, CheckCircleIcon as CheckCircle } from '@/components/icons/Icon';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { cargarReferidos, cargarReparto, estadisticasDeReferidos } from '@/lib/afiliados';
 import type { Referral } from '@/types';
 
@@ -164,7 +164,7 @@ const AffiliateProgramPage = () => {
                   {referrals.map((r) => (
                     <tr key={r.id} className="text-sm text-gray-300 hover:bg-gray-800/50 transition-colors">
                       <td className="px-6 py-4">{r.referred_user_name || 'Invitado'}</td>
-                      <td className="px-6 py-4">{new Date(r.created_at || r.join_date || '').toLocaleDateString('es-ES')}</td>
+                      <td className="px-6 py-4">{formatearFecha(r.created_at || r.join_date)}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-1 rounded-full text-[10px] font-bold border ${statusClasses[r.status]}`}>
                           {statusLabels[r.status]}
