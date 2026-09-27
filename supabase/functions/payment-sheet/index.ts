@@ -20,6 +20,10 @@ const corsHeaders = {
 // número si cambia la comisión acordada.
 const PLATFORM_FEE_PERCENT = 3
 
+// Las únicas tablas de plantillas que existen. El tipo llega del navegador y
+// con él se forma el nombre de la tabla que se lee con la clave de servicio.
+const TIPOS_DE_PLANTILLA = new Set(['proposal', 'contract', 'invoice'])
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -44,6 +48,31 @@ serve(async (req) => {
     // una factura de 5.000 €. Ahora finalAmount arranca en null y solo lo
     // fija el servidor; si ninguna rama lo fija, no se cobra.
     let finalAmount: number | null = null
+
+    // CAMBIO (27/09, fallo crítico): una misma petición podía traer a la vez
+    // invoice_id y los datos de una plantilla. La rama de la plantilla fijaba
+    // el importe y el destino del dinero (la cuenta Connect del vendedor, que
+    // podía ser el propio atacante), pero invoice_id seguía viajando en el
+    // metadata del PaymentIntent, y el webhook apuntaba ese cobro como pago de
+    // la factura. Resultado: una factura ajena marcada como pagada con el
+    // dinero en otra cuenta. Ahora el pago es de UNA cosa, y el metadata que
+    // llega a Stripe lo construye el servidor, no el navegador.
+    const esFactura = !!metadata?.invoice_id
+    const esPlantilla = !!(metadata?.template_type || metadata?.template_id)
+    if (esFactura === esPlantilla) {
+      return new Response(
+        JSON.stringify({ error: 'Pago no válido.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+    if (esPlantilla && !TIPOS_DE_PLANTILLA.has(String(metadata?.template_type))) {
+      return new Response(
+        JSON.stringify({ error: 'Tipo de plantilla no válido.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+    let metadataServidor: Record<string, string> = {}
+    let descripcion = 'Pago'
 
     // Optional: Get user to attach to customer, or create guest customer
     const { data: { user } } = await supabaseClient.auth.getUser()
@@ -76,7 +105,7 @@ serve(async (req) => {
 
       const { data: invoice } = await supabaseAdmin
         .from('invoices')
-        .select('user_id, total_cents, paid')
+        .select('id, user_id, total_cents, paid, invoice_number')
         .eq('id', metadata.invoice_id)
         .maybeSingle()
 
@@ -121,6 +150,8 @@ serve(async (req) => {
       }
 
       finalAmount = Math.round(pendiente)
+      metadataServidor = { invoice_id: String(invoice.id), itemKey: 'invoicePayment' }
+      descripcion = `Factura ${invoice.invoice_number ?? ''}`.trim()
 
       if (invoice.user_id) {
         const { data: freelancerProfile } = await supabaseAdmin
@@ -150,7 +181,16 @@ serve(async (req) => {
     // Stripe Connect verificada para recibir el dinero. Si no la tiene,
     // NO se completa la compra (a diferencia de las facturas, aquí no
     // tiene sentido cobrar y que el vendedor no pueda cobrar su parte).
-    if (metadata?.template_type && metadata?.template_id) {
+    if (esPlantilla) {
+      // La copia de la plantilla se entrega a una cuenta: sin sesión no hay a
+      // quién dársela.
+      if (!user) {
+        return new Response(
+          JSON.stringify({ error: 'Inicia sesión para comprar plantillas.' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+
       const supabaseAdmin = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -191,6 +231,13 @@ serve(async (req) => {
       }
 
       finalAmount = template.price_cents
+      metadataServidor = {
+        template_type: String(metadata.template_type),
+        template_id: String(metadata.template_id),
+        supabase_user_id: user.id,
+        itemKey: 'templatePurchase',
+      }
+      descripcion = 'Plantilla del marketplace'
 
       connectParams = {
         application_fee_amount: Math.round(finalAmount * (PLATFORM_FEE_PERCENT / 100)),
@@ -216,15 +263,12 @@ serve(async (req) => {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: finalAmount,
       currency: 'eur',
-      description: description,
+      description: descripcion,
       customer: customerId,
       automatic_payment_methods: {
         enabled: true,
       },
-      metadata: {
-          supabase_user_id: user?.id,
-          ...metadata
-      },
+      metadata: metadataServidor,
       ...connectParams,
     })
 
@@ -233,8 +277,10 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (error: any) {
+    // El detalle (puede llevar ids de Stripe) va al log, no al navegador.
+    console.error('[payment-sheet] error:', error?.message ?? error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: 'No se pudo preparar el pago. Inténtalo de nuevo.' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }

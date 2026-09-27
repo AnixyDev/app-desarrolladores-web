@@ -105,23 +105,17 @@ const ContractsPage: React.FC = () => {
       return;
     }
 
-    const portalLink = `${window.location.origin}/portal/contracts/${contract.id}`;
-    const subject = `Contrato para el proyecto "${project.name}"`;
-    const html = `<p>Hola ${client.name},</p><p>Te envío el contrato para nuestro proyecto "${project.name}".</p><p>Puedes revisarlo y firmarlo digitalmente aquí:<br/><a href="${portalLink}">${portalLink}</a></p><p>Encontrarás también el PDF adjunto para tu archivo.</p><p>Saludos,<br/>${profile.full_name}</p>`;
-
     try {
       const pdfBase64 = generateContractPdfBase64(contract);
       await sendDocumentEmail({
-        to: client.email,
-        subject,
-        html,
+        tipo: 'contrato',
+        documentoId: contract.id,
         pdfBase64,
-        filename: `Contrato_${project.name}.pdf`,
       });
       addToast('Estado actualizado a Enviado y email enviado con el contrato adjunto.', 'success');
     } catch (error) {
       console.error('Error enviando el contrato por email:', error);
-      addToast('El estado se actualizó a Enviado, pero el email no pudo enviarse. Inténtalo de nuevo.', 'error');
+      addToast(`El estado se actualizó a Enviado, pero el email no pudo enviarse: ${(error as Error)?.message || 'inténtalo de nuevo.'}`, 'error');
     }
   };
   // CAMBIO: usa pdfService.ts (import estático ya cargado en el bundle)

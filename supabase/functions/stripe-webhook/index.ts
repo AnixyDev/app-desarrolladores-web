@@ -393,15 +393,36 @@ serve(async (req) => {
         const paymentIntent = event.data.object as Stripe.PaymentIntent
         const invoiceId = paymentIntent.metadata?.invoice_id
 
-        if (invoiceId) {
+        // CAMBIO (27/09, fallo crítico): un PaymentIntent podía llevar a la vez
+        // invoice_id y una plantilla, con el dinero yendo al vendedor de la
+        // plantilla. Se apuntaba como pago de la factura igualmente. Ahora:
+        //  - si trae plantilla, NO cuenta como pago de ninguna factura;
+        //  - el destino del dinero tiene que ser el dueño de la factura (su
+        //    cuenta Connect) o la plataforma (sin destino).
+        const destinoDelDinero = typeof paymentIntent.transfer_data?.destination === 'string'
+          ? paymentIntent.transfer_data.destination
+          : (paymentIntent.transfer_data?.destination as any)?.id ?? null
+
+        if (invoiceId && paymentIntent.metadata?.template_id) {
+          console.error(`🚨 payment_intent ${paymentIntent.id}: trae factura y plantilla a la vez — no se apunta como pago de la factura ${invoiceId}`)
+        } else if (invoiceId) {
           const { data: invoice, error: fetchErr } = await supabase
             .from('invoices')
             .select('id, user_id, total_cents, paid')
             .eq('id', invoiceId)
             .maybeSingle()
 
+          let cuentaDelDueno: string | null = null
+          if (invoice?.user_id) {
+            const { data: dueno } = await supabase
+              .from('profiles').select('stripe_account_id').eq('id', invoice.user_id).maybeSingle()
+            cuentaDelDueno = dueno?.stripe_account_id ?? null
+          }
+
           if (fetchErr || !invoice) {
             console.error(`⚠️ payment_intent.succeeded: factura ${invoiceId} no encontrada`, fetchErr?.message)
+          } else if (destinoDelDinero && destinoDelDinero !== cuentaDelDueno) {
+            console.error(`🚨 payment_intent ${paymentIntent.id}: el dinero fue a ${destinoDelDinero}, que no es la cuenta del dueño de la factura ${invoiceId} — no se apunta`)
           } else {
             // FIX 1: el cobro no dejaba rastro en public.payments — solo se
             // marcaba invoices.paid. Por eso remaining_cents seguia mostrando
@@ -477,7 +498,9 @@ serve(async (req) => {
         const templateId = paymentIntent.metadata?.template_id
         const buyerId = paymentIntent.metadata?.supabase_user_id
 
-        if (templateType && templateId && buyerId) {
+        if (templateType && templateId && buyerId && !['proposal', 'contract', 'invoice'].includes(templateType)) {
+          console.error(`🚨 payment_intent ${paymentIntent.id}: tipo de plantilla desconocido "${templateType}"`)
+        } else if (templateType && templateId && buyerId) {
           const templateTable = `${templateType}_templates`
 
           // Idempotencia: si ya existe una compra para este PaymentIntent,

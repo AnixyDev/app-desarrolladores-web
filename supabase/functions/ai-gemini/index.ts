@@ -2,6 +2,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { costeDe } from "../_shared/creditos-ia.ts";
 
+// Topes de tamaño (ver el comentario junto a req.json()). 60.000 caracteres son
+// unas 15.000 palabras: sobra para cualquier uso de la app (propuestas, base de
+// conocimiento, datos de previsión). La foto de un ticket va aparte.
+const MAX_ENTRADA_TEXTO = 60_000;
+const MAX_ENTRADA_IMAGEN = 8 * 1024 * 1024;
+const MAX_TOKENS_DE_SALIDA = 4096;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -119,13 +126,16 @@ function isAuthError(rawMessage: string): boolean {
 }
 
 async function callGeminiWithModel(apiKey: string, model: string, fullPrompt: string): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  // CAMBIO (27/09): la clave va en la cabecera, no en la URL. En la URL
+  // acababa en los registros si fallaba la conexión.
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
       contents: [{ parts: [{ text: fullPrompt }] }],
+      generationConfig: { maxOutputTokens: MAX_TOKENS_DE_SALIDA },
     }),
   });
 
@@ -189,11 +199,11 @@ async function callGeminiWithImage(
   mimeType: string,
   imageBase64: string
 ): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
       contents: [
         {
@@ -207,6 +217,7 @@ async function callGeminiWithImage(
         // Fuerza a Gemini a devolver JSON válido en vez de texto libre.
         responseMimeType: "application/json",
         temperature: 0.1,
+        maxOutputTokens: MAX_TOKENS_DE_SALIDA,
       },
     }),
   });
@@ -386,6 +397,20 @@ serve(async (req) => {
     }
 
     const { action, payload } = await req.json();
+
+    // CAMBIO (27/09): cada acción cuesta un número fijo de créditos, pero el
+    // texto de entrada y la respuesta no tenían tope: por 1 crédito se podía
+    // mandar un prompt enorme y pedir una respuesta enorme, y lo pagaba la
+    // clave compartida. Ahora hay techo para las dos cosas. Se comprueba
+    // ANTES de cobrar: si se pasa, no se cobra nada.
+    const tamanoEntrada = JSON.stringify(payload ?? {}).length;
+    const limiteEntrada = action === "extractExpenseFromImage" ? MAX_ENTRADA_IMAGEN : MAX_ENTRADA_TEXTO;
+    if (tamanoEntrada > limiteEntrada) {
+      return new Response(
+        JSON.stringify({ error: "El texto es demasiado largo para el asistente. Resúmelo o divídelo en partes." }),
+        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // ------------------------------------------------------------------
     // COBRO DE CREDITOS — en el servidor, ANTES de gastar la cuota de Gemini.

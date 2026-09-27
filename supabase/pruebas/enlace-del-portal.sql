@@ -29,8 +29,14 @@ declare
   v_fallos   int := 0;
   v_visto    uuid;
 begin
-  select id, lower(email) into v_cuenta, v_correo
-    from auth.users where email is not null order by created_at limit 1;
+  -- Una cuenta que no sea ya cliente de portal de nadie (portal_user_id es
+  -- único): la primera versión cogía la más antigua, y dejó de valer en
+  -- cuanto esa cuenta se enlazó de verdad a una ficha.
+  select u.id, lower(u.email) into v_cuenta, v_correo
+    from auth.users u
+   where u.email is not null
+     and not exists (select 1 from public.clients c where c.portal_user_id = u.id)
+   order by u.created_at limit 1;
   -- (profiles no tiene created_at; vale cualquier perfil como dueño de la ficha)
   select id into v_dueno from public.profiles limit 1;
 

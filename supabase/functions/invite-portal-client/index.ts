@@ -20,8 +20,8 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
-  puedeInvitarAlPortal,
   INVITACIONES_PORTAL_POR_DIA,
+  ESPERA_ENTRE_REENVIOS_MINUTOS,
 } from '../_shared/limites-portal.ts';
 
 const corsHeaders = {
@@ -211,25 +211,27 @@ Deno.serve(async (req) => {
     }
 
     // ── CONTROL 2: tope diario y espera entre reenvíos ────────────────────
-    const hace24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { count: invitadosHoy, error: errorConteo } = await supabaseAdmin
-      .from('clients')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', freelancer.id)
-      .gte('portal_invitado_en', hace24h);
+    //
+    // CAMBIO (27/09): antes se contaba con clients.portal_invitado_en, que el
+    // propio usuario podía poner a null desde el navegador (o borrar y volver
+    // a crear clientes) para mandar correos sin límite. Ahora cada envío se
+    // apunta en invitaciones_portal_enviadas, que solo toca el servidor, y la
+    // cuenta y el apunte van juntos en reservar_invitacion_portal(), con un
+    // candado por usuario: peticiones simultáneas tampoco se cuelan.
+    const { data: motivoRechazo, error: errorReserva } = await supabaseAdmin.rpc('reservar_invitacion_portal', {
+      p_user: freelancer.id,
+      p_client: cliente.id,
+      p_email: destinatario,
+      p_max_dia: INVITACIONES_PORTAL_POR_DIA,
+      p_espera_min: ESPERA_ENTRE_REENVIOS_MINUTOS,
+    });
 
-    if (errorConteo) {
-      console.error('No se pudieron contar las invitaciones:', errorConteo.message);
+    if (errorReserva) {
+      console.error('No se pudo reservar la invitación:', errorReserva.message);
       return json({ error: 'Error interno' }, 500);
     }
-
-    const veredicto = puedeInvitarAlPortal(
-      invitadosHoy ?? 0,
-      cliente.portal_invitado_en,
-    );
-
-    if (!veredicto.permitida) {
-      return rechazo(veredicto.motivo);
+    if (motivoRechazo) {
+      return rechazo(String(motivoRechazo));
     }
 
     // ── El correo ─────────────────────────────────────────────────────────
@@ -267,26 +269,25 @@ Deno.serve(async (req) => {
       return rechazo('No se pudo enviar la invitación. Inténtalo de nuevo en unos minutos.');
     }
 
-    // Solo se marca si el correo ha salido: un fallo de Resend no debe gastar
-    // cupo ni activar la espera entre reenvíos.
+    // Se marca para que la ficha del cliente enseñe cuándo se le invitó. El
+    // cupo ya no depende de esta columna (ver CONTROL 2).
     const { error: errorMarca } = await supabaseAdmin
       .from('clients')
       .update({ portal_invitado_en: new Date().toISOString() })
       .eq('id', cliente.id);
 
     if (errorMarca) {
-      // No se deshace nada: el correo ya ha salido. Queda el aviso en los
-      // registros — si esto fallara siempre, el tope dejaría de contar.
+      // No se deshace nada: el correo ya ha salido y el cupo ya está apuntado.
+      // Solo afecta a la fecha que enseña la ficha.
       console.error('Invitación enviada pero no registrada:', errorMarca.message);
     }
 
     return json({
       success: true,
       email: destinatario,
-      restantesHoy: INVITACIONES_PORTAL_POR_DIA - (invitadosHoy ?? 0) - 1,
     });
   } catch (error) {
     console.error('Error enviando la invitación al portal:', error);
-    return rechazo((error as Error).message || 'Error interno');
+    return rechazo('No se pudo enviar la invitación. Inténtalo de nuevo en unos minutos.');
   }
 });

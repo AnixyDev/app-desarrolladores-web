@@ -327,22 +327,16 @@ const handleSelectBudget = (budgetId: string) => {
       return;
     }
 
-    const paymentLink = `${window.location.origin}/pay/${invoice.id}`;
-    const subject = `Factura ${invoice.invoice_number}`;
-    const html = `<p>Hola ${client.name},</p><p>Te envío la factura ${invoice.invoice_number} por un importe de ${formatCurrency(invoice.total_cents)}. La encontrarás adjunta en este email.</p><p>Puedes pagarla online con tarjeta desde este enlace: <a href="${paymentLink}">${paymentLink}</a></p><p>Un saludo.</p>`;
-
     try {
       await sendDocumentEmail({
-        to: client.email,
-        subject,
-        html,
+        tipo: 'factura',
+        documentoId: invoice.id,
         pdfBase64,
-        filename: `Factura-${invoice.invoice_number}.pdf`,
       });
       addToast('Email enviado con la factura adjunta y el enlace de pago.', 'success');
     } catch (error) {
       console.error('Error enviando el email:', error);
-      addToast('No se pudo enviar el email. Inténtalo de nuevo.', 'error');
+      addToast((error as Error)?.message || 'No se pudo enviar el email. Inténtalo de nuevo.', 'error');
     }
   };
 

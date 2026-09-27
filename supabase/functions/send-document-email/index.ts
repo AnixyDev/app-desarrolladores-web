@@ -9,6 +9,16 @@
 // explícitamente cada vez que cambie este archivo.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  nombreDelRemitente,
+  esPdfEnBase64,
+  nombreDeArchivo,
+  correoDeFactura,
+  correoDeContrato,
+  TIPOS_DE_DOCUMENTO,
+  ENVIOS_DE_DOCUMENTOS_POR_DIA,
+  type Correo,
+} from '../_shared/correo-documentos.ts';
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 // CAMBIO: ya no hay remitente/reply-to fijos — se resuelven por usuario más
@@ -22,13 +32,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// CAMBIO (27/09): el navegador ya no manda destinatario, asunto ni HTML. Solo
+// QUÉ documento envía y su PDF. Todo lo demás sale de la base de datos (ver
+// _shared/correo-documentos.ts para el porqué).
 interface SendDocumentEmailPayload {
-  to: string;
-  subject: string;
-  html: string;
-  attachmentBase64?: string; // opcional — PDF sin el prefijo data:application/pdf;base64,
-  attachmentFilename?: string;
+  tipo: string;
+  documento_id: string;
+  attachmentBase64: string; // PDF sin el prefijo data:application/pdf;base64,
 }
+
+const SITIO = (Deno.env.get('SITE_URL') ?? 'https://devfreelancer.app').replace(/\/$/, '');
+
+const json = (cuerpo: unknown, status = 200) =>
+  new Response(JSON.stringify(cuerpo), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -77,78 +93,105 @@ Deno.serve(async (req) => {
       });
     }
 
-    const displayName = profile.business_name || profile.full_name || 'Devfreelancer';
-    const fromAddress = `${displayName} <${FROM_DOMAIN_ADDRESS}>`;
-    const replyToAddress = profile.invoice_reply_to_email || profile.email;
+    const fromAddress = `${nombreDelRemitente(profile.business_name || profile.full_name)} <${FROM_DOMAIN_ADDRESS}>`;
+    const replyToAddress = profile.invoice_reply_to_email || profile.email || user.email;
 
-    // 2. Validar payload
-    const payload: SendDocumentEmailPayload = await req.json();
-    const { to, subject, html, attachmentBase64, attachmentFilename } = payload;
+    // 2. Qué documento: tiene que ser del usuario, y el destinatario es el
+    //    email del cliente de ese documento. Nada de esto lo decide el navegador.
+    const payload = (await req.json().catch(() => ({}))) as Partial<SendDocumentEmailPayload>;
+    const tipo = String(payload.tipo ?? '');
+    const documentoId = String(payload.documento_id ?? '');
+    const attachmentBase64 = payload.attachmentBase64;
 
-    if (!to || !subject) {
-      return new Response(JSON.stringify({ error: 'Faltan campos obligatorios' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (!(TIPOS_DE_DOCUMENTO as readonly string[]).includes(tipo) || !/^[0-9a-f-]{36}$/i.test(documentoId)) {
+      return json({ error: 'Documento no válido' }, 400);
     }
 
-    // FIX: `to` llegaba del navegador sin ninguna comprobación. Con una sesión
-    // válida — la tiene cualquier usuario registrado — esto era un relé de
-    // correo abierto: enviar HTML arbitrario, con adjunto arbitrario, a
-    // cualquier dirección, desde facturas@devfreelancer.app, el dominio
-    // verificado. Es decir, phishing con el remitente de la casa, y la
-    // reputación del dominio por medio.
-    //
-    // Los tres usos legítimos (factura, contrato y presupuesto) mandan siempre
-    // a `client.email`, un cliente del propio usuario. Así que se exige eso.
-    const destinatario = String(to).trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(destinatario)) {
-      return new Response(JSON.stringify({ error: 'La dirección de destino no es válida' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    let destinatario = '';
+    let correo: Correo;
+    let archivo: string;
 
-    const esSuPropioEmail =
-      destinatario === String(profile.email ?? '').toLowerCase() ||
-      destinatario === String(user.email ?? '').toLowerCase();
-
-    if (!esSuPropioEmail) {
-      const { data: cliente } = await supabase
-        .from('clients')
-        .select('id')
+    if (tipo === 'factura') {
+      const { data: factura } = await supabase
+        .from('invoices')
+        .select('id, client_id, invoice_number, total_cents')
+        .eq('id', documentoId)
         .eq('user_id', user.id)
-        .ilike('email', destinatario)
         .maybeSingle();
+      if (!factura) return json({ error: 'Esa factura no existe o no es tuya.' }, 404);
 
-      if (!cliente) {
-        console.error(`[send-document-email] destino no permitido para ${user.id}: ${destinatario}`);
-        return new Response(
-          JSON.stringify({
-            error: 'Solo puedes enviar documentos a tus clientes. Añade este correo a la ficha del cliente y vuelve a intentarlo.',
-          }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+      const { data: cliente } = await supabase
+        .from('clients').select('name, email').eq('id', factura.client_id).eq('user_id', user.id).maybeSingle();
+      destinatario = String(cliente?.email ?? '').trim().toLowerCase();
+      correo = correoDeFactura({
+        cliente: cliente?.name ?? '',
+        numero: factura.invoice_number,
+        totalCents: factura.total_cents,
+        enlacePago: `${SITIO}/pay/${factura.id}`,
+      });
+      archivo = nombreDeArchivo('Factura', factura.invoice_number);
+    } else {
+      const { data: contrato } = await supabase
+        .from('contracts')
+        .select('id, client_id, project_id')
+        .eq('id', documentoId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!contrato) return json({ error: 'Ese contrato no existe o no es tuyo.' }, 404);
+
+      const [{ data: cliente }, { data: proyecto }] = await Promise.all([
+        supabase.from('clients').select('name, email').eq('id', contrato.client_id).eq('user_id', user.id).maybeSingle(),
+        supabase.from('projects').select('name').eq('id', contrato.project_id).eq('user_id', user.id).maybeSingle(),
+      ]);
+      destinatario = String(cliente?.email ?? '').trim().toLowerCase();
+      correo = correoDeContrato({
+        cliente: cliente?.name ?? '',
+        proyecto: proyecto?.name ?? '',
+        firma: profile.full_name || profile.business_name || '',
+        enlacePortal: `${SITIO}/portal/contracts/${contrato.id}`,
+      });
+      archivo = nombreDeArchivo('Contrato', proyecto?.name);
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(destinatario)) {
+      return json({ error: 'Este cliente no tiene un email válido. Añádeselo en su ficha.' }, 400);
+    }
+
+    // 3. El adjunto tiene que ser un PDF.
+    if (!esPdfEnBase64(attachmentBase64)) {
+      return json({ error: 'El adjunto tiene que ser el PDF del documento.' }, 400);
     }
 
     // Un PDF de factura ronda los 50-300 kB. El tope existe para que nadie
     // pueda usar esto para mover ficheros grandes a través de tu cuenta.
     const MAX_ADJUNTO_BASE64 = 8 * 1024 * 1024; // ~6 MB reales
-    if (attachmentBase64 && attachmentBase64.length > MAX_ADJUNTO_BASE64) {
+    if (String(attachmentBase64).length > MAX_ADJUNTO_BASE64) {
       return new Response(JSON.stringify({ error: 'El adjunto es demasiado grande' }), {
         status: 413,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    if ((attachmentBase64 && !attachmentFilename) || (!attachmentBase64 && attachmentFilename)) {
-      return new Response(JSON.stringify({ error: 'Adjunto incompleto: faltan datos o nombre de archivo' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    // 4. Cupo diario de envíos, apuntado en el servidor con candado.
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+    const { data: hayCupo, error: errorCupo } = await supabaseAdmin.rpc('reservar_envio_documento', {
+      p_user: user.id,
+      p_tipo: tipo,
+      p_documento: documentoId,
+      p_email: destinatario,
+      p_max_dia: ENVIOS_DE_DOCUMENTOS_POR_DIA,
+    });
+    if (errorCupo) {
+      console.error('[send-document-email] no se pudo reservar el envío:', errorCupo.message);
+      return json({ error: 'Error interno' }, 500);
+    }
+    if (!hayCupo) {
+      return json({ error: `Has llegado al máximo de ${ENVIOS_DE_DOCUMENTOS_POR_DIA} envíos en 24 horas. Inténtalo mañana.` }, 429);
     }
 
-    // 3. Enviar vía Resend (fetch directo a su API REST — en Deno no hace
+    // 5. Enviar vía Resend (fetch directo a su API REST — en Deno no hace
     //    falta el SDK de npm, y evita añadir otra dependencia al proyecto).
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
@@ -163,18 +206,10 @@ Deno.serve(async (req) => {
       from: fromAddress,
       reply_to: replyToAddress,
       to: [destinatario],
-      subject,
-      html,
+      subject: correo.asunto,
+      html: correo.html,
+      attachments: [{ filename: archivo, content: attachmentBase64 }],
     };
-
-    if (attachmentBase64 && attachmentFilename) {
-      resendBody.attachments = [
-        {
-          filename: attachmentFilename,
-          content: attachmentBase64,
-        },
-      ];
-    }
 
     const resendResponse = await fetch(RESEND_API_URL, {
       method: 'POST',
@@ -196,7 +231,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ ok: true, id: resendData.id }), {
+    return new Response(JSON.stringify({ ok: true, email: destinatario }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
