@@ -148,7 +148,9 @@ Deno.serve(async (req) => {
         cliente: cliente?.name ?? '',
         proyecto: proyecto?.name ?? '',
         firma: profile.full_name || profile.business_name || '',
-        enlacePortal: `${SITIO}/portal/contracts/${contrato.id}`,
+        // Con el email puesto: sin sesión, el portal pide acceso con esa dirección
+        // ya escrita y, al entrar, vuelve a este contrato.
+        enlacePortal: `${SITIO}/portal/contracts/${contrato.id}?email=${encodeURIComponent(destinatario)}`,
       });
       archivo = nombreDeArchivo('Contrato', proyecto?.name);
     }
