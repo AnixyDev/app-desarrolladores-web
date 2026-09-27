@@ -5,9 +5,10 @@ import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { useAppStore } from '@/hooks/useAppStore';
 import ComisionesAfiliados from '@/components/admin/ComisionesAfiliados';
+import { cargarMetricas, beneficioNeto30d, type MetricasAdmin } from '@/lib/adminMetricas';
 import {
   DollarSignIcon,
   Users as UsersIcon,
@@ -27,19 +28,8 @@ interface Transaction {
   created_at: string;
 }
 
-interface PlatformStats {
-  totalRevenueCents: number;
-  totalUsers: number;
-  totalAiCreditsUsed: number;
-  transactionCount: number;
-}
-
-const STRIPE_FIXED_FEE_CENTS = 25;
-const STRIPE_PERCENT_FEE = 0.015;
-const MONTHLY_INFRA_COST_CENTS = 82;
-
 const PanelAdmin = () => {
-  const [stats, setStats] = useState<PlatformStats | null>(null);
+  const [stats, setStats] = useState<MetricasAdmin | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,34 +47,11 @@ const PanelAdmin = () => {
 
       if (transError) throw transError;
 
-      const { count: userCount, error: userError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-
-      if (userError) throw userError;
-
-      const { data: aiData } = await supabase
-        .from('profiles')
-        .select('ai_credits');
-
-      const totalUsersForAi = userCount ?? 0;
-      const currentAiCredits =
-        aiData?.reduce((sum, p) => sum + (p.ai_credits ?? 0), 0) ?? 0;
-      const totalAiUsed = totalUsersForAi * 10 - currentAiCredits;
-
-      const { data: revenueData } = await supabase
-        .from('platform_payments')
-        .select('amount_cents');
-
-      const totalRevenue =
-        revenueData?.reduce((sum, r) => sum + r.amount_cents, 0) ?? 0;
-
-      setStats({
-        totalRevenueCents: totalRevenue,
-        totalUsers: userCount ?? 0,
-        totalAiCreditsUsed: Math.max(0, totalAiUsed),
-        transactionCount: revenueData?.length ?? 0,
-      });
+      // CAMBIO (27/09): antes estas cifras salían de consultas que, por la
+      // RLS, solo veían el perfil de quien miraba, y los ingresos de una
+      // tabla en la que nada escribía. Ahora vienen de admin_metricas()
+      // (solo Admin) y stripe-webhook apunta cada cobro real.
+      setStats(await cargarMetricas());
 
       setTransactions(transData ?? []);
     } catch (err: unknown) {
@@ -103,15 +70,7 @@ const PanelAdmin = () => {
     fetchData();
   }, []);
 
-  const netProfitCents = useMemo(() => {
-    if (!stats) return 0;
-    const stripeFees =
-      stats.transactionCount * STRIPE_FIXED_FEE_CENTS +
-      stats.totalRevenueCents * STRIPE_PERCENT_FEE;
-    return (
-      stats.totalRevenueCents - stripeFees - MONTHLY_INFRA_COST_CENTS
-    );
-  }, [stats]);
+  const netProfitCents = useMemo(() => (stats ? beneficioNeto30d(stats) : 0), [stats]);
 
   const StatCard = ({
     title,
@@ -198,29 +157,32 @@ const PanelAdmin = () => {
         ) : (
           <>
             <StatCard
-              title="Ingresos Brutos"
-              value={formatCurrency(stats?.totalRevenueCents ?? 0)}
+              title="Ingresos (30 días)"
+              value={formatCurrency(stats?.ingresos_30d_cents ?? 0)}
               icon={DollarSignIcon}
               color="bg-primary-600 shadow-lg shadow-primary-500/20"
+              subvalue={`Total: ${formatCurrency(stats?.ingresos_total_cents ?? 0)} · ${stats?.cobros_total ?? 0} cobros`}
             />
             <StatCard
-              title="Beneficio Neto Est."
+              title="Beneficio neto est."
               value={formatCurrency(netProfitCents)}
               icon={TrendingUpIcon}
               color="bg-green-600 shadow-lg shadow-green-500/20"
-              subvalue="Tras Stripe y Costes"
+              subvalue="30 días, tras Stripe e infraestructura"
             />
             <StatCard
-              title="Usuarios Totales"
-              value={stats?.totalUsers ?? 0}
+              title="Usuarios"
+              value={stats?.usuarios_total ?? 0}
               icon={UsersIcon}
               color="bg-blue-600 shadow-lg shadow-blue-500/20"
+              subvalue={`+${stats?.usuarios_nuevos_30d ?? 0} en los últimos 30 días`}
             />
             <StatCard
-              title="Uso de IA"
-              value={`${stats?.totalAiCreditsUsed ?? 0} cred.`}
+              title="Suscriptores de pago"
+              value={(stats?.suscriptores_pro ?? 0) + (stats?.suscriptores_teams ?? 0)}
               icon={SparklesIcon}
               color="bg-purple-600 shadow-lg shadow-purple-500/20"
+              subvalue={`Pro ${stats?.suscriptores_pro ?? 0} · Equipos ${stats?.suscriptores_teams ?? 0}`}
             />
           </>
         )}
@@ -233,7 +195,7 @@ const PanelAdmin = () => {
             Recientes
           </h2>
           <span className="text-xs font-bold text-gray-500 uppercase">
-            Últimos Pagos en Directo
+            Últimos 10 cobros
           </span>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
@@ -277,7 +239,7 @@ const PanelAdmin = () => {
                       {formatCurrency(t.amount_cents)}
                     </td>
                     <td className="p-4 text-xs text-gray-500">
-                      {new Date(t.created_at).toLocaleDateString()}
+                      {formatearFecha(t.created_at)}
                     </td>
                     <td className="p-4 text-right text-[10px] font-black uppercase text-green-400">
                       <div className="flex items-center justify-end gap-1">
@@ -295,7 +257,7 @@ const PanelAdmin = () => {
                   >
                     <div className="flex flex-col items-center">
                       <ActivityIcon className="w-10 h-10 mb-2 opacity-20" />
-                      No hay transacciones registradas todavía.
+                      Todavía no hay cobros registrados. Se apuntan solos a partir de ahora con cada pago en Stripe.
                     </div>
                   </td>
                 </tr>

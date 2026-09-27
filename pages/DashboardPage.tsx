@@ -3,6 +3,7 @@ import { useAppStore } from '../hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Sparkles, TrendingUp, Users, Briefcase, Clock } from 'lucide-react';
 
+import { formatCurrency } from '@/lib/utils';
 // Carga diferida — los gráficos no bloquean el chunk principal
 const IncomeExpenseChart = lazy(() => import('../components/charts/IncomeExpenseChart'));
 const WeeklyHoursChart   = lazy(() => import('../components/charts/WeeklyHoursChart'));
@@ -90,12 +91,9 @@ const DashboardPage: React.FC = () => {
   }, [timeEntries]);
 
   // ── Formatear ingresos ─────────────────────────────────────────────────────
-  const formattedIncome = monthlyIncome.toLocaleString('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
+  // Mismo formato que el resto de la app (con céntimos): antes se redondeaba
+  // al euro y aquí salía "3180 €" mientras las facturas decían "1590,00 €".
+  const formattedIncome = formatCurrency(Math.round(monthlyIncome * 100));
 
   return (
     <div className="space-y-6">

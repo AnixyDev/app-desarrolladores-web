@@ -144,7 +144,7 @@ const ClientsPage: React.FC = () => {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <PhoneIcon className="w-4 h-4 text-gray-500" />
-                                    <span className="text-gray-300">{client.phone || 'N/A'}</span>
+                                    <span className="text-gray-300">{client.phone || 'Sin teléfono'}</span>
                                 </div>
                             </CardContent>
                             <div className="p-4 border-t border-gray-800 flex items-center justify-end gap-2">

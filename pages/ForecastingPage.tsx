@@ -6,7 +6,7 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { NewInvoice } from '@/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient';
 import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
@@ -366,7 +366,7 @@ const handleSelectBudget = (budgetId: string) => {
                         <tr key={inv.id} className="text-sm text-gray-300 hover:bg-gray-800/30 transition-colors">
                           <td className="px-6 py-4 font-mono text-white">{inv.invoice_number}</td>
                           <td className="px-6 py-4">{getClientName(inv.client_id)}</td>
-                          <td className="px-6 py-4">{new Date(inv.due_date).toLocaleDateString()}</td>
+                          <td className="px-6 py-4">{formatearFecha(inv.due_date)}</td>
                           <td className="px-6 py-4 text-right font-bold text-white">{formatCurrency(inv.total_cents)}</td>
 
                           <td className="px-6 py-4 min-w-[140px]">
@@ -516,7 +516,7 @@ const handleSelectBudget = (budgetId: string) => {
         <option value="">Sin contrato vinculado</option>
         {availableContracts.map(c => (
           <option key={c.id} value={c.id}>
-            Contrato firmado el {c.signed_at ? new Date(c.signed_at).toLocaleDateString() : '—'}
+            Contrato firmado el {c.signed_at ? formatearFecha(c.signed_at) : '—'}
           </option>
         ))}
       </select>

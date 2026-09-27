@@ -18,6 +18,7 @@ import { CheckCircleIcon as CheckCircle, XCircleIcon as XCircle, ClockIcon as Cl
 import { Users, ArrowLeft } from 'lucide-react';
 import { JobApplicationStatus } from '@/types';
 
+import { formatearFecha } from '@/lib/utils';
 const statusBadge = (status: JobApplicationStatus) => {
   switch (status) {
     case 'accepted':
@@ -102,7 +103,7 @@ const JobApplicantsPage: React.FC = () => {
 
                   <div className="flex items-center gap-2 text-sm text-gray-400">
                     <Clock className="w-4 h-4" />
-                    Aplicó el {new Date(applicant.appliedAt).toLocaleDateString('es-ES')}
+                    Aplicó el {formatearFecha(applicant.appliedAt)}
                   </div>
 
                   <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-800">

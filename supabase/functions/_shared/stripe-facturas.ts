@@ -18,3 +18,17 @@ export function suscripcionDeLaFactura(invoice: any): string | null {
   if (!valor) return null
   return typeof valor === 'string' ? valor : (valor.id ?? null)
 }
+
+/**
+ * price_id de la primera línea de la factura, en las dos formas de la API:
+ * clover (line.pricing.price_details.price) y la antigua (line.price.id).
+ * Sirve para saber si una factura es del plan Pro o del de equipos.
+ */
+export function precioDeLaFactura(invoice: any): string | null {
+  const linea = invoice?.lines?.data?.[0]
+  if (!linea) return null
+  const nueva = linea?.pricing?.price_details?.price
+  const valor = nueva ?? linea?.price ?? null
+  if (!valor) return null
+  return typeof valor === 'string' ? valor : (valor.id ?? null)
+}

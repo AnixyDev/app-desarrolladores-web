@@ -7,6 +7,7 @@ import { JobApplication } from '@/types';
 import { Link, useNavigate } from 'react-router-dom';
 import EmptyState from '@/components/ui/EmptyState';
 
+import { formatearFecha } from '@/lib/utils';
 const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
 
 const applicationStatusConfig = {
@@ -81,7 +82,7 @@ const MyApplicationsPage: React.FC = () => {
                                                     <Link to={`/job-market/${job?.id}`} className="hover:text-primary-400">{job?.titulo || 'Oferta no encontrada'}</Link>
                                                 </td>
                                                 <td className="p-4 text-gray-300">{job?.cliente}</td>
-                                                <td className="p-4 text-gray-300">{new Date(app.appliedAt).toLocaleDateString()}</td>
+                                                <td className="p-4 text-gray-300">{formatearFecha(app.appliedAt)}</td>
                                                 <td className="p-4">
                                                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${statusInfo.className}`}>
                                                         {statusInfo.label}

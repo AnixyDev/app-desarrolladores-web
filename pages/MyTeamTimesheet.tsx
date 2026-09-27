@@ -4,7 +4,7 @@ import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { useElapsedTime } from '@/hooks/useElapsedTime';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration, formatearFecha } from '@/lib/utils';
 import { Task } from '@/types';
 import { requestTimerNotificationPermission, isTimerNotificationSupported } from '@/services/timerNotifications';
 
@@ -269,7 +269,7 @@ const MyTeamTimesheet: React.FC = () => {
                   <div key={entry.id} className="p-3 bg-gray-800 rounded-lg flex justify-between items-center hover:bg-gray-700 transition duration-150">
                     <div>
                       <p className="text-sm font-medium text-white">{entry.description || 'Sin descripción'}</p>
-                      <p className="text-xs text-gray-400 flex items-center"><GitBranch className="w-3 h-3 mr-1" /> {scopedProjects.find(p=>p.id === entry.project_id)?.name} | {new Date(entry.start_time).toLocaleDateString()}</p>
+                      <p className="text-xs text-gray-400 flex items-center"><GitBranch className="w-3 h-3 mr-1" /> {scopedProjects.find(p=>p.id === entry.project_id)?.name} | {formatearFecha(entry.start_time)}</p>
                     </div>
                     <span className="text-lg font-bold text-fuchsia-500">{(entry.duration_seconds/3600).toFixed(2)}h</span>
                   </div>

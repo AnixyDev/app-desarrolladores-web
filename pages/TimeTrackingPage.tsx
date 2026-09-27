@@ -11,7 +11,7 @@ import { useElapsedTime } from '@/hooks/useElapsedTime';
 import { generateTimeEntryDescription, AI_CREDIT_COSTS } from '@/services/geminiService';
 import { TimeEntry } from '@/types';
 import { requestTimerNotificationPermission, isTimerNotificationSupported } from '@/services/timerNotifications';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration, formatearFecha } from '@/lib/utils';
 
 const TimeDistributionChart = lazy(() => import('@/components/charts/TimeDistributionChart'));
 const WeeklyHoursChart = lazy(() => import('@/components/charts/WeeklyHoursChart'));
@@ -442,7 +442,7 @@ const TimeTrackingPage: React.FC = () => {
                                                 <div className="min-w-0">
                                                     <p className="text-white text-sm truncate">{entry.description || <span className="text-gray-600 italic">Sin descripción</span>}</p>
                                                     <p className="text-xs text-gray-500">
-                                                        {new Date(entry.start_time).toLocaleDateString()}
+                                                        {formatearFecha(entry.start_time)}
                                                         {scope === 'all' && entry.logged_by && entry.logged_by !== profile?.id && (
                                                             <span className="text-gray-600"> · por {memberNameById[entry.logged_by] || 'Miembro del equipo'}</span>
                                                         )}

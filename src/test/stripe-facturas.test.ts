@@ -29,3 +29,18 @@ describe('suscripcionDeLaFactura', () => {
         expect(suscripcionDeLaFactura({})).toBeNull();
     });
 });
+
+import { precioDeLaFactura } from '../../supabase/functions/_shared/stripe-facturas';
+
+describe('precioDeLaFactura (para saber si el cobro es de Pro o de equipos)', () => {
+    it('forma clover: lines.data[0].pricing.price_details.price', () => {
+        expect(precioDeLaFactura({ lines: { data: [{ pricing: { price_details: { price: 'price_pro' } } }] } })).toBe('price_pro');
+    });
+    it('forma antigua: lines.data[0].price.id', () => {
+        expect(precioDeLaFactura({ lines: { data: [{ price: { id: 'price_teams' } }] } })).toBe('price_teams');
+    });
+    it('sin líneas: null', () => {
+        expect(precioDeLaFactura({ lines: { data: [] } })).toBeNull();
+        expect(precioDeLaFactura({})).toBeNull();
+    });
+});

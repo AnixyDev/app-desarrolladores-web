@@ -38,6 +38,37 @@ export const formatJobPublishDate = (fechaPublicacion?: string | null): string =
 };
 
 /**
+ * Fecha en formato español (27/09/2026), para toda la app.
+ *
+ * - "AAAA-MM-DD" (columnas date de Postgres) se formatea a partir del texto,
+ *   sin pasar por Date: new Date('2026-09-27') es medianoche UTC y en un
+ *   navegador de América mostraba el día anterior.
+ * - Fechas con hora (timestamptz) se muestran en la hora local.
+ * - Vacío o no válido: "—".
+ *
+ * Antes se usaba toLocaleDateString() sin idioma, que en un navegador
+ * configurado en inglés enseñaba "9/27/2026".
+ */
+export const formatearFecha = (valor?: string | number | Date | null): string => {
+    if (valor === null || valor === undefined || valor === '') return '—';
+    if (typeof valor === 'string') {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(valor.trim());
+        if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    }
+    const d = valor instanceof Date ? valor : new Date(valor);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
+
+/** Fecha y hora en formato español (27/09/2026, 15:40). */
+export const formatearFechaHora = (valor?: string | number | Date | null): string => {
+    if (valor === null || valor === undefined || valor === '') return '—';
+    const d = valor instanceof Date ? valor : new Date(valor);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+/**
  * Calcula los totales de una factura de forma centralizada.
  * Maneja céntimos para evitar errores de redondeo en JS.
  */

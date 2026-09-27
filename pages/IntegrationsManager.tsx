@@ -8,6 +8,7 @@ import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { urlDeWebhookValida, MENSAJE_URL_NO_VALIDA, esperarResultadoPrueba, pruebaCorrecta } from '@/lib/webhooks';
 
+import { formatearFechaHora } from '@/lib/utils';
 // --- TYPES ---
 interface Integration {
   id: string;
@@ -36,7 +37,7 @@ const rowToIntegration = (row: IntegrationRow): Integration => ({
   event: row.event,
   isActive: row.is_active,
   lastTest: row.last_test_at
-    ? { success: !!row.last_test_success, timestamp: new Date(row.last_test_at).toLocaleString() }
+    ? { success: !!row.last_test_success, timestamp: formatearFechaHora(row.last_test_at) }
     : null,
 });
 
@@ -271,7 +272,7 @@ const IntegrationsManager: React.FC = () => {
         .eq('id', id);
 
       setIntegrations(prev => prev.map(i =>
-        i.id === id ? { ...i, lastTest: { success, timestamp: new Date(timestamp).toLocaleString() } } : i
+        i.id === id ? { ...i, lastTest: { success, timestamp: formatearFechaHora(timestamp) } } : i
       ));
     } finally {
       setTestingId(null);

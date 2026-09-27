@@ -10,6 +10,7 @@ import { UserIcon as User, BellIcon as Bell, ShieldIcon as Shield, CreditCard, G
 import { useToast } from '@/hooks/useToast';
 import { nivelDeCaducidad } from '../supabase/functions/_shared/caducidad-certificado';
 
+import { formatearFecha } from '@/lib/utils';
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal' | 'connect';
 
 /**
@@ -730,7 +731,7 @@ const SettingsPage: React.FC = () => {
                     <p className="text-sm text-gray-500">Cargando...</p>
                   ) : secretsStatus?.gemini_configured ? (
                     <div className="flex items-center justify-between bg-gray-800 p-3 rounded-lg">
-                      <span className="text-sm text-green-400">✅ Configurada {secretsStatus.gemini_updated_at && `(actualizada el ${new Date(secretsStatus.gemini_updated_at).toLocaleDateString('es-ES')})`}</span>
+                      <span className="text-sm text-green-400">✅ Configurada {secretsStatus.gemini_updated_at && `(actualizada el ${formatearFecha(secretsStatus.gemini_updated_at)})`}</span>
                       <Button size="sm" variant="danger" onClick={handleDeleteGeminiKey}>
                         <TrashIcon className="w-4 h-4" />
                       </Button>
@@ -773,7 +774,7 @@ const SettingsPage: React.FC = () => {
                         <div className={`flex items-start justify-between p-3 rounded-lg ${alerta ? 'bg-gray-800 ring-1 ring-red-500/40' : 'bg-gray-800'}`}>
                           <div className="space-y-1 pr-3">
                             <p className="text-sm text-green-400">
-                              ✅ Certificado guardado {secretsStatus.certificate_uploaded_at && `(subido el ${new Date(secretsStatus.certificate_uploaded_at).toLocaleDateString('es-ES')})`}
+                              ✅ Certificado guardado {secretsStatus.certificate_uploaded_at && `(subido el ${formatearFecha(secretsStatus.certificate_uploaded_at)})`}
                             </p>
                             {secretsStatus.certificate_subject && (
                               <p className="text-xs text-gray-400">Titular: {secretsStatus.certificate_subject}</p>

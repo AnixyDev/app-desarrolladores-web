@@ -87,7 +87,12 @@ const ProjectPage: React.FC = () => {
     const { addToast } = useToast();
     const navigate = useNavigate();
 
-    const [viewMode, setViewMode] = useState<'grid' | 'kanban'>('kanban');
+    // En el móvil el tablero abría en una columna vacía ("Planificación") y los
+    // proyectos quedaban escondidos a la derecha. En pantallas estrechas se
+    // empieza en la vista de tarjetas; el botón de arriba sigue cambiando.
+    const [viewMode, setViewMode] = useState<'grid' | 'kanban'>(() =>
+        typeof window !== 'undefined' && window.innerWidth < 768 ? 'grid' : 'kanban'
+    );
     const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [form, setForm] = useState<NewProject>(initialForm);

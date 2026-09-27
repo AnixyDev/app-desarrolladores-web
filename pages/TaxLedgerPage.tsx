@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { BookIcon, AlertTriangleIcon, DownloadIcon, ZapIcon, FileTextIcon } from '@/components/icons/Icon';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
@@ -363,7 +363,7 @@ const TaxLedgerPage: React.FC = () => {
                         <tbody className="divide-y divide-gray-800">
                         {filteredData.filteredInvoices.length > 0 ? filteredData.filteredInvoices.map(inv => (
                             <tr key={inv.id} className='hover:bg-gray-800/30'>
-                                <td className='p-3 text-gray-300 whitespace-nowrap'>{inv.issue_date}</td>
+                                <td className='p-3 text-gray-300 whitespace-nowrap'>{formatearFecha(inv.issue_date)}</td>
                                 <td className='p-3 text-white font-mono text-sm'>{inv.invoice_number}</td>
                                 <td className='p-3 text-right font-medium text-green-400'>{formatCurrency(inv.subtotal_cents)}</td>
                                 <td className='p-3 text-right text-gray-400 text-sm'>{formatCurrency(inv.subtotal_cents * (inv.tax_percent / 100))}</td>

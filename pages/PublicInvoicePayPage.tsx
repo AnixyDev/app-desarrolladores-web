@@ -18,7 +18,7 @@ import { supabase } from '@/lib/supabaseClient';
 import { Logo } from '@/components/icons/Logo';
 import Button from '@/components/ui/Button';
 import { CheckCircleIcon } from '@/components/icons/Icon';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 
 const StripePaymentModal = lazy(() => import('@/components/modals/StripePaymentModal'));
 
@@ -121,7 +121,7 @@ const PublicInvoicePayPage: React.FC = () => {
                 <p className="text-sm text-gray-400">Para: {invoice.client_name}</p>
               )}
               <p className="text-xs text-gray-500 mt-1">
-                Emitida {new Date(invoice.issue_date).toLocaleDateString('es-ES')} · Vence {new Date(invoice.due_date).toLocaleDateString('es-ES')}
+                Emitida {formatearFecha(invoice.issue_date)} · Vence {formatearFecha(invoice.due_date)}
               </p>
             </div>
             {invoice.paid ? (
