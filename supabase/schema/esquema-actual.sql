@@ -867,6 +867,38 @@ $$;
 ALTER FUNCTION "public"."increment_email_open"("p_business_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."jobs_proteger_destacado"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+begin
+  if current_user not in ('anon', 'authenticated') then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    new.isfeatured := false;
+    return new;
+  end if;
+
+  if new.isfeatured is distinct from old.isfeatured then
+    raise exception 'El destacado de una oferta solo se activa pagándolo.'
+      using errcode = '42501';
+  end if;
+
+  if new.user_id is distinct from old.user_id then
+    raise exception 'No se puede cambiar el dueño de una oferta.'
+      using errcode = '42501';
+  end if;
+
+  return new;
+end;
+$$;
+
+
+ALTER FUNCTION "public"."jobs_proteger_destacado"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."is_active_team_member"("p_owner_id" "uuid") RETURNS boolean
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO 'public', 'pg_temp'
@@ -3344,6 +3376,10 @@ CREATE INDEX "webhooks_enviados_integracion_idx" ON "public"."webhooks_enviados"
 
 
 
+CREATE OR REPLACE TRIGGER "a_jobs_proteger_destacado" BEFORE INSERT OR UPDATE ON "public"."jobs" FOR EACH ROW EXECUTE FUNCTION "public"."jobs_proteger_destacado"();
+
+
+
 CREATE OR REPLACE TRIGGER "a_profiles_proteger_columnas_de_pago" BEFORE INSERT OR UPDATE ON "public"."profiles" FOR EACH ROW EXECUTE FUNCTION "public"."proteger_columnas_de_pago_del_perfil"();
 
 
@@ -3895,10 +3931,6 @@ CREATE POLICY "Users can insert own tech_analysis" ON "public"."tech_analysis" F
 
 
 CREATE POLICY "Users can insert own time entries" ON "public"."time_entries" FOR INSERT WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
-
-
-
-CREATE POLICY "Users can insert their own payments" ON "public"."platform_payments" FOR INSERT WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
 
 
 
@@ -4947,6 +4979,12 @@ GRANT ALL ON FUNCTION "public"."increment_email_click"("p_business_id" "uuid") T
 
 REVOKE ALL ON FUNCTION "public"."increment_email_open"("p_business_id" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."increment_email_open"("p_business_id" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."jobs_proteger_destacado"() TO "anon";
+GRANT ALL ON FUNCTION "public"."jobs_proteger_destacado"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."jobs_proteger_destacado"() TO "service_role";
 
 
 
