@@ -1,18 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
-
-interface PortalClient {
-  client_id: string;
-  client_name: string;
-  // FIX / NUEVO: marca del freelancer dueño de este cliente, para el portal
-  // con marca blanca — antes el portal siempre mostraba el genérico
-  // "Portal de Cliente" sin ningún logo ni nombre de negocio.
-  ownerBusinessName: string | null;
-  ownerFullName: string | null;
-  ownerLogoUrl: string | null;
-  ownerBrandColor: string | null;
-}
+import { destinoValido, loginConDestino, recogerDestino } from '@/lib/destinoPortal';
+import {
+  type FichaDelPortal, documentoDeLaRuta, fichaInicial, guardarFichaPreferida,
+  leerFichaPreferida, nombreDelFreelancer,
+} from '@/lib/portalClientes';
 
 const DEFAULT_BRAND_COLOR = '#d9009f';
 
@@ -24,8 +17,17 @@ const PortalLayout: React.FC = () => {
   const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [hasSession, setHasSession] = useState(false);
-  const [client, setClient] = useState<PortalClient | null>(null);
+  // Todas las fichas de esta persona (puede ser cliente de varios
+  // freelancers) y la que se está viendo.
+  const [fichas, setFichas] = useState<FichaDelPortal[]>([]);
+  const [client, setClient] = useState<FichaDelPortal | null>(null);
+  // Mientras se averigua de qué ficha es el documento abierto, no se pinta:
+  // la página hija buscaría el documento en la ficha equivocada.
+  const [rutaResuelta, setRutaResuelta] = useState<string | null>(null);
   const [linkError, setLinkError] = useState(false);
+  // Página a la que iba el cliente antes de iniciar sesión (p. ej. el contrato
+  // del correo). Se calcula una sola vez: recogerDestino() la borra al leerla.
+  const destino = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     const init = async () => {
@@ -38,23 +40,23 @@ const PortalLayout: React.FC = () => {
       }
       setHasSession(true);
 
-      // Vincula (o recupera el vínculo ya existente) del cliente para este email.
-      // link_portal_client() ahora también devuelve la marca (logo, nombre,
-      // color) del freelancer dueño de este cliente.
+      // Enlaza (o recupera) todas las fichas de cliente con este email, con la
+      // marca (logo, nombre, color) del freelancer de cada una.
       const { data, error } = await supabase.rpc('link_portal_client');
 
       if (error || !data || data.length === 0) {
         setLinkError(true);
       } else {
-        const row = data[0];
-        setClient({
-          client_id: row.client_id,
-          client_name: row.client_name,
+        const lista: FichaDelPortal[] = (data as Array<Record<string, string | null>>).map(row => ({
+          client_id: String(row.client_id),
+          client_name: String(row.client_name ?? ''),
           ownerBusinessName: row.owner_business_name,
           ownerFullName: row.owner_full_name,
           ownerLogoUrl: row.owner_logo_url,
           ownerBrandColor: row.owner_brand_color,
-        });
+        }));
+        setFichas(lista);
+        setClient(fichaInicial(lista, leerFichaPreferida()));
       }
       setLoading(false);
     };
@@ -65,18 +67,52 @@ const PortalLayout: React.FC = () => {
       if (!session) {
         setHasSession(false);
         setClient(null);
+        setFichas([]);
       }
     });
 
     return () => authListener.subscription.unsubscribe();
   }, []);
 
+  // Con varias fichas, un enlace a un documento (el contrato del correo) abre
+  // la ficha a la que pertenece ese documento, sea del freelancer que sea.
+  useEffect(() => {
+    const doc = documentoDeLaRuta(location.pathname);
+    if (!doc || fichas.length < 2) return;
+    let vigente = true;
+    const ruta = location.pathname;
+    (async () => {
+      try {
+        const { data } = await supabase.from(doc.tabla).select('client_id').eq('id', doc.id).maybeSingle();
+        const suya = fichas.find(f => f.client_id === (data as { client_id?: string } | null)?.client_id);
+        if (vigente && suya) {
+          setClient(actual => (actual?.client_id === suya.client_id ? actual : suya));
+          guardarFichaPreferida(suya.client_id);
+        }
+      } finally {
+        if (vigente) setRutaResuelta(ruta);
+      }
+    })();
+    return () => { vigente = false; };
+  }, [location.pathname, fichas]);
+
+  const cambiarDeFicha = (id: string) => {
+    const nueva = fichas.find(f => f.client_id === id);
+    if (!nueva) return;
+    setClient(nueva);
+    guardarFichaPreferida(nueva.client_id);
+    navigate('/portal/dashboard');
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/portal/login');
   };
 
-  if (loading) {
+  const resolviendo =
+    fichas.length > 1 && documentoDeLaRuta(location.pathname) !== null && rutaResuelta !== location.pathname;
+
+  if (loading || resolviendo) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500" />
@@ -100,12 +136,22 @@ const PortalLayout: React.FC = () => {
         </div>
       );
     }
-    return <Navigate to="/portal/login" replace />;
+    // Se lleva la página pedida (`?next=`) y el email, si el enlace lo traía,
+    // para volver a ella después de entrar.
+    const email = new URLSearchParams(location.search).get('email');
+    return <Navigate to={loginConDestino(location.pathname, email)} replace />;
   }
 
-  // Con sesión, el formulario de acceso no pinta nada: al panel.
-  if (enLogin) {
-    return <Navigate to="/portal/dashboard" replace />;
+  const enRaiz = location.pathname === '/portal' || location.pathname === '/portal/';
+
+  // Con sesión, el formulario de acceso no pinta nada. Y al volver del enlace
+  // mágico (que siempre aterriza en /portal) se va a la página que se pidió
+  // antes de iniciar sesión, si la hay; si no, al panel.
+  if (enLogin || enRaiz) {
+    if (destino.current === undefined) {
+      destino.current = destinoValido(new URLSearchParams(location.search).get('next')) ?? recogerDestino();
+    }
+    return <Navigate to={destino.current ?? '/portal/dashboard'} replace />;
   }
 
   if (linkError) {
@@ -125,18 +171,8 @@ const PortalLayout: React.FC = () => {
     );
   }
 
-  const brandName = client?.ownerBusinessName || client?.ownerFullName || 'Portal de Cliente';
+  const brandName = client ? nombreDelFreelancer(client) : 'Portal de Cliente';
   const brandColor = client?.ownerBrandColor || DEFAULT_BRAND_COLOR;
-
-  // FIX: la ruta hija "index" del router (App.tsx) hacía
-  // <Navigate to="login" replace /> incondicionalmente. Como PortalLayout
-  // ya ha comprobado aquí arriba que hay sesión y cliente vinculado, un
-  // cliente que llega recién autenticado (tras pulsar el enlace mágico,
-  // que redirige a la raíz "/portal") acababa devuelto a la pantalla de
-  // login en vez de a su dashboard, aunque ya estuviera dentro.
-  if (location.pathname === '/portal' || location.pathname === '/portal/') {
-    return <Navigate to="/portal/dashboard" replace />;
-  }
 
   return (
     // La variable CSS --portal-brand-color permite que cualquier página hija
@@ -166,7 +202,23 @@ const PortalLayout: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {client && <span className="text-sm text-gray-400 hidden sm:inline">{client.client_name}</span>}
+            {fichas.length > 1 && client ? (
+              <label className="text-sm text-gray-400 flex items-center gap-2">
+                <span className="hidden sm:inline">Freelancer:</span>
+                <select
+                  aria-label="Cambiar de freelancer"
+                  value={client.client_id}
+                  onChange={(e) => cambiarDeFicha(e.target.value)}
+                  className="bg-gray-800 border border-gray-700 rounded-md px-2 py-1 text-gray-200 max-w-[11rem] truncate"
+                >
+                  {fichas.map(f => (
+                    <option key={f.client_id} value={f.client_id}>{nombreDelFreelancer(f)}</option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              client && <span className="text-sm text-gray-400 hidden sm:inline">{client.client_name}</span>
+            )}
             <button onClick={handleLogout} className="text-sm text-gray-400 hover:text-white">
               Cerrar sesión
             </button>

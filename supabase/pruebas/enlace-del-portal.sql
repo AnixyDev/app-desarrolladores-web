@@ -29,9 +29,10 @@ declare
   v_fallos   int := 0;
   v_visto    uuid;
 begin
-  -- Una cuenta que no sea ya cliente de portal de nadie (portal_user_id es
-  -- único): la primera versión cogía la más antigua, y dejó de valer en
-  -- cuanto esa cuenta se enlazó de verdad a una ficha.
+  -- Una cuenta que no sea ya cliente de portal de nadie: la primera versión
+  -- cogía la más antigua, y dejó de valer en cuanto esa cuenta se enlazó de
+  -- verdad a una ficha (entonces portal_user_id era único; desde el 27/09
+  -- ya no, pero así la prueba no toca enlaces reales).
   select u.id, lower(u.email) into v_cuenta, v_correo
     from auth.users u
    where u.email is not null

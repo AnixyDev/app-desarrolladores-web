@@ -5,6 +5,7 @@ import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { supabase } from '@/lib/supabaseClient';
 import CaptchaTurnstile, { type CaptchaTurnstileHandle } from '@/components/auth/CaptchaTurnstile';
+import { guardarDestino } from '@/lib/destinoPortal';
 import { opcionesCaptcha, puedeEnviarConCaptcha, esErrorDeCaptcha, MENSAJE_CAPTCHA_FALLIDO } from '@/lib/captcha';
 
 const PortalLoginPage: React.FC = () => {
@@ -24,6 +25,10 @@ const PortalLoginPage: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    // El enlace mágico vuelve a /portal; desde ahí el portal lleva al cliente
+    // a la página que había pedido (el contrato del correo, por ejemplo).
+    guardarDestino(searchParams.get('next'));
 
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -71,6 +76,11 @@ const PortalLoginPage: React.FC = () => {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
+              {searchParams.get('next') && (
+                <p className="text-sm text-gray-400 text-center">
+                  Para ver el documento, pide un enlace de acceso con tu email. Al abrirlo irás directamente a él.
+                </p>
+              )}
               <Input
                 label="Email"
                 type="email"
