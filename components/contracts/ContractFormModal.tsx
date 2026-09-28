@@ -3,32 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { Contract, Client, Project, Profile } from '@/types';
-import { formatCurrency } from '@/lib/utils';
+import { generarContrato, huecosPendientes } from '@/lib/plantillaContrato';
 
-const CONTRACT_TEMPLATE = `CONTRATO DE PRESTACIÓN DE SERVICIOS FREELANCE
-
-Este contrato se celebra entre:
-
-- [YOUR_NAME] (en adelante, "el Freelancer"), con NIF [YOUR_TAX_ID].
-- [CLIENT_NAME], en representación de [CLIENT_COMPANY] (en adelante, "el Cliente").
-
-Ambas partes acuerdan lo siguiente:
-
-1. OBJETO DEL CONTRATO
-El Freelancer se compromete a realizar los servicios profesionales para el proyecto "[PROJECT_NAME]".
-Descripción del proyecto: [PROJECT_DESCRIPTION].
-
-2. DURACIÓN Y ENTREGA
-Este contrato entrará en vigor en la fecha de su firma. La fecha de entrega estimada para la finalización del proyecto es el [PROJECT_DUE_DATE].
-
-3. HONORARIOS Y FORMA DE PAGO
-El coste total de los servicios será de [PROJECT_BUDGET]. El pago se realizará según los plazos acordados en la factura correspondiente.
-
-4. CONFIDENCIALIDAD
-Ambas partes se comprometen a mantener la confidencialidad de toda la información compartida durante la duración de este contrato.
-
-Firmado a [CURRENT_DATE].
-`;
 
 interface ContractFormModalProps {
   isOpen: boolean;
@@ -58,20 +34,38 @@ const ContractFormModal: React.FC<ContractFormModalProps> = ({
     [projects, selectedClientId]
   );
 
+  // Plantilla ajustada a la ley española (lib/plantillaContrato.ts), rellena
+  // con los datos del perfil, del cliente y del proyecto.
   const generateTemplate = (clientId: string, projectId: string): string => {
     const project = projects.find(p => p.id === projectId);
     const client = clients.find(c => c.id === clientId);
     if (!project || !client) return '';
-    return CONTRACT_TEMPLATE
-      .replace('[YOUR_NAME]', profile.full_name)
-      .replace('[YOUR_TAX_ID]', profile.tax_id)
-      .replace('[CLIENT_NAME]', client.name)
-      .replace('[CLIENT_COMPANY]', client.company || client.name)
-      .replace('[PROJECT_NAME]', project.name)
-      .replace('[PROJECT_DESCRIPTION]', project.description || 'No especificada.')
-      .replace('[PROJECT_DUE_DATE]', project.due_date)
-      .replace('[PROJECT_BUDGET]', project.budget_cents ? formatCurrency(project.budget_cents) : 'a convenir')
-      .replace('[CURRENT_DATE]', new Date().toLocaleDateString('es-ES'));
+    const domicilio = [profile.fiscal_street, [profile.fiscal_postal_code, profile.fiscal_city].filter(Boolean).join(' '), profile.fiscal_province]
+      .map(x => (x ?? '').trim()).filter(Boolean).join(', ');
+    return generarContrato({
+      freelancer: {
+        nombre: profile.full_name,
+        negocio: profile.business_name,
+        nif: profile.tax_id,
+        domicilio,
+        email: profile.invoice_reply_to_email || profile.email,
+      },
+      cliente: {
+        nombre: client.name,
+        empresa: client.company,
+        nif: client.tax_id,
+        domicilio: client.address,
+        email: client.email,
+      },
+      proyecto: {
+        nombre: project.name,
+        descripcion: project.description,
+        fechaEntrega: project.due_date,
+        importeCents: project.budget_cents,
+      },
+      lugar: profile.fiscal_city,
+      fecha: new Date().toISOString().slice(0, 10),
+    });
   };
 
   // Sync state when modal opens
@@ -162,16 +156,34 @@ const ContractFormModal: React.FC<ContractFormModalProps> = ({
         </div>
 
         <div className="flex-grow flex flex-col">
-          <label className="block text-sm font-medium text-gray-300 mb-1">Contenido del Contrato</label>
+          <div className="flex items-center justify-between mb-1 gap-2">
+            <label className="block text-sm font-medium text-gray-300">Contenido del Contrato</label>
+            <button
+              type="button"
+              disabled={!selectedProjectId}
+              onClick={() => {
+                if (contractContent.trim() && !window.confirm('Se sustituirá el texto actual por la plantilla legal con los datos del cliente y del proyecto. ¿Continuar?')) return;
+                setContractContent(generateTemplate(selectedClientId, selectedProjectId));
+              }}
+              className="text-xs text-primary-400 hover:text-primary-300 disabled:opacity-40"
+            >
+              Usar la plantilla legal
+            </button>
+          </div>
           <textarea
             value={contractContent}
             onChange={e => setContractContent(e.target.value)}
-            className="w-full h-96 p-6 border border-gray-600 rounded-md bg-gray-100 text-gray-900 font-mono text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full h-96 p-6 border border-gray-600 rounded-md bg-gray-100 text-gray-900 text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-primary-500"
             placeholder="Escribe o pega aquí el contenido del contrato..."
             disabled={!selectedProjectId}
           />
-          <p className="text-xs text-gray-500 mt-1 text-right">
-            Puedes usar formato Markdown básico si lo deseas.
+          {huecosPendientes(contractContent) > 0 && (
+            <p className="text-xs text-yellow-300 mt-2">
+              Faltan {huecosPendientes(contractContent)} dato(s) marcados como [________]. Complétalos aquí, o rellena tu domicilio fiscal y NIF en Ajustes y los del cliente en su ficha, y pulsa «Usar la plantilla legal».
+            </p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">
+            Plantilla orientativa conforme a la legislación española (Código Civil, Ley de Propiedad Intelectual, RGPD, Ley de morosidad y normas de consumo). Adáptala a cada caso y, si el proyecto es importante, pide que la revise un abogado.
           </p>
         </div>
 
