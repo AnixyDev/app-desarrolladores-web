@@ -37,13 +37,27 @@ const ContractsPage: React.FC = () => {
   // ── Handlers del formulario ────────────────────────────────────────────────
 
   const handleOpenCreate = () => { setEditingContract(null); setIsFormOpen(true); };
-  const handleOpenEdit = (contract: Contract) => { setEditingContract(contract); setIsFormOpen(true); };
+  const handleOpenEdit = (contract: Contract) => {
+    if (contract.status === 'signed' && !window.confirm(
+      'Este contrato ya está firmado. Si lo editas, se quita la firma y habrá que volver a enviarlo para firmar. ¿Continuar?'
+    )) return;
+    setEditingContract(contract);
+    setIsFormOpen(true);
+  };
 
   const handleFormSubmit = async ({ clientId, projectId, content }: { clientId: string; projectId: string; content: string }) => {
     try {
       if (editingContract) {
-        await updateContract(editingContract.id, { client_id: clientId, project_id: projectId, content });
-        addToast('Contrato actualizado.', 'success');
+        // Un contrato firmado que cambia deja de estar firmado: la firma era
+        // del texto anterior.
+        const quitarFirma = editingContract.status === 'signed';
+        await updateContract(editingContract.id, {
+          client_id: clientId,
+          project_id: projectId,
+          content,
+          ...(quitarFirma ? { status: 'draft' as Contract['status'], signed_by: null, signed_at: null } : {}),
+        });
+        addToast(quitarFirma ? 'Contrato actualizado. Ha vuelto a borrador: envíalo de nuevo para firmar.' : 'Contrato actualizado.', 'success');
       } else {
         await addContract({ client_id: clientId, project_id: projectId, content, status: 'draft' });
         addToast('Contrato creado.', 'success');
@@ -77,7 +91,10 @@ const ContractsPage: React.FC = () => {
   // ── Handlers de acciones ────────────────────────────────────────────────────
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('¿Estás seguro de eliminar este contrato?')) {
+    const firmado = contracts.find(c => c.id === id)?.status === 'signed';
+    if (window.confirm(firmado
+      ? 'Este contrato está FIRMADO. Si lo borras, perderás la prueba de la firma. ¿Borrarlo de todas formas?'
+      : '¿Estás seguro de eliminar este contrato?')) {
       try {
         await deleteContract(id);
         addToast('Contrato eliminado.', 'info');
@@ -98,11 +115,15 @@ const ContractsPage: React.FC = () => {
       addToast('Faltan datos del cliente o del proyecto.', 'error');
       return;
     }
-    try {
-      await sendContract(contract.id);
-    } catch (err) {
-      addToast((err as Error).message || 'No se pudo actualizar el estado del contrato.', 'error');
-      return;
+    // Solo un borrador pasa a "Enviado"; reenviar uno enviado o firmado no
+    // toca su estado (a un firmado le llega la copia, no la petición de firma).
+    if (contract.status === 'draft') {
+      try {
+        await sendContract(contract.id);
+      } catch (err) {
+        addToast((err as Error).message || 'No se pudo actualizar el estado del contrato.', 'error');
+        return;
+      }
     }
 
     try {
@@ -112,10 +133,12 @@ const ContractsPage: React.FC = () => {
         documentoId: contract.id,
         pdfBase64,
       });
-      addToast('Estado actualizado a Enviado y email enviado con el contrato adjunto.', 'success');
+      addToast(contract.status === 'draft'
+        ? 'Contrato enviado por email y marcado como Enviado.'
+        : contract.status === 'signed' ? 'Copia del contrato firmado enviada por email.' : 'Contrato reenviado por email.', 'success');
     } catch (error) {
       console.error('Error enviando el contrato por email:', error);
-      addToast(`El estado se actualizó a Enviado, pero el email no pudo enviarse: ${(error as Error)?.message || 'inténtalo de nuevo.'}`, 'error');
+      addToast(`El email no pudo enviarse: ${(error as Error)?.message || 'inténtalo de nuevo.'}`, 'error');
     }
   };
   // CAMBIO: usa pdfService.ts (import estático ya cargado en el bundle)

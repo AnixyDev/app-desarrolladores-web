@@ -15,6 +15,9 @@ import {
   nombreDeArchivo,
   correoDeFactura,
   correoDeContrato,
+  correoDePresupuesto,
+  correoDePropuesta,
+  correoDeRecibo,
   TIPOS_DE_DOCUMENTO,
   ENVIOS_DE_DOCUMENTOS_POR_DIA,
   type Correo,
@@ -111,48 +114,125 @@ Deno.serve(async (req) => {
     let correo: Correo;
     let archivo: string;
 
+    const firma = profile.full_name || profile.business_name || '';
+    // El email del cliente de ese documento, de las fichas del propio usuario.
+    const clienteDe = async (clientId: string | null) => {
+      if (!clientId) return null;
+      const { data } = await supabase
+        .from('clients').select('name, email').eq('id', clientId).eq('user_id', user.id).maybeSingle();
+      return data as { name: string | null; email: string | null } | null;
+    };
+    const enlaceDelPortal = (ruta: string, email: string) =>
+      `${SITIO}/portal/${ruta}?email=${encodeURIComponent(email)}`;
+
     if (tipo === 'factura') {
       const { data: factura } = await supabase
         .from('invoices')
-        .select('id, client_id, invoice_number, total_cents')
+        .select('id, client_id, invoice_number, total_cents, rectifies_invoice_id')
         .eq('id', documentoId)
         .eq('user_id', user.id)
         .maybeSingle();
       if (!factura) return json({ error: 'Esa factura no existe o no es tuya.' }, 404);
 
-      const { data: cliente } = await supabase
-        .from('clients').select('name, email').eq('id', factura.client_id).eq('user_id', user.id).maybeSingle();
+      let rectificaA: string | null | undefined = undefined;
+      if (factura.rectifies_invoice_id) {
+        const { data: original } = await supabase
+          .from('invoices').select('invoice_number').eq('id', factura.rectifies_invoice_id).eq('user_id', user.id).maybeSingle();
+        rectificaA = original?.invoice_number ?? '';
+      }
+
+      const cliente = await clienteDe(factura.client_id);
       destinatario = String(cliente?.email ?? '').trim().toLowerCase();
       correo = correoDeFactura({
         cliente: cliente?.name ?? '',
         numero: factura.invoice_number,
         totalCents: factura.total_cents,
         enlacePago: `${SITIO}/pay/${factura.id}`,
+        rectificaA,
       });
-      archivo = nombreDeArchivo('Factura', factura.invoice_number);
-    } else {
+      archivo = nombreDeArchivo(rectificaA !== undefined ? 'Factura-rectificativa' : 'Factura', factura.invoice_number);
+    } else if (tipo === 'contrato') {
       const { data: contrato } = await supabase
         .from('contracts')
-        .select('id, client_id, project_id')
+        .select('id, client_id, project_id, status')
         .eq('id', documentoId)
         .eq('user_id', user.id)
         .maybeSingle();
       if (!contrato) return json({ error: 'Ese contrato no existe o no es tuyo.' }, 404);
 
-      const [{ data: cliente }, { data: proyecto }] = await Promise.all([
-        supabase.from('clients').select('name, email').eq('id', contrato.client_id).eq('user_id', user.id).maybeSingle(),
+      const [cliente, { data: proyecto }] = await Promise.all([
+        clienteDe(contrato.client_id),
         supabase.from('projects').select('name').eq('id', contrato.project_id).eq('user_id', user.id).maybeSingle(),
       ]);
       destinatario = String(cliente?.email ?? '').trim().toLowerCase();
       correo = correoDeContrato({
         cliente: cliente?.name ?? '',
         proyecto: proyecto?.name ?? '',
-        firma: profile.full_name || profile.business_name || '',
-        // Con el email puesto: sin sesión, el portal pide acceso con esa dirección
-        // ya escrita y, al entrar, vuelve a este contrato.
-        enlacePortal: `${SITIO}/portal/contracts/${contrato.id}?email=${encodeURIComponent(destinatario)}`,
+        firma,
+        // Con el email puesto: sin sesión, el portal pide acceso con esa
+        // dirección ya escrita y, al entrar, vuelve a este contrato.
+        enlacePortal: enlaceDelPortal(`contracts/${contrato.id}`, destinatario),
+        firmado: contrato.status === 'signed',
       });
       archivo = nombreDeArchivo('Contrato', proyecto?.name);
+    } else if (tipo === 'presupuesto') {
+      const { data: presupuesto } = await supabase
+        .from('budgets')
+        .select('id, client_id, description, amount_cents')
+        .eq('id', documentoId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!presupuesto) return json({ error: 'Ese presupuesto no existe o no es tuyo.' }, 404);
+
+      const cliente = await clienteDe(presupuesto.client_id);
+      destinatario = String(cliente?.email ?? '').trim().toLowerCase();
+      correo = correoDePresupuesto({
+        cliente: cliente?.name ?? '',
+        descripcion: presupuesto.description,
+        importeCents: presupuesto.amount_cents,
+        enlacePortal: enlaceDelPortal(`budgets/${presupuesto.id}`, destinatario),
+        firma,
+      });
+      archivo = nombreDeArchivo('Presupuesto', presupuesto.description);
+    } else if (tipo === 'propuesta') {
+      const { data: propuesta } = await supabase
+        .from('proposals')
+        .select('id, client_id, title, amount_cents')
+        .eq('id', documentoId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!propuesta) return json({ error: 'Esa propuesta no existe o no es tuya.' }, 404);
+
+      const cliente = await clienteDe(propuesta.client_id);
+      destinatario = String(cliente?.email ?? '').trim().toLowerCase();
+      correo = correoDePropuesta({
+        cliente: cliente?.name ?? '',
+        titulo: propuesta.title,
+        importeCents: propuesta.amount_cents,
+        enlacePortal: enlaceDelPortal(`proposals/${propuesta.id}`, destinatario),
+        firma,
+      });
+      archivo = nombreDeArchivo('Propuesta', propuesta.title);
+    } else {
+      const { data: recibo } = await supabase
+        .from('receipts')
+        .select('id, client_id, receipt_number, concept, amount_cents')
+        .eq('id', documentoId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!recibo) return json({ error: 'Ese recibo no existe o no es tuyo.' }, 404);
+      if (!recibo.client_id) return json({ error: 'Este recibo no tiene cliente: edítalo y elige uno para poder enviarlo.' }, 400);
+
+      const cliente = await clienteDe(recibo.client_id);
+      destinatario = String(cliente?.email ?? '').trim().toLowerCase();
+      correo = correoDeRecibo({
+        cliente: cliente?.name ?? '',
+        numero: recibo.receipt_number,
+        concepto: recibo.concept,
+        importeCents: recibo.amount_cents,
+        firma,
+      });
+      archivo = nombreDeArchivo('Recibo', recibo.receipt_number);
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(destinatario)) {

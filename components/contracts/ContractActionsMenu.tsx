@@ -21,7 +21,9 @@ const ContractActionsMenu: React.FC<ContractActionsMenuProps> = ({
   onSend,
   onDelete,
 }) => {
-  const isDraft = contract.status === 'draft';
+  // Desde el 28/09 editar, reenviar y borrar están siempre disponibles (a
+  // petición de Ana). Editar un contrato firmado le quita la firma: lo avisa
+  // ContractsPage antes de abrir el formulario.
   const isSigned = contract.status === 'signed';
 
   return (
@@ -37,24 +39,23 @@ const ContractActionsMenu: React.FC<ContractActionsMenuProps> = ({
           <CheckCircleIcon className="w-4 h-4" />
         </Button>
       )}
-      {isDraft && (
-        <Button size="sm" variant="secondary" onClick={() => onEdit(contract)} title="Editar">
-          <EditIcon className="w-4 h-4" />
-        </Button>
-      )}
+      <Button size="sm" variant="secondary" onClick={() => onEdit(contract)} title="Editar">
+        <EditIcon className="w-4 h-4" />
+      </Button>
       <Button size="sm" variant="secondary" onClick={() => onDownload(contract)} title="Descargar PDF">
         <DownloadIcon className="w-4 h-4" />
       </Button>
-      {isDraft && (
-        <Button size="sm" variant="secondary" onClick={() => onSend(contract)} title="Enviar por email">
-          <SendIcon className="w-4 h-4" />
-        </Button>
-      )}
-      {isDraft && (
-        <Button size="sm" variant="danger" onClick={() => onDelete(contract.id)} title="Eliminar">
-          <TrashIcon className="w-4 h-4" />
-        </Button>
-      )}
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() => onSend(contract)}
+        title={contract.status === 'draft' ? 'Enviar por email' : isSigned ? 'Enviar copia firmada por email' : 'Reenviar por email'}
+      >
+        <SendIcon className="w-4 h-4" />
+      </Button>
+      <Button size="sm" variant="danger" onClick={() => onDelete(contract.id)} title="Eliminar">
+        <TrashIcon className="w-4 h-4" />
+      </Button>
     </div>
   );
 };

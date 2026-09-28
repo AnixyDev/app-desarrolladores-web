@@ -150,6 +150,10 @@ export interface Invoice {
   fiscal_locked?: boolean;
   rectifies_invoice_id?: string | null;
   is_rectified?: boolean;
+  motivo_rectificacion?: string | null;
+  notes?: string | null;
+  budget_id?: string | null;
+  contract_id?: string | null;
 }
 
 export interface Receipt {
@@ -257,8 +261,8 @@ export interface Contract {
   content: string;
   status: ContractStatus;
   created_at: string;
-  signed_by?: string;
-  signed_at?: string;
+  signed_by?: string | null;
+  signed_at?: string | null;
 }
 
 export interface JobApplication {

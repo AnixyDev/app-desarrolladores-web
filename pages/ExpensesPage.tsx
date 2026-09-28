@@ -7,8 +7,8 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { Expense, RecurringExpense } from '@/types';
-import { formatCurrency } from '@/lib/utils';
-import { PlusIcon, TrashIcon, RepeatIcon, SparklesIcon } from '@/components/icons/Icon';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
+import { PlusIcon, TrashIcon, RepeatIcon, SparklesIcon, EditIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 import { ExtractedExpenseData } from '@/services/geminiService';
 
@@ -16,7 +16,11 @@ const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationMod
 const ExpenseOcrModal = lazy(() => import('@/components/modals/ExpenseOcrModal'));
 
 const ExpensesPage: React.FC = () => {
-    const { expenses, recurringExpenses, addExpense, deleteExpense, addRecurringExpense, deleteRecurringExpense, projects } = useAppStore(useShallow(s => ({ expenses: s.expenses, recurringExpenses: s.recurringExpenses, addExpense: s.addExpense, deleteExpense: s.deleteExpense, addRecurringExpense: s.addRecurringExpense, deleteRecurringExpense: s.deleteRecurringExpense, projects: s.projects })));
+    const { expenses, recurringExpenses, addExpense, updateExpense, deleteExpense, addRecurringExpense, updateRecurringExpense, deleteRecurringExpense, projects } = useAppStore(useShallow(s => ({ expenses: s.expenses, recurringExpenses: s.recurringExpenses, addExpense: s.addExpense, updateExpense: s.updateExpense, deleteExpense: s.deleteExpense, addRecurringExpense: s.addRecurringExpense, updateRecurringExpense: s.updateRecurringExpense, deleteRecurringExpense: s.deleteRecurringExpense, projects: s.projects })));
+    // Gasto (o gasto recurrente) que se está editando; null = crear uno nuevo.
+    const [gastoEnEdicion, setGastoEnEdicion] = useState<Expense | null>(null);
+    const [recurrenteEnEdicion, setRecurrenteEnEdicion] = useState<RecurringExpense | null>(null);
+    const [proximaFecha, setProximaFecha] = useState('');
     const { addToast } = useToast();
 
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -55,34 +59,96 @@ const ExpensesPage: React.FC = () => {
     };
 
 
+    const abrirNuevoGasto = () => {
+        setGastoEnEdicion(null);
+        setNewExpense(initialExpenseState);
+        setIsExpenseModalOpen(true);
+    };
+
+    const abrirEdicionGasto = (gasto: Expense) => {
+        setGastoEnEdicion(gasto);
+        setNewExpense({
+            description: gasto.description,
+            amount_cents: gasto.amount_cents / 100,
+            tax_percent: gasto.tax_percent,
+            date: gasto.date.slice(0, 10),
+            category: gasto.category,
+            project_id: gasto.project_id ?? '',
+        });
+        setIsExpenseModalOpen(true);
+    };
+
+    const abrirNuevoRecurrente = () => {
+        setRecurrenteEnEdicion(null);
+        setNewRecurringExpense(initialRecurringState);
+        setIsRecurringModalOpen(true);
+    };
+
+    const abrirEdicionRecurrente = (gasto: RecurringExpense) => {
+        setRecurrenteEnEdicion(gasto);
+        setNewRecurringExpense({
+            description: gasto.description,
+            amount_cents: gasto.amount_cents / 100,
+            category: gasto.category,
+            frequency: gasto.frequency,
+            start_date: gasto.start_date.slice(0, 10),
+        });
+        setProximaFecha(gasto.next_date.slice(0, 10));
+        setIsRecurringModalOpen(true);
+    };
+
     const handleExpenseSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const datos = {
+            description: newExpense.description,
+            category: newExpense.category,
+            date: newExpense.date,
+            amount_cents: Math.round(Number(newExpense.amount_cents) * 100),
+            tax_percent: Number(newExpense.tax_percent) || 0,
+            // '' no es un uuid válido: sin proyecto va null.
+            project_id: newExpense.project_id || null,
+        };
         try {
-            await addExpense({
-                ...newExpense,
-                amount_cents: Math.round(Number(newExpense.amount_cents) * 100),
-                tax_percent: Number(newExpense.tax_percent) || 0,
-            } as any);
-            addToast('Gasto añadido.', 'success');
+            if (gastoEnEdicion) {
+                await updateExpense(gastoEnEdicion.id, datos);
+                addToast('Gasto actualizado.', 'success');
+            } else {
+                await addExpense(datos);
+                addToast('Gasto añadido.', 'success');
+            }
             setIsExpenseModalOpen(false);
+            setGastoEnEdicion(null);
             setNewExpense(initialExpenseState);
         } catch (err) {
-            addToast((err as Error).message || 'No se pudo añadir el gasto.', 'error');
+            addToast((err as Error).message || 'No se pudo guardar el gasto.', 'error');
         }
     };
 
     const handleRecurringSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const datos = {
+            ...newRecurringExpense,
+            amount_cents: Math.round(Number(newRecurringExpense.amount_cents) * 100),
+        };
         try {
-            await addRecurringExpense({
-                ...newRecurringExpense,
-                amount_cents: Math.round(Number(newRecurringExpense.amount_cents) * 100),
-            });
-            addToast('Gasto recurrente añadido.', 'success');
+            if (recurrenteEnEdicion) {
+                await updateRecurringExpense(recurrenteEnEdicion.id, {
+                    description: datos.description,
+                    amount_cents: datos.amount_cents,
+                    category: datos.category,
+                    frequency: datos.frequency,
+                    next_date: proximaFecha || recurrenteEnEdicion.next_date,
+                });
+                addToast('Gasto recurrente actualizado.', 'success');
+            } else {
+                await addRecurringExpense(datos);
+                addToast('Gasto recurrente añadido.', 'success');
+            }
             setIsRecurringModalOpen(false);
+            setRecurrenteEnEdicion(null);
             setNewRecurringExpense(initialRecurringState);
         } catch (err) {
-            addToast((err as Error).message || 'No se pudo añadir el gasto recurrente.', 'error');
+            addToast((err as Error).message || 'No se pudo guardar el gasto recurrente.', 'error');
         }
     };
 
@@ -90,6 +156,7 @@ const ExpensesPage: React.FC = () => {
     // y confirma manualmente pulsando "Guardar Gasto" (mismo flujo de
     // validación y guardado que un gasto añadido a mano).
     const handleOcrExtracted = (data: ExtractedExpenseData) => {
+        setGastoEnEdicion(null);
         setNewExpense({
             description: data.vendor_name ? `${data.description} — ${data.vendor_name}` : data.description,
             amount_cents: data.amount_cents / 100,
@@ -130,10 +197,10 @@ const ExpensesPage: React.FC = () => {
                     <Button onClick={() => setIsOcrModalOpen(true)} variant="secondary">
                         <SparklesIcon className="w-4 h-4 mr-2" /> Escanear Ticket (IA)
                     </Button>
-                    <Button onClick={() => setIsRecurringModalOpen(true)} variant="secondary">
+                    <Button onClick={abrirNuevoRecurrente} variant="secondary">
                         <RepeatIcon className="w-4 h-4 mr-2" /> Añadir Gasto Recurrente
                     </Button>
-                    <Button onClick={() => setIsExpenseModalOpen(true)}>
+                    <Button onClick={abrirNuevoGasto}>
                         <PlusIcon className="w-4 h-4 mr-2" /> Añadir Gasto
                     </Button>
                 </div>
@@ -159,12 +226,17 @@ const ExpensesPage: React.FC = () => {
                                 {expenses.map(expense => (
                                     <tr key={expense.id} className="border-b border-gray-800 hover:bg-gray-800/50">
                                         <td className="p-4 text-white">{(expense as any).description}</td>
-                                        <td className="p-4 text-gray-300">{expense.date}</td>
+                                        <td className="p-4 text-gray-300">{formatearFecha(expense.date)}</td>
                                         <td className="p-4 text-white font-semibold">{formatCurrency(expense.amount_cents)}</td>
                                         <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
-                                            <Button size="sm" variant="danger" onClick={() => handleDeleteClick(expense.id, 'single')}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            <div className="flex justify-end gap-2">
+                                                <Button size="sm" variant="secondary" onClick={() => abrirEdicionGasto(expense)} title="Editar">
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                                <Button size="sm" variant="danger" onClick={() => handleDeleteClick(expense.id, 'single')} title="Eliminar">
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -193,12 +265,17 @@ const ExpensesPage: React.FC = () => {
                                 {recurringExpenses.map(expense => (
                                     <tr key={expense.id} className="border-b border-gray-800 hover:bg-gray-800/50">
                                         <td className="p-4 text-white">{(expense as any).description}</td>
-                                        <td className="p-4 text-gray-300">{(expense as any).next_date}</td>
+                                        <td className="p-4 text-gray-300">{formatearFecha(expense.next_date)}</td>
                                         <td className="p-4 text-white font-semibold">{formatCurrency(expense.amount_cents)}</td>
                                         <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
-                                            <Button size="sm" variant="danger" onClick={() => handleDeleteClick(expense.id, 'recurring')}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            <div className="flex justify-end gap-2">
+                                                <Button size="sm" variant="secondary" onClick={() => abrirEdicionRecurrente(expense)} title="Editar">
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                                <Button size="sm" variant="danger" onClick={() => handleDeleteClick(expense.id, 'recurring')} title="Eliminar">
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -210,7 +287,7 @@ const ExpensesPage: React.FC = () => {
             </div>
             
             {/* Modal for single expense */}
-            <Modal isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} title="Añadir Nuevo Gasto">
+            <Modal isOpen={isExpenseModalOpen} onClose={() => setIsExpenseModalOpen(false)} title={gastoEnEdicion ? 'Editar gasto' : 'Añadir Nuevo Gasto'}>
                 <form onSubmit={handleExpenseSubmit} className="space-y-4">
                     <Input name="description" label="Descripción" value={newExpense.description} onChange={handleExpenseChange} required />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -227,17 +304,21 @@ const ExpensesPage: React.FC = () => {
                         </select>
                     </div>
                     <div className="flex justify-end pt-4">
-                        <Button type="submit">Guardar Gasto</Button>
+                        <Button type="submit">{gastoEnEdicion ? 'Guardar cambios' : 'Guardar Gasto'}</Button>
                     </div>
                 </form>
             </Modal>
             
             {/* Modal for recurring expense */}
-            <Modal isOpen={isRecurringModalOpen} onClose={() => setIsRecurringModalOpen(false)} title="Añadir Gasto Recurrente">
+            <Modal isOpen={isRecurringModalOpen} onClose={() => setIsRecurringModalOpen(false)} title={recurrenteEnEdicion ? 'Editar gasto recurrente' : 'Añadir Gasto Recurrente'}>
                 <form onSubmit={handleRecurringSubmit} className="space-y-4">
                     <Input name="description" label="Descripción" value={newRecurringExpense.description} onChange={handleRecurringChange} required />
                     <Input name="amount_cents" label="Importe (€)" type="number" step="0.01" value={newRecurringExpense.amount_cents} onChange={handleRecurringChange} required />
-                    <Input name="start_date" label="Fecha de Inicio" type="date" value={newRecurringExpense.start_date} onChange={handleRecurringChange} required />
+                    {recurrenteEnEdicion ? (
+                        <Input label="Próximo cargo" type="date" value={proximaFecha} onChange={(e) => setProximaFecha(e.target.value)} required />
+                    ) : (
+                        <Input name="start_date" label="Fecha de Inicio" type="date" value={newRecurringExpense.start_date} onChange={handleRecurringChange} required />
+                    )}
                     <Input name="category" label="Categoría" value={newRecurringExpense.category} onChange={handleRecurringChange} />
                      <div>
                          <label className="block text-sm font-medium text-gray-300 mb-1">Frecuencia</label>
@@ -247,7 +328,7 @@ const ExpensesPage: React.FC = () => {
                         </select>
                     </div>
                     <div className="flex justify-end pt-4">
-                        <Button type="submit">Guardar Gasto Recurrente</Button>
+                        <Button type="submit">{recurrenteEnEdicion ? 'Guardar cambios' : 'Guardar Gasto Recurrente'}</Button>
                     </div>
                 </form>
             </Modal>

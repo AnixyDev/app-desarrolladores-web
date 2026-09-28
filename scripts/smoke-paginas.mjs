@@ -81,7 +81,7 @@ const ESQUEMA = {
  clients:"id=t,user_id=t,name=t,company=t?,email=t?,phone=t?,payment_method_on_file=b?,stripe_customer_id=t?,created_at=d?,updated_at=d?,portal_user_id=t?,tax_id=t?,address=t?",
  contracts:"id=t,user_id=t,client_id=t,project_id=t,content=t,status=t?,signed_by=t?,signed_at=d?,expires_at=d?,signature=t?,created_at=d?",
  expenses:"id=t,user_id=t,description=t,amount_cents=i,tax_percent=n?,date=d,category=t?,project_id=t?,created_at=d?",
- invoices:"id=t,user_id=t,invoice_number=t,client_id=t,project_id=t?,issue_date=d,due_date=d,items=j,subtotal_cents=i,tax_percent=n?,total_cents=i,paid=b?,payment_date=d?,created_at=d?,irpf_percent=n?,notes=t?,budget_id=t?,contract_id=t?,fiscal_locked=b,rectifies_invoice_id=t?,is_rectified=b",
+ invoices:"id=t,user_id=t,invoice_number=t,client_id=t,project_id=t?,issue_date=d,due_date=d,items=j,subtotal_cents=i,tax_percent=n?,total_cents=i,paid=b?,payment_date=d?,created_at=d?,irpf_percent=n?,notes=t?,budget_id=t?,contract_id=t?,fiscal_locked=b,rectifies_invoice_id=t?,is_rectified=b,motivo_rectificacion=t?",
  jobs:"id=t,titulo=t,descripcioncorta=t?,descripcionlarga=t?,presupuesto=i,duracionsemanas=i,habilidades=a?,cliente=t?,fechapublicacion=d?,isfeatured=b?,compatibilidadia=i?,created_at=d?,email_contacto=t?,user_id=t",
  knowledge_articles:"id=t,user_id=t,title=t,content=t?,tags=a?,created_at=d?,updated_at=d?",
  projects:"id=t,user_id=t,client_id=t,name=t,description=t?,status=t?,start_date=d?,due_date=d?,budget_cents=i?,category=t?,priority=t?,created_at=d?",
@@ -115,7 +115,9 @@ const RUTAS = ['/','/clients','/projects','/invoices','/receipts','/fiscal','/ba
 '/knowledge-base','/inbox','/roles','/integrations','/forecasting','/affiliate','/billing',
 '/portal-branding','/settings','/admin',
 // Detalle de un proyecto (con sus hitos). El id es el de la primera fila simulada.
-'/projects/00000000-0000-4000-8000-000000000001'];
+'/projects/00000000-0000-4000-8000-000000000001',
+// Editar una oferta de empleo publicada.
+'/post-job/00000000-0000-4000-8000-000000000001'];
 
 const RUIDO = /DevTools|Download the React|runtime\.lastError|preloaded using link|WebSocket|ERR_TUNNEL|Failed to load resource/i;
 

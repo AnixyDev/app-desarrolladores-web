@@ -21,7 +21,19 @@ type NewInvoiceInput = Omit<Invoice, 'id' | 'user_id' | 'created_at' | 'invoice_
 type NewRecurringInvoiceInput = Omit<RecurringInvoice, 'id' | 'user_id' | 'created_at' | 'next_due_date'>;
 type NewBudgetInput = Omit<Budget, 'id' | 'user_id' | 'created_at' | 'amount_cents' | 'status'> & { items: InvoiceItem[] };
 type NewProposalInput = Omit<Proposal, 'id' | 'user_id' | 'created_at'>;
+export type InvoiceEditInput = Pick<Invoice, 'client_id' | 'due_date' | 'items' | 'tax_percent'> & {
+  irpf_percent?: number;
+  notes?: string | null;
+  project_id?: string | null;
+};
 type NewContractInput = Omit<Contract, 'id' | 'user_id' | 'created_at' | 'signed_by' | 'signed_at'>;
+
+/** Base y total en céntimos, con la misma fórmula al crear y al editar. */
+export const totalesDeFactura = (items: InvoiceItem[], taxPercent: number, irpfPercent: number) => {
+  const subtotal = items.reduce((sum, item) => sum + item.price_cents * item.quantity, 0);
+  const total = Math.round(subtotal + (subtotal * ((taxPercent || 0) / 100)) - (subtotal * ((irpfPercent || 0) / 100)));
+  return { subtotal, total };
+};
 
 // ─── Interfaz del slice ───────────────────────────────────────────────────────
 
@@ -44,22 +56,30 @@ export interface FinanceSlice {
   updateVeriFactuSettings: (enabled: boolean, modality: 'verifactu' | 'no_verifactu') => Promise<void>;
 
   addInvoice: (invoiceData: NewInvoiceInput, timeEntryIdsToBill?: string[]) => Promise<void>;
+  /** Editar una factura SIN registro fiscal (las bloqueadas se rectifican). */
+  updateInvoice: (id: string, cambios: InvoiceEditInput) => Promise<void>;
+  /** Factura rectificativa por diferencias. Sin líneas = abono total (anulación). */
+  rectificarFactura: (id: string, items: InvoiceItem[], motivo: string) => Promise<Invoice>;
   deleteInvoice: (id: string) => Promise<void>;
   markInvoiceAsPaid: (id: string) => Promise<void>;
 
   addRecurringInvoice: (recurringData: Omit<RecurringInvoice, 'id' | 'user_id' | 'created_at' | 'next_due_date'>) => Promise<void>;
+  updateRecurringInvoice: (id: string, cambios: Partial<Omit<RecurringInvoice, 'id' | 'user_id' | 'created_at'>>) => Promise<void>;
   deleteRecurringInvoice: (id: string) => Promise<void>;
   checkAndGenerateRecurringInvoices: () => Promise<void>;
 
   addExpense: (expense: Omit<Expense, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  updateExpense: (id: string, cambios: Partial<Omit<Expense, 'id' | 'user_id' | 'created_at'>>) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
 
   addRecurringExpense: (expense: Omit<RecurringExpense, 'id' | 'user_id' | 'created_at' | 'next_date'>) => Promise<void>;
+  updateRecurringExpense: (id: string, cambios: Partial<Omit<RecurringExpense, 'id' | 'user_id' | 'created_at'>>) => Promise<void>;
   deleteRecurringExpense: (id: string) => Promise<void>;
 
   addBudget: (budget: NewBudgetInput) => Promise<void>;
   updateBudget: (id: string, budget: NewBudgetInput) => Promise<void>;
   updateBudgetStatus: (id: string, status: Budget['status']) => Promise<void>;
+  deleteBudget: (id: string) => Promise<void>;
 
   addProposal: (proposal: NewProposalInput) => Promise<void>;
   updateProposal: (id: string, updates: Partial<Proposal>) => Promise<void>;
@@ -76,6 +96,7 @@ export interface FinanceSlice {
   // informales, arreglos puntuales) — el cliente se queda con el PDF como
   // constancia de lo pagado.
   addReceipt: (receipt: NewReceipt) => Promise<void>;
+  updateReceipt: (id: string, cambios: Partial<NewReceipt>) => Promise<void>;
   deleteReceipt: (id: string) => Promise<void>;
 
   setMonthlyGoal: (goal: number) => void;
@@ -183,8 +204,7 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
   if (!user) throw new Error("Usuario no autenticado");
 
   // Cálculos de negocio (mantener lógica)
-  const subtotal = invoiceData.items.reduce((sum, item) => sum + item.price_cents * item.quantity, 0);
-  const total = Math.round(subtotal + (subtotal * ((invoiceData.tax_percent || 0) / 100)) - (subtotal * ((invoiceData.irpf_percent || 0) / 100)));
+  const { subtotal, total } = totalesDeFactura(invoiceData.items, invoiceData.tax_percent, invoiceData.irpf_percent ?? 0);
 
   // FIX: la numeración de facturas debe ser correlativa por ley (AEAT);
   // antes se generaba con Date.now(), sin garantía de unicidad ni de
@@ -244,23 +264,69 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
     get().fetchTimeEntries?.();
   }
 },
-  // NUEVO: si la factura tiene registro fiscal Veri*Factu, hay que
-  // anularla primero (genera un registro de anulación encadenado) antes
-  // de poder borrarla — el trigger de la base de datos lo exige.
+  updateInvoice: async (id, cambios) => {
+    const actual = get().invoices.find(i => i.id === id);
+    if (!actual) throw new Error('No se encontró la factura.');
+    if (actual.fiscal_locked) {
+      throw new Error('Esta factura tiene registro fiscal y no se puede modificar: usa «Rectificar».');
+    }
+    const { subtotal, total } = totalesDeFactura(cambios.items, cambios.tax_percent, cambios.irpf_percent ?? 0);
+    const fila = {
+      ...cambios,
+      irpf_percent: cambios.irpf_percent ?? 0,
+      project_id: cambios.project_id || null,
+      notes: cambios.notes || null,
+      subtotal_cents: subtotal,
+      total_cents: total,
+    };
+    const { data, error } = await supabase.from('invoices').update(fila).eq('id', id).select().single();
+    if (error) { console.error('Error actualizando la factura:', error); throw error; }
+    set(state => ({ invoices: state.invoices.map(i => (i.id === id ? (data as Invoice) : i)) }));
+  },
+
+  // Rectificativa "por diferencias" (ver la migración facturas_rectificativas):
+  // la hace la base de datos, que numera en la serie R y marca la original.
+  rectificarFactura: async (id, items, motivo) => {
+    const { data, error } = await supabase.rpc('crear_factura_rectificativa', {
+      p_factura: id,
+      p_items: items.map(i => ({ description: i.description, quantity: i.quantity, price_cents: i.price_cents })),
+      p_motivo: motivo,
+    });
+    if (error) { console.error('Error creando la rectificativa:', error); throw new Error(error.message); }
+    let nueva = data as Invoice;
+
+    // Igual que al crear: con el cumplimiento activo, registro fiscal al momento.
+    if (get().profile?.veri_factu_enabled) {
+      const { data: registro, error: errorFiscal } = await supabase.rpc('generate_fiscal_record', { p_invoice_id: nueva.id });
+      if (errorFiscal) {
+        console.error('Error generando el registro fiscal de la rectificativa:', errorFiscal);
+      } else {
+        nueva = { ...nueva, fiscal_locked: true };
+        set(state => ({ fiscalRecords: [registro as FiscalRecord, ...state.fiscalRecords] }));
+      }
+    }
+
+    set(state => ({
+      invoices: [nueva, ...state.invoices.map(i => (i.id === id ? { ...i, is_rectified: true } : i))],
+    }));
+    return nueva;
+  },
+
+  // Una factura con registro fiscal no se borra: se anula con una
+  // rectificativa (rectificarFactura sin líneas), que queda en el registro.
   deleteInvoice: async (id) => {
     const invoice = get().invoices.find(i => i.id === id);
     if (invoice?.fiscal_locked) {
-      const { error: cancelError } = await supabase.rpc('generate_fiscal_cancellation', { p_invoice_id: id });
-      if (cancelError) {
-        console.error('Error anulando el registro fiscal:', cancelError);
-        throw new Error('Esta factura tiene registro fiscal Veri*Factu y no se pudo anular. No se ha eliminado.');
-      }
-      get().fetchFiscalRecords?.();
+      throw new Error('Esta factura tiene registro fiscal y no se puede borrar: usa «Anular», que crea la factura rectificativa.');
     }
 
     const { error } = await supabase.from('invoices').delete().eq('id', id);
     if (error) { console.error('Error deleting invoice:', error); throw error; }
-    set(state => ({ invoices: state.invoices.filter(i => i.id !== id) }));
+    set(state => ({
+      invoices: state.invoices
+        .filter(i => i.id !== id)
+        .map(i => (invoice?.rectifies_invoice_id && i.id === invoice.rectifies_invoice_id ? { ...i, is_rectified: false } : i)),
+    }));
   },
 
   markInvoiceAsPaid: async (id) => {
@@ -299,6 +365,12 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
     get().checkAndGenerateRecurringInvoices();
   },
 
+  updateRecurringInvoice: async (id, cambios) => {
+    const { data, error } = await supabase.from('recurring_invoices').update(cambios).eq('id', id).select().single();
+    if (error) { console.error('Error actualizando la factura recurrente:', error); throw error; }
+    set(state => ({ recurringInvoices: state.recurringInvoices.map(r => (r.id === id ? (data as RecurringInvoice) : r)) }));
+  },
+
   deleteRecurringInvoice: async (id) => {
     const { error } = await supabase.from('recurring_invoices').delete().eq('id', id);
     if (error) { console.error('Error deleting recurring invoice:', error); throw error; }
@@ -329,6 +401,12 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
     set(state => ({ expenses: [data as Expense, ...state.expenses] }));
   },
 
+  updateExpense: async (id, cambios) => {
+    const { data, error } = await supabase.from('expenses').update(cambios).eq('id', id).select().single();
+    if (error) { console.error('Error actualizando el gasto:', error); throw error; }
+    set(state => ({ expenses: state.expenses.map(e => (e.id === id ? (data as Expense) : e)) }));
+  },
+
   deleteExpense: async (id) => {
     const { error } = await supabase.from('expenses').delete().eq('id', id);
     if (error) { console.error('Error deleting expense:', error); throw error; }
@@ -350,6 +428,12 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
     set(state => ({
       recurringExpenses: [data as RecurringExpense, ...state.recurringExpenses],
     }));
+  },
+
+  updateRecurringExpense: async (id, cambios) => {
+    const { data, error } = await supabase.from('recurring_expenses').update(cambios).eq('id', id).select().single();
+    if (error) { console.error('Error actualizando el gasto recurrente:', error); throw error; }
+    set(state => ({ recurringExpenses: state.recurringExpenses.map(r => (r.id === id ? (data as RecurringExpense) : r)) }));
   },
 
   deleteRecurringExpense: async (id) => {
@@ -411,6 +495,12 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
     set(state => ({
       budgets: state.budgets.map(b => (b.id === id ? { ...b, status } : b)),
     }));
+  },
+
+  deleteBudget: async (id) => {
+    const { error } = await supabase.from('budgets').delete().eq('id', id);
+    if (error) { console.error('Error borrando el presupuesto:', error); throw error; }
+    set(state => ({ budgets: state.budgets.filter(b => b.id !== id) }));
   },
 
   addProposal: async (proposalData) => {
@@ -562,6 +652,12 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
 
     if (error) { console.error('Error adding receipt:', error); throw error; }
     set(state => ({ receipts: [data as Receipt, ...state.receipts] }));
+  },
+
+  updateReceipt: async (id, cambios) => {
+    const { data, error } = await supabase.from('receipts').update(cambios).eq('id', id).select().single();
+    if (error) { console.error('Error actualizando el recibo:', error); throw error; }
+    set(state => ({ receipts: state.receipts.map(r => (r.id === id ? (data as Receipt) : r)) }));
   },
 
   deleteReceipt: async (id) => {

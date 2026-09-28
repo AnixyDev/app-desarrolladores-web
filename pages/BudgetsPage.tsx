@@ -6,21 +6,25 @@ import Button from '@/components/ui/Button';
 import StatusChip from '@/components/ui/StatusChip';
 import EmptyState from '@/components/ui/EmptyState';
 import { Budget } from '@/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 import {
   CheckCircleIcon,
   XCircleIcon,
   MessageSquareIcon,
   SendIcon,
   EditIcon,
+  TrashIcon,
+  DownloadIcon,
 } from '../components/icons/Icon';
 
-import { sendEmail } from '../services/emailService';
+import { sendDocumentEmail } from '../services/emailService';
+import { generateBudgetPdf, generateBudgetPdfBase64 } from '../services/pdfService';
 import { useToast } from '../hooks/useToast';
 import CreateBudgetModal from '../components/modals/CreateBudgetModal';
 
 const BudgetsPage: React.FC = () => {
-  const { budgets, getClientById, updateBudgetStatus } = useAppStore(useShallow(s => ({ budgets: s.budgets, getClientById: s.getClientById, updateBudgetStatus: s.updateBudgetStatus })));
+  const { budgets, profile, getClientById, updateBudgetStatus, deleteBudget } = useAppStore(useShallow(s => ({ budgets: s.budgets, profile: s.profile, getClientById: s.getClientById, updateBudgetStatus: s.updateBudgetStatus, deleteBudget: s.deleteBudget })));
+  const [enviando, setEnviando] = useState<string | null>(null);
 
   const { addToast } = useToast();
 
@@ -47,21 +51,71 @@ const BudgetsPage: React.FC = () => {
     }
   };
 
-  // FIX: no existía ninguna forma de enviar el presupuesto al cliente — ni
-  // link al portal, ni email. Mismo patrón que ya usa ContractsPage.tsx:
-  // abre un borrador de correo con el link real de /portal/budgets/:id.
-  const handleSendBudget = (budget: typeof budgets[number]) => {
+  // Envío real desde facturas@devfreelancer.app, con el PDF adjunto y el
+  // enlace al portal para aceptarlo o rechazarlo (antes: borrador de mailto).
+  const handleSendBudget = async (budget: Budget) => {
     const client = getClientById(budget.client_id);
     if (!client?.email) {
       addToast('Este cliente no tiene email registrado.', 'error');
       return;
     }
-    const portalLink = `${window.location.origin}/portal/budgets/${budget.id}`;
-    const subject = `Presupuesto: ${budget.description}`;
-    const body = `Hola ${client.name},\n\nTe envío el presupuesto "${budget.description}" por un importe de ${formatCurrency(budget.amount_cents)}.\n\nPuedes verlo y aceptarlo o rechazarlo aquí:\n${portalLink}\n\nUn saludo.`;
-    sendEmail(client.email, subject, body);
-    addToast('Se abrió tu cliente de correo con el borrador del presupuesto.', 'success');
+    if (!profile) return;
+    setEnviando(budget.id);
+    try {
+      await sendDocumentEmail({
+        tipo: 'presupuesto',
+        documentoId: budget.id,
+        pdfBase64: generateBudgetPdfBase64(budget, client.name, profile),
+      });
+      addToast(`Presupuesto enviado a ${client.email}.`, 'success');
+    } catch (error) {
+      addToast((error as Error)?.message || 'No se pudo enviar el presupuesto.', 'error');
+    } finally {
+      setEnviando(null);
+    }
   };
+
+  const handleDownload = (budget: Budget) => {
+    if (!profile) return;
+    generateBudgetPdf(budget, getClientById(budget.client_id)?.name ?? '', profile);
+  };
+
+  const handleDelete = async (budget: Budget) => {
+    if (!window.confirm(`¿Borrar el presupuesto "${budget.description}"? No se puede deshacer.`)) return;
+    try {
+      await deleteBudget(budget.id);
+      addToast('Presupuesto borrado.', 'info');
+    } catch (err) {
+      addToast((err as Error).message || 'No se pudo borrar el presupuesto.', 'error');
+    }
+  };
+
+  const renderAcciones = (budget: Budget) => (
+    <>
+      <Button size="sm" variant="secondary" onClick={() => openEditModal(budget)} title="Editar">
+        <EditIcon className="w-4 h-4" />
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => handleDownload(budget)} title="Descargar PDF">
+        <DownloadIcon className="w-4 h-4" />
+      </Button>
+      <Button size="sm" variant="secondary" onClick={() => handleSendBudget(budget)} title="Enviar por email" disabled={enviando === budget.id}>
+        <SendIcon className="w-4 h-4" />
+      </Button>
+      {budget.status === 'pending' && (
+        <>
+          <Button size="sm" variant="secondary" onClick={() => handleUpdateStatus(budget.id, 'accepted')} title="Marcar como aceptado">
+            <CheckCircleIcon className="w-4 h-4 text-green-400" />
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => handleUpdateStatus(budget.id, 'rejected')} title="Marcar como rechazado">
+            <XCircleIcon className="w-4 h-4 text-red-400" />
+          </Button>
+        </>
+      )}
+      <Button size="sm" variant="danger" onClick={() => handleDelete(budget)} title="Eliminar">
+        <TrashIcon className="w-4 h-4" />
+      </Button>
+    </>
+  );
 
   return (
     <div className="space-y-6">
@@ -124,7 +178,7 @@ const BudgetsPage: React.FC = () => {
                     </td>
 
                     <td className="p-4 text-gray-300">
-                      {budget.created_at}
+                      {formatearFecha(budget.created_at)}
                     </td>
 
                     <td className="p-4 text-white">
@@ -140,41 +194,7 @@ const BudgetsPage: React.FC = () => {
 
                     <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => openEditModal(budget)}
-                          title="Editar"
-                        >
-                          <EditIcon className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => handleSendBudget(budget)}
-                          title="Enviar al cliente"
-                        >
-                          <SendIcon className="w-4 h-4" />
-                        </Button>
-                        {budget.status === 'pending' && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handleUpdateStatus(budget.id, 'accepted')}
-                            >
-                              <CheckCircleIcon className="w-4 h-4 text-green-400" />
-                            </Button>
-
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handleUpdateStatus(budget.id, 'rejected')}
-                            >
-                              <XCircleIcon className="w-4 h-4 text-red-400" />
-                            </Button>
-                          </>
-                        )}
+                        {renderAcciones(budget)}
                       </div>
                     </td>
                   </tr>
@@ -194,24 +214,9 @@ const BudgetsPage: React.FC = () => {
                     <span className="text-primary-400">{getClientById(budget.client_id)?.name}</span>
                     <span className="text-white font-bold">{formatCurrency(budget.amount_cents)}</span>
                   </div>
-                  <p className="text-xs text-gray-500">{budget.created_at}</p>
-                  <div className="flex justify-end gap-2 pt-1 border-t border-gray-800/50">
-                    <Button size="sm" variant="secondary" onClick={() => openEditModal(budget)} title="Editar">
-                      <EditIcon className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => handleSendBudget(budget)} title="Enviar al cliente">
-                      <SendIcon className="w-4 h-4" />
-                    </Button>
-                    {budget.status === 'pending' && (
-                      <>
-                        <Button size="sm" variant="secondary" onClick={() => handleUpdateStatus(budget.id, 'accepted')}>
-                          <CheckCircleIcon className="w-4 h-4 text-green-400" />
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => handleUpdateStatus(budget.id, 'rejected')}>
-                          <XCircleIcon className="w-4 h-4 text-red-400" />
-                        </Button>
-                      </>
-                    )}
+                  <p className="text-xs text-gray-500">{formatearFecha(budget.created_at)}</p>
+                  <div className="flex flex-wrap justify-end gap-2 pt-1 border-t border-gray-800/50">
+                    {renderAcciones(budget)}
                   </div>
                 </div>
               ))}

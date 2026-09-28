@@ -3,7 +3,7 @@ import { Briefcase, DollarSign, Clock, Hash, Send, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 const commonSkills = [
   'Angular', 'AWS', 'CSS', 'Docker', 'Firebase', 'Go', 'GCP (Google Cloud)',
@@ -41,8 +41,23 @@ const JobPostForm: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const { addToast } = useToast();
-  const { profile, addJob } = useAppStore(useShallow(s => ({ profile: s.profile, addJob: s.addJob })));
+  const { profile, addJob, updateJob, getJobById, jobs } = useAppStore(useShallow(s => ({ profile: s.profile, addJob: s.addJob, updateJob: s.updateJob, getJobById: s.getJobById, jobs: s.jobs })));
   const navigate = useNavigate();
+  // /post-job/:jobId = editar una oferta propia ya publicada.
+  const { jobId } = useParams<{ jobId?: string }>();
+  const ofertaEnEdicion = jobId ? getJobById(jobId) : undefined;
+
+  useEffect(() => {
+    if (!ofertaEnEdicion) return;
+    setFormData({
+      titulo: ofertaEnEdicion.titulo,
+      descripcion: ofertaEnEdicion.descripcionLarga || ofertaEnEdicion.descripcionCorta || '',
+      presupuesto: String(ofertaEnEdicion.presupuesto ?? ''),
+      duracionSemanas: String(ofertaEnEdicion.duracionSemanas ?? ''),
+      habilidadesRequeridas: ofertaEnEdicion.habilidades ?? [],
+    });
+    // jobs: cuando la lista llega después de abrir la página.
+  }, [ofertaEnEdicion?.id, jobs.length]);
 
   useEffect(() => {
     // CORRECCIÓN: Permitir acceso si es Pro o Teams
@@ -75,7 +90,7 @@ const JobPostForm: React.FC = () => {
     }
     const newJob = {
         titulo: formData.titulo,
-        descripcionCorta: formData.descripcion.substring(0, 100) + '...',
+        descripcionCorta: formData.descripcion.length > 100 ? formData.descripcion.substring(0, 100) + '...' : formData.descripcion,
         descripcionLarga: formData.descripcion,
         presupuesto: parseFloat(formData.presupuesto) || 0,
         duracionSemanas: parseInt(formData.duracionSemanas, 10) || 0,
@@ -87,11 +102,20 @@ const JobPostForm: React.FC = () => {
         postedByUserId: profile.id
     };
     setIsLoading(true);
-    const result = await addJob(newJob);
+    const result = ofertaEnEdicion
+      ? await updateJob(ofertaEnEdicion.id, {
+          titulo: newJob.titulo,
+          descripcionCorta: newJob.descripcionCorta,
+          descripcionLarga: newJob.descripcionLarga,
+          presupuesto: newJob.presupuesto,
+          duracionSemanas: newJob.duracionSemanas,
+          habilidades: newJob.habilidades,
+        })
+      : await addJob(newJob);
     setIsLoading(false);
 
     if (result.success) {
-        addToast('¡Oferta de trabajo publicada con éxito!', 'success');
+        addToast(ofertaEnEdicion ? 'Oferta actualizada.' : '¡Oferta de trabajo publicada con éxito!', 'success');
         navigate('/my-job-posts');
     } else {
         addToast(result.message || 'No se pudo publicar la oferta.', 'error');
@@ -133,7 +157,7 @@ const JobPostForm: React.FC = () => {
       <div className="w-full max-w-3xl bg-gray-900 rounded-3xl shadow-2xl shadow-fuchsia-900/50 p-6 sm:p-10 border-t-8 border-fuchsia-600 my-8">
         <h1 className="text-3xl font-bold text-white mb-2 flex items-center">
           <Briefcase className="w-7 h-7 text-fuchsia-500 mr-3" />
-          Publicar Nueva Oferta
+          {jobId ? 'Editar oferta' : 'Publicar Nueva Oferta'}
         </h1>
         <p className="text-gray-400 mb-8">
           Detalla tu proyecto para que el talento compatible pueda encontrarte.
@@ -168,7 +192,7 @@ const JobPostForm: React.FC = () => {
           <div className="flex justify-end">
             <button type="submit" disabled={isLoading} className="w-full sm:w-auto px-8 py-3 font-semibold rounded-lg transition duration-200 bg-fuchsia-600 text-black hover:bg-fuchsia-700 shadow-lg shadow-fuchsia-500/50 flex items-center justify-center">
               <Send className="w-5 h-5 mr-2" />
-              {isLoading ? 'Cargando...' : 'Publicar Oferta'}
+              {isLoading ? 'Guardando...' : jobId ? 'Guardar cambios' : 'Publicar Oferta'}
             </button>
           </div>
           <p className="text-xs text-gray-500 mt-3 text-right">

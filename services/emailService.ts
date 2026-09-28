@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabaseClient';
 // qué documento envía y su PDF. El servidor saca el email del cliente de ese
 // documento y redacta el correo (ver supabase/functions/_shared/correo-documentos.ts).
 export const sendDocumentEmail = async (params: {
-  tipo: 'factura' | 'contrato';
+  tipo: 'factura' | 'contrato' | 'presupuesto' | 'propuesta' | 'recibo';
   documentoId: string;
   pdfBase64: string;
 }): Promise<void> => {
