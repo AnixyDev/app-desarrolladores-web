@@ -97,16 +97,18 @@ const HitosDelProyecto: React.FC<Props> = ({ projectId, puedeEditar }) => {
 
             <ul className="space-y-2">
                 {hitos.map(h => (
-                    <li key={h.id} className="flex items-center gap-3 rounded-lg border border-gray-800 bg-gray-900/40 p-3">
+                    <li key={h.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-gray-800 bg-gray-900/40 p-3">
                         <CheckCircleIcon className={`h-5 w-5 shrink-0 ${h.status === 'entregado' ? 'text-green-400' : 'text-gray-600'}`} />
-                        <div className="min-w-0 flex-1">
-                            <p className={`truncate text-sm ${h.status === 'entregado' ? 'text-gray-400 line-through' : 'text-white'}`}>{h.title}</p>
+                        {/* En la columna estrecha, estado y papelera bajan a otra línea
+                            antes que recortar el nombre del hito a una letra. */}
+                        <div className="min-w-[9rem] flex-1">
+                            <p className={`break-words text-sm ${h.status === 'entregado' ? 'text-gray-400 line-through' : 'text-white'}`}>{h.title}</p>
                             <p className={`text-xs ${hitoAtrasado(h) ? 'text-red-400' : 'text-gray-500'}`}>
                                 {fechaCorta(h.due_date)}{hitoAtrasado(h) ? ' · con retraso' : ''}
                             </p>
                         </div>
                         {puedeEditar ? (
-                            <>
+                            <div className="ml-auto flex items-center gap-3">
                                 <select
                                     value={h.status}
                                     onChange={e => cambiarEstado(h.id, e.target.value as EstadoHito)}
@@ -123,7 +125,7 @@ const HitosDelProyecto: React.FC<Props> = ({ projectId, puedeEditar }) => {
                                 >
                                     <TrashIcon className="h-4 w-4" />
                                 </button>
-                            </>
+                            </div>
                         ) : (
                             <span className={`rounded-full px-2 py-0.5 text-xs ${COLOR_ESTADO[h.status]}`}>{textoDeEstado(h.status)}</span>
                         )}
@@ -132,29 +134,34 @@ const HitosDelProyecto: React.FC<Props> = ({ projectId, puedeEditar }) => {
             </ul>
 
             {puedeEditar && (
-                <form onSubmit={crear} className="flex flex-col gap-2 sm:flex-row">
+                // La tarjeta vive en una columna estrecha (un tercio en escritorio):
+                // nombre arriba a lo ancho y, debajo, fecha + botón. En una sola
+                // fila la fecha se salía y el botón quedaba encima de "Tareas".
+                <form onSubmit={crear} className="space-y-2">
                     <input
                         value={titulo}
                         onChange={e => setTitulo(e.target.value)}
                         maxLength={200}
                         placeholder="Nuevo hito (p. ej. Diseño aprobado)"
                         aria-label="Nombre del hito"
-                        className="flex-1 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white"
+                        className="w-full min-w-0 rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white"
                     />
-                    <input
-                        type="date"
-                        value={fecha}
-                        onChange={e => setFecha(e.target.value)}
-                        aria-label="Fecha del hito"
-                        className="rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white"
-                    />
-                    <button
-                        type="submit"
-                        disabled={guardando || !titulo.trim()}
-                        className="flex items-center justify-center gap-1 rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
-                    >
-                        <PlusIcon className="h-4 w-4" /> Añadir
-                    </button>
+                    <div className="flex flex-wrap gap-2">
+                        <input
+                            type="date"
+                            value={fecha}
+                            onChange={e => setFecha(e.target.value)}
+                            aria-label="Fecha del hito"
+                            className="min-w-[10rem] flex-[2] rounded-md border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white [color-scheme:dark]"
+                        />
+                        <button
+                            type="submit"
+                            disabled={guardando || !titulo.trim()}
+                            className="flex flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50"
+                        >
+                            <PlusIcon className="h-4 w-4" /> Añadir
+                        </button>
+                    </div>
                 </form>
             )}
 
