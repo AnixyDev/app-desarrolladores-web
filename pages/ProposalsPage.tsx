@@ -120,7 +120,7 @@ const ProposalsPage: React.FC = () => {
       await sendDocumentEmail({
         tipo: 'propuesta',
         documentoId: proposal.id,
-        pdfBase64: generateProposalPdfBase64(proposal, client.name, profile),
+        pdfBase64: generateProposalPdfBase64(proposal, client, profile),
       });
       if (proposal.status === 'draft') {
         try {
@@ -139,7 +139,7 @@ const ProposalsPage: React.FC = () => {
 
   const handleDownload = (proposal: Proposal) => {
     if (!profile) return;
-    generateProposalPdf(proposal, getClientName(proposal.client_id), profile);
+    generateProposalPdf(proposal, clients.find(c => c.id === proposal.client_id) ?? { name: getClientName(proposal.client_id) }, profile);
   };
 
   const renderAcciones = (proposal: Proposal) => (

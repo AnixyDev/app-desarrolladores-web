@@ -1,5 +1,5 @@
 // services/pdfService.ts
-import type { Invoice, Client, Profile, Receipt, Contract, Budget, Proposal } from '@/types';
+import type { Invoice, Client, Profile, Receipt, Contract } from '@/types';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import * as autoTableNamespace from 'jspdf-autotable';
@@ -425,119 +425,8 @@ export const generateReceiptPdf = (receipt: Receipt, clientName: string, profile
 export const generateReceiptPdfBase64 = (receipt: Receipt, clientName: string, profile: Profile): string =>
     buildReceiptPdfDocument(receipt, clientName, profile).output('datauristring').split(',')[1];
 
-// Presupuestos y propuestas: hasta el 28/09 no tenían PDF. Mismo encabezado
-// de marca que facturas y recibos; no son documentos fiscales (sin número de
-// serie ni impuestos desglosados): el importe va sin impuestos.
-interface DocumentoConLineas {
-    titulo: 'PRESUPUESTO' | 'PROPUESTA';
-    asunto: string;
-    fecha: string;
-    validoHasta?: string | null;
-    texto?: string | null;
-    items: { description: string; quantity: number; price_cents: number }[];
-    importeCents: number;
-}
-
-function buildDocumentoConLineas(d: DocumentoConLineas, clientName: string, profile: Profile): jsPDF {
-    const autoTable = resolveAutoTable();
-    const doc = new jsPDF();
-
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text(profile.business_name || profile.full_name, 14, 22);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(profile.full_name, 14, 30);
-    if (profile.tax_id) doc.text(`NIF/CIF: ${profile.tax_id}`, 14, 35);
-    doc.text(profile.email, 14, 40);
-
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text(d.titulo, 200, 22, { align: 'right' });
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Fecha: ${d.fecha.slice(0, 10)}`, 200, 30, { align: 'right' });
-    if (d.validoHasta) doc.text(`Válido hasta: ${d.validoHasta.slice(0, 10)}`, 200, 35, { align: 'right' });
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Para:', 14, 55);
-    doc.setFont('helvetica', 'normal');
-    doc.text(clientName, 14, 61);
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    const asunto = doc.splitTextToSize(d.asunto, 180);
-    doc.text(asunto, 14, 75);
-    let y = 75 + asunto.length * 6 + 4;
-
-    if (d.texto) {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        const lineas = doc.splitTextToSize(d.texto, 180) as string[];
-        for (const linea of lineas) {
-            if (y > 270) { doc.addPage(); y = 20; }
-            doc.text(linea, 14, y);
-            y += 5;
-        }
-        y += 4;
-    }
-
-    if (d.items.length > 0) {
-        autoTable(doc, {
-            startY: y,
-            head: [['Descripción', 'Cant.', 'Precio', 'Total']],
-            body: d.items.map(i => [i.description, i.quantity, formatCurrency(i.price_cents), formatCurrency(i.price_cents * i.quantity)]),
-            theme: 'striped',
-            headStyles: { fillColor: profile.pdf_color || '#d9009f' },
-        });
-        y = (doc as any).lastAutoTable.finalY + 10;
-    }
-
-    if (y > 270) { doc.addPage(); y = 20; }
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Importe (impuestos no incluidos):', 150, y, { align: 'right' });
-    doc.text(formatCurrency(d.importeCents), 200, y, { align: 'right' });
-
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(120, 120, 120);
-    doc.text('Documento generado automáticamente. No es una factura.', 14, 285);
-    doc.setTextColor(0, 0, 0);
-    return doc;
-}
-
-const datosDelPresupuesto = (b: Budget): DocumentoConLineas => ({
-    titulo: 'PRESUPUESTO',
-    asunto: b.description,
-    fecha: b.created_at,
-    items: b.items || [],
-    importeCents: b.amount_cents,
-});
-
-const datosDeLaPropuesta = (p: Proposal): DocumentoConLineas => ({
-    titulo: 'PROPUESTA',
-    asunto: p.title,
-    fecha: p.created_at,
-    validoHasta: p.valid_until,
-    texto: p.content,
-    items: p.items || [],
-    importeCents: p.amount_cents,
-});
-
-const nombreSeguro = (texto: string) => texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'documento';
-
-export const generateBudgetPdf = (b: Budget, clientName: string, profile: Profile) =>
-    buildDocumentoConLineas(datosDelPresupuesto(b), clientName, profile).save(`Presupuesto-${nombreSeguro(b.description)}.pdf`);
-
-export const generateBudgetPdfBase64 = (b: Budget, clientName: string, profile: Profile): string =>
-    buildDocumentoConLineas(datosDelPresupuesto(b), clientName, profile).output('datauristring').split(',')[1];
-
-export const generateProposalPdf = (p: Proposal, clientName: string, profile: Profile) =>
-    buildDocumentoConLineas(datosDeLaPropuesta(p), clientName, profile).save(`Propuesta-${nombreSeguro(p.title)}.pdf`);
-
-export const generateProposalPdfBase64 = (p: Proposal, clientName: string, profile: Profile): string =>
-    buildDocumentoConLineas(datosDeLaPropuesta(p), clientName, profile).output('datauristring').split(',')[1];
+// Presupuestos y propuestas: ver services/pdfOfertas.ts (rediseño del 28/09).
+export { generateBudgetPdf, generateBudgetPdfBase64, generateProposalPdf, generateProposalPdfBase64 } from './pdfOfertas';
 
 // FIX / NUEVO: exportación en PDF del "Libro Fiscal" (TaxLedgerPage.tsx).
 // Antes solo existía exportación a CSV (útil para pegar en Excel, pero poco

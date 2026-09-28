@@ -65,7 +65,7 @@ const BudgetsPage: React.FC = () => {
       await sendDocumentEmail({
         tipo: 'presupuesto',
         documentoId: budget.id,
-        pdfBase64: generateBudgetPdfBase64(budget, client.name, profile),
+        pdfBase64: generateBudgetPdfBase64(budget, client, profile),
       });
       addToast(`Presupuesto enviado a ${client.email}.`, 'success');
     } catch (error) {
@@ -77,7 +77,7 @@ const BudgetsPage: React.FC = () => {
 
   const handleDownload = (budget: Budget) => {
     if (!profile) return;
-    generateBudgetPdf(budget, getClientById(budget.client_id)?.name ?? '', profile);
+    generateBudgetPdf(budget, getClientById(budget.client_id) ?? { name: '' }, profile);
   };
 
   const handleDelete = async (budget: Budget) => {
