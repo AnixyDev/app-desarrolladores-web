@@ -277,10 +277,54 @@ export const generateInvoicePdfBase64 = async (
 function buildContractPdfDocument(contract: Contract): jsPDF {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
-    doc.setFontSize(10);
-    const splitText = doc.splitTextToSize(contract.content, pageWidth - margin * 2);
-    doc.text(splitText, margin, 20);
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 18;
+    const ancho = pageWidth - margin * 2;
+    const alto = 5;
+    let y = 22;
+
+    // Antes se pintaba todo el texto de golpe en una sola página: un contrato
+    // de más de una página salía cortado. Ahora se pagina línea a línea, con
+    // los títulos (líneas en mayúsculas) en negrita y numeración al pie.
+    const saltoSiHaceFalta = (lineas: number) => {
+        if (y + lineas * alto > pageHeight - 20) { doc.addPage(); y = 22; }
+    };
+    const esTitulo = (t: string) => t.length > 3 && t.length < 90 && t === t.toUpperCase() && /[A-ZÁÉÍÓÚÑ]/.test(t);
+
+    const parrafos = String(contract.content ?? '').replace(/\r\n/g, '\n').split('\n');
+    parrafos.forEach((parrafo, i) => {
+        const texto = parrafo.trimEnd();
+        if (!texto.trim()) { y += alto * 0.6; return; }
+        const titulo = esTitulo(texto.trim());
+        doc.setFont('helvetica', titulo ? 'bold' : 'normal');
+        doc.setFontSize(i === 0 && titulo ? 13 : 10);
+        const lineas = doc.splitTextToSize(texto, ancho) as string[];
+        if (titulo) saltoSiHaceFalta(lineas.length + 2);
+        for (const linea of lineas) {
+            saltoSiHaceFalta(1);
+            doc.text(linea, i === 0 && titulo ? pageWidth / 2 : margin, y, i === 0 && titulo ? { align: 'center' } : undefined);
+            y += alto;
+        }
+        if (titulo) y += 1;
+    });
+
+    if (contract.status === 'signed' && contract.signed_by) {
+        saltoSiHaceFalta(3);
+        y += 4;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text(`Firmado electrónicamente por ${contract.signed_by}${contract.signed_at ? ' el ' + String(contract.signed_at).slice(0, 10) : ''}.`, margin, y);
+    }
+
+    const paginas = doc.getNumberOfPages();
+    for (let n = 1; n <= paginas; n++) {
+        doc.setPage(n);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(120, 120, 120);
+        doc.text(`Página ${n} de ${paginas}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+        doc.setTextColor(0, 0, 0);
+    }
     return doc;
 }
 
