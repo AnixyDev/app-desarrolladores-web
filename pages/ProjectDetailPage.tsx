@@ -69,7 +69,8 @@ const ProjectDetailPage: React.FC = () => {
             .reduce((sum, e) => sum + e.amount_cents, 0);
 
         const totalSecondsTracked = projectTimeEntries.reduce((sum, entry) => sum + entry.duration_seconds, 0);
-        const hourlyRate = profile.hourly_rate_cents;
+        // Sin tarifa por hora configurada salía NaN € en el control de presupuesto.
+        const hourlyRate = Number(profile.hourly_rate_cents) || 0;
         const projectTimeCost = (totalSecondsTracked / 3600) * hourlyRate;
 
         const totalCosts = projectExpensesCost + projectTimeCost;
@@ -196,7 +197,7 @@ const ProjectDetailPage: React.FC = () => {
                     )}
                     {puede('editarProyecto', project.user_id, profile?.id, teamMembership) && (
                     <Button variant="secondary" onClick={() => setEditandoProyecto(true)} aria-label="Editar proyecto" title="Editar proyecto">
-                        <EditIcon className="w-4 h-4" />
+                        <EditIcon className="w-4 h-4 mr-2" /> Editar
                     </Button>
                     )}
                     {puede('borrarProyecto', project.user_id, profile?.id, teamMembership) && (
@@ -215,8 +216,16 @@ const ProjectDetailPage: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-1 space-y-6">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex items-center justify-between">
                             <h2 className="text-lg font-semibold text-white">Detalles del Proyecto</h2>
+                            {puede('editarProyecto', project.user_id, profile?.id, teamMembership) && (
+                                <button
+                                    onClick={() => setEditandoProyecto(true)}
+                                    className="flex items-center gap-1 text-sm text-primary-400 hover:text-primary-300"
+                                >
+                                    <EditIcon className="w-4 h-4" /> Editar
+                                </button>
+                            )}
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
@@ -240,7 +249,7 @@ const ProjectDetailPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-gray-400">Prioridad</p>
-                                    <p className="text-white">{project.priority || 'Sin definir'}</p>
+                                    <p className="text-white">{({ Low: 'Baja', Medium: 'Media', High: 'Alta' } as Record<string, string>)[project.priority] ?? project.priority ?? 'Sin definir'}</p>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">

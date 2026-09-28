@@ -134,7 +134,10 @@ const JobPostForm: React.FC = () => {
     );
   }
 
-  const InputField: React.FC<InputFieldProps> = ({ label, name, type = 'text', icon: Icon, required = false }) => (
+  // Es una función, no un componente: definida como componente dentro del
+  // render, React la trataba como un tipo nuevo en cada tecla, desmontaba el
+  // input y se perdía el foco — solo dejaba escribir una letra (28/09).
+  const InputField = ({ label, name, type = 'text', icon: Icon, required = false }: InputFieldProps) => (
     <div className="mb-4">
       <label htmlFor={name} className="block text-sm font-medium text-white mb-2 flex items-center">
         {Icon && <Icon className="w-4 h-4 text-fuchsia-500 mr-2" />}
@@ -164,7 +167,7 @@ const JobPostForm: React.FC = () => {
         </p>
 
         <form onSubmit={handleSubmit}>
-          <InputField label="Título del Proyecto" name="titulo" icon={Briefcase} required />
+          {InputField({ label: 'Título del Proyecto', name: 'titulo', icon: Briefcase, required: true })}
           <div className="mb-6">
             <label htmlFor="descripcion" className="block text-sm font-medium text-white mb-2 flex items-center">
               <Zap className="w-4 h-4 text-fuchsia-500 mr-2" />
@@ -173,8 +176,8 @@ const JobPostForm: React.FC = () => {
             <textarea id="descripcion" name="descripcion" required rows={6} value={formData.descripcion} onChange={handleChange} className="w-full px-4 py-3 bg-gray-800 text-white border border-gray-700 rounded-xl focus:border-fuchsia-500 focus:ring-1 focus:ring-fuchsia-500 outline-none transition duration-150" placeholder="Describe los objetivos..."/>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6">
-            <InputField label="Presupuesto Máximo (€)" name="presupuesto" type="number" icon={DollarSign} required />
-            <InputField label="Duración Estimada (Semanas)" name="duracionSemanas" type="number" icon={Clock} required />
+            {InputField({ label: 'Presupuesto Máximo (€)', name: 'presupuesto', type: 'number', icon: DollarSign, required: true })}
+            {InputField({ label: 'Duración Estimada (Semanas)', name: 'duracionSemanas', type: 'number', icon: Clock, required: true })}
           </div>
           <div className="mb-8">
             <label className="block text-sm font-medium text-white mb-3 flex items-center">

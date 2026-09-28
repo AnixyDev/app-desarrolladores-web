@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../hooks/useAppStore';
 import Sidebar from './Sidebar';
 import Header from './Header';
@@ -9,6 +9,16 @@ export const AppLayout: React.FC = () => {
   const isAuthenticated = useAppStore((state) => state.isAuthenticated);
   const isProfileLoading = useAppStore((state) => state.isProfileLoading); // 🆕
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // El scroll vive en <main>, no en la ventana: al cambiar de página se
+  // quedaba donde estaba la anterior, y un proyecto abierto desde abajo de la
+  // lista se mostraba ya bajado, sin la cabecera (ni el botón Editar) a la
+  // vista. Cada página nueva empieza arriba.
+  const mainRef = useRef<HTMLElement>(null);
+  const { pathname } = useLocation();
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [pathname]);
 
   // 🆕 Mientras se confirma la sesión (refresh de página, primera carga), NO decidimos nada todavía.
   // Antes: solo se miraba isAuthenticated, que arranca en `false` y provoca el redirect prematuro.
@@ -32,7 +42,7 @@ export const AppLayout: React.FC = () => {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header onMenuClick={() => setIsSidebarOpen(true)} />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+        <main ref={mainRef} className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
           <div className="max-w-7xl mx-auto">
             <ErrorBoundary>
               <Outlet />
