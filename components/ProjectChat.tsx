@@ -48,9 +48,13 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, puedeResumir = fal
   const [resumen, setResumen] = useState<string | null>(null);
   const [resumiendo, setResumiendo] = useState(false);
 
-  const finRef = useRef<HTMLDivElement>(null);
+  // Baja solo la lista de mensajes. Antes usaba scrollIntoView, que baja
+  // también la página entera hasta el chat: al abrir un proyecto con mensajes
+  // se veía ya abajo, sin la cabecera ni el botón Editar (28/09).
+  const listaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    finRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const lista = listaRef.current;
+    if (lista) lista.scrollTop = lista.scrollHeight;
   }, [mensajes]);
 
   const handleSend = async (e: React.FormEvent) => {
@@ -96,7 +100,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, puedeResumir = fal
 
   return (
     <div className="flex flex-col h-[500px]">
-      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1">
+      <div ref={listaRef} className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1">
         {cargando ? (
           <div className="h-full flex items-center justify-center text-gray-500 text-sm">
             Cargando mensajes…
@@ -131,7 +135,6 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, puedeResumir = fal
             );
           })
         )}
-        <div ref={finRef} />
       </div>
 
       {error && <p className="text-xs text-red-400 pt-2">{error}</p>}
