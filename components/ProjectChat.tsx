@@ -3,7 +3,7 @@ import { useAppStore } from '../hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { SendIcon, SparklesIcon, UserIcon } from './icons/Icon';
 import { useProjectChat, LIMITE_CARACTERES } from '../hooks/useProjectChat';
-import { AI_CREDIT_COSTS, getAIResponse } from '@/services/geminiService';
+import { AI_CREDIT_COSTS, resumirChatDeProyecto } from '@/services/geminiService';
 import { useToast } from '@/hooks/useToast';
 import Input from './ui/Input';
 import Button from './ui/Button';
@@ -73,14 +73,7 @@ const ProjectChat: React.FC<ProjectChatProps> = ({ projectId, puedeResumir = fal
         .map(m => `${m.author_name} (${m.author_role}): ${m.body}`)
         .join('\n');
 
-      const texto = await getAIResponse(
-        'Resume esta conversación de un proyecto entre un freelancer y su cliente. ' +
-        'Enumera los acuerdos alcanzados y lo que queda pendiente, en español y en pocas líneas. ' +
-        'Si no hay acuerdos claros, dilo en vez de inventarlos.\n\n' +
-        conversacion,
-        [],
-        'chatMessage'
-      );
+      const texto = await resumirChatDeProyecto(conversacion);
 
       setResumen(texto);
     } catch (e) {

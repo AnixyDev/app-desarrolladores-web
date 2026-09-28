@@ -177,8 +177,8 @@ const CreateInvoicePage: React.FC = () => {
         setIsAIGeneratorOpen(false);
         addToast('Conceptos generados.', 'success');
       }
-    } catch {
-      addToast('Error al generar con IA.', 'error');
+    } catch (err) {
+      addToast((err as Error)?.message || 'Error al generar con IA.', 'error');
     } finally {
       setIsAiLoading(false);
     }
