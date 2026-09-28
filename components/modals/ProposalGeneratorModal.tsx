@@ -52,7 +52,6 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
             // el único aviso era un toast que podía desaparecer sin que se
             // llegara a leer. Ahora el motivo real queda fijo en el modal.
             setGenerationError((error as Error).message || 'Error al generar la propuesta.');
-            addToast('Error al generar la propuesta', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -72,16 +71,16 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
             consumeCredits(AI_CREDIT_COSTS.refineProposal);
             addToast(`Propuesta refinada a un tono más ${refinementType}`, 'success');
         } catch (error) {
-            addToast('Error al refinar la propuesta', 'error');
+            addToast((error as Error)?.message || 'Error al refinar la propuesta', 'error');
         } finally {
             setIsRefining(false);
         }
     };
     
+    // Antes se generaba sola al abrir el modal: cada vez que se abría, 5
+    // créditos, aunque se fuera a escribir a mano. Ahora se pide con un botón.
     useEffect(() => {
-        if (isOpen) {
-            handleGenerate();
-        } else {
+        if (!isOpen) {
             // Reset state when closing
             setProposalText('');
             setIsLoading(false);
@@ -114,6 +113,22 @@ const ProposalGeneratorModal: React.FC<ProposalGeneratorModalProps> = ({ isOpen,
                         <div className="text-center p-8">
                             <RefreshCwIcon className="w-10 h-10 text-primary-400 mx-auto animate-spin mb-4" />
                             <p className="text-white">Analizando la oferta y generando tu propuesta...</p>
+                        </div>
+                    )}
+                    {!isLoading && !generationError && !proposalText && (
+                        <div className="text-center p-6 space-y-3">
+                            <p className="text-gray-300 text-sm">
+                                La IA lee la oferta y tu perfil y redacta una propuesta personalizada que luego puedes editar.
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+                                <Button onClick={handleGenerate}>
+                                    <SparklesIcon className="w-4 h-4 mr-2" />
+                                    Generar con IA ({AI_CREDIT_COSTS.generateProposal} créditos)
+                                </Button>
+                                <Button variant="secondary" onClick={() => setProposalText(' ')}>
+                                    Escribirla yo
+                                </Button>
+                            </div>
                         </div>
                     )}
                     {!isLoading && generationError && !proposalText && (

@@ -7,7 +7,7 @@ import Modal from '@/components/ui/Modal';
 import { KnowledgeArticle } from '@/types';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { AI_CREDIT_COSTS, rankArticlesByRelevance, getAIResponse } from '@/services/geminiService';
+import { AI_CREDIT_COSTS, rankArticlesByRelevance, generarDocumento, generarQuiz } from '@/services/geminiService';
 import { useToast } from '@/hooks/useToast';
 
 const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
@@ -107,7 +107,9 @@ const KnowledgeBase: React.FC = () => {
 
     const displayedArticles = useMemo(() => {
         if (debouncedSearchTerm.trim() && rankedArticleIds.length > 0) {
-            return [...articles].sort((a, b) => rankedArticleIds.indexOf(a.id) - rankedArticleIds.indexOf(b.id));
+            // Primero los que la IA considera relevantes, en su orden; luego el resto.
+            const pos = (id: string) => { const i = rankedArticleIds.indexOf(id); return i === -1 ? Number.MAX_SAFE_INTEGER : i; };
+            return [...articles].sort((a, b) => pos(a.id) - pos(b.id));
         }
         return articles;
     }, [articles, rankedArticleIds, debouncedSearchTerm]);
@@ -174,14 +176,7 @@ const KnowledgeBase: React.FC = () => {
             // ("Sección 1: ...") que no llamaba a ninguna IA, y aun así
             // descontaba 10 créditos del contador. Ahora llama de verdad; el
             // cobro lo hace el servidor dentro de ai-gemini.
-            const contenido = await getAIResponse(
-                `Redacta un documento interno de base de conocimiento sobre "${tema}".\n` +
-                `Usa Markdown, con un título de primer nivel, secciones con encabezados ` +
-                `y listas donde aporten claridad. Escribe en español, en tono profesional ` +
-                `y directo, sin introducción ni despedida.`,
-                [],
-                'generateDocument'
-            );
+            const contenido = await generarDocumento(tema);
 
             setCurrentArticle({
                 title: tema,
@@ -215,14 +210,7 @@ const KnowledgeBase: React.FC = () => {
 
         setIsLoading(true);
         try {
-            const cuestionario = await getAIResponse(
-                `Crea un cuestionario de 5 preguntas para comprobar que se ha entendido ` +
-                `el siguiente artículo. Numera las preguntas y añade al final la sección ` +
-                `"Respuestas" con la solución de cada una. Escribe en español.\n\n` +
-                `Título: ${currentArticle?.title ?? 'Sin título'}\n\n${contenido}`,
-                [],
-                'generateQuiz'
-            );
+            const cuestionario = await generarQuiz(currentArticle?.title ?? 'Sin título', contenido);
 
             setQuizResult(cuestionario);
             setIsQuizModalOpen(true);

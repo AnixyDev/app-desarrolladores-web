@@ -264,9 +264,25 @@ const ReportsPage: React.FC = () => {
             </h2>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm leading-relaxed break-words">
+            <p className="text-sm leading-relaxed break-words whitespace-pre-line">
               {String(analysis.summary)}
             </p>
+            {analysis.topPerformers.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-green-400 mb-1">Lo que funciona</h3>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-300">
+                  {analysis.topPerformers.map((t, i) => <li key={i}>{t}</li>)}
+                </ul>
+              </div>
+            )}
+            {analysis.areasForImprovement.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-yellow-400 mb-1">Qué mejorar</h3>
+                <ul className="list-disc pl-5 space-y-1 text-sm text-gray-300">
+                  {analysis.areasForImprovement.map((t, i) => <li key={i}>{t}</li>)}
+                </ul>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

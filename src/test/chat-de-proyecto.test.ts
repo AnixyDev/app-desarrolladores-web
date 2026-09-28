@@ -72,7 +72,7 @@ describe('el resumen de IA no es de mentira', () => {
   });
 
   it('llama a la IA de verdad', () => {
-    expect(chat).toMatch(/getAIResponse\(/);
+    expect(chat).toMatch(/resumirChatDeProyecto\(/);
   });
 
   it('no se inventa un texto fijo de resumen', () => {

@@ -128,7 +128,7 @@ const ProfitabilityReportPage: React.FC = () => {
       if (error instanceof Error && /cr[eé]dito/i.test(error.message)) {
         setIsBuyCreditsOpen(true);
       } else {
-        addToast('Error al analizar la rentabilidad. Intenta nuevamente.', 'error');
+        addToast((error as Error)?.message || 'Error al analizar la rentabilidad. Inténtalo de nuevo.', 'error');
       }
     } finally {
       setIsAnalyzing(false);

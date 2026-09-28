@@ -46,6 +46,15 @@ export type FuncionIA = keyof typeof AI_CREDIT_COSTS;
  */
 const COSTE_POR_ACCION: Record<string, FuncionIA> = {
   getAIResponse: 'chatMessage',
+  // Acciones propias de cada función (28/09): el precio ya no depende de lo
+  // que declare el cliente. getAIResponse se queda solo por compatibilidad
+  // con versiones anteriores de la web mientras se actualiza.
+  asistente: 'chatMessage',
+  resumirChat: 'chatMessage',
+  ordenarArticulos: 'searchKnowledgeBase',
+  generarDocumento: 'generateDocument',
+  generarQuiz: 'generateQuiz',
+  refinarPropuesta: 'refineProposal',
   generateTimeEntryDescription: 'enhanceTimeEntry',
   generateItemsForDocument: 'generateInvoiceItems',
   generateFinancialForecast: 'generateForecast',

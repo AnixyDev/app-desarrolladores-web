@@ -302,7 +302,7 @@ const TimeTrackingPage: React.FC = () => {
             consumeCredits(AI_CREDIT_COSTS.enhanceTimeEntry);
             addToast('Descripción generada con IA', 'success');
         } catch (error) {
-            addToast('Error al generar la descripción.', 'error');
+            addToast((error as Error)?.message || 'Error al generar la descripción.', 'error');
         } finally {
             setIsAiLoading(false);
         }
