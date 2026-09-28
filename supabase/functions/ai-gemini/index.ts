@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { costeDe } from "../_shared/creditos-ia.ts";
+import { conRespaldo as reintentar } from "../_shared/reintentos-ia.ts";
 import {
   resumenDelNegocio,
   instruccionesDelAsistente,
@@ -110,6 +111,9 @@ function translateGeminiError(rawMessage: string): string {
   if (msg.includes("resource_exhausted") || msg.includes("quota") || msg.includes("prepayment credits") || msg.includes("429")) {
     return "El asistente de IA no está disponible ahora mismo (se ha alcanzado el límite de uso). Inténtalo de nuevo más tarde.";
   }
+  if (msg.includes("high demand") || msg.includes("unavailable") || msg.includes("overloaded") || msg.includes("503")) {
+    return "El servicio de IA de Google está saturado en este momento. Espera un minuto y vuelve a intentarlo.";
+  }
   if (msg.includes("api key not valid") || msg.includes("api_key_invalid") || msg.includes("permission_denied") || msg.includes("401") || msg.includes("403")) {
     return "El asistente de IA no está disponible ahora mismo. Nuestro equipo ya ha sido avisado.";
   }
@@ -126,14 +130,14 @@ function translateGeminiError(rawMessage: string): string {
   return "Ha ocurrido un error con el asistente de IA. Inténtalo de nuevo en unos minutos.";
 }
 
-function isAuthError(rawMessage: string): boolean {
-  const msg = rawMessage.toLowerCase();
-  return (
-    msg.includes("api key not valid") ||
-    msg.includes("api_key_invalid") ||
-    msg.includes("permission_denied") ||
-    msg.includes("error 401") ||
-    msg.includes("error 403")
+// Política común de reintentos: ver _shared/reintentos-ia.ts.
+const PLAN_DE_MODELOS = [PRIMARY_MODEL, FALLBACK_MODEL, PRIMARY_MODEL, FALLBACK_MODEL];
+const TIEMPO_MAXIMO_LLAMADA_MS = 45_000;
+
+function conRespaldo<T>(ownApiKey: string, sharedApiKey: string, llamar: (apiKey: string, model: string) => Promise<T>): Promise<T> {
+  return reintentar(
+    { plan: PLAN_DE_MODELOS, clavePropia: ownApiKey, claveCompartida: sharedApiKey, registrar: (t) => console.error(`[ai-gemini] ${t}`) },
+    llamar
   );
 }
 
@@ -145,6 +149,7 @@ async function callGeminiWithModel(apiKey: string, model: string, fullPrompt: st
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    signal: AbortSignal.timeout(TIEMPO_MAXIMO_LLAMADA_MS),
     body: JSON.stringify({
       contents: [{ parts: [{ text: fullPrompt }] }],
       generationConfig: { maxOutputTokens: MAX_TOKENS_DE_SALIDA },
@@ -184,6 +189,7 @@ async function pedirAGemini(apiKey: string, model: string, p: PeticionGemini): P
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    signal: AbortSignal.timeout(TIEMPO_MAXIMO_LLAMADA_MS),
     body: JSON.stringify({
       ...(p.system ? { systemInstruction: { parts: [{ text: p.system }] } } : {}),
       contents: p.contents,
@@ -200,24 +206,9 @@ async function pedirAGemini(apiKey: string, model: string, p: PeticionGemini): P
   return text;
 }
 
-/* Misma política de respaldo que callGemini: modelo principal, clave
-   compartida si falla la propia por autenticación, y modelo de respaldo. */
-async function pedirConRespaldo(ownApiKey: string, sharedApiKey: string, p: PeticionGemini): Promise<string> {
-  const usingOwnKey = ownApiKey !== sharedApiKey;
-  try {
-    return await pedirAGemini(ownApiKey, PRIMARY_MODEL, p);
-  } catch (e) {
-    const msg = (e as Error).message;
-    console.error(`[ai-gemini] Fallo el modelo principal (${PRIMARY_MODEL}):`, msg);
-    if (usingOwnKey && isAuthError(msg)) {
-      try {
-        return await pedirAGemini(sharedApiKey, PRIMARY_MODEL, p);
-      } catch {
-        return await pedirAGemini(sharedApiKey, FALLBACK_MODEL, p);
-      }
-    }
-    return await pedirAGemini(ownApiKey, FALLBACK_MODEL, p);
-  }
+/* Petición con la política común de respaldo y reintentos. */
+function pedirConRespaldo(ownApiKey: string, sharedApiKey: string, p: PeticionGemini): Promise<string> {
+  return conRespaldo(ownApiKey, sharedApiKey, (clave, modelo) => pedirAGemini(clave, modelo, p));
 }
 
 const unTurno = (texto: string): PeticionGemini["contents"] => [{ role: "user", parts: [{ text: texto }] }];
@@ -281,27 +272,7 @@ async function callGemini(
 ): Promise<string> {
   const rules = extraRules ? `${PLAIN_TEXT_RULES}\n\n${extraRules}` : PLAIN_TEXT_RULES;
   const fullPrompt = `${prompt}\n\n${rules}`;
-  const usingOwnKey = ownApiKey !== sharedApiKey;
-
-  let text: string;
-  try {
-    text = await callGeminiWithModel(ownApiKey, PRIMARY_MODEL, fullPrompt);
-  } catch (primaryError) {
-    const primaryMsg = (primaryError as Error).message;
-    console.error(`[ai-gemini] Fallo el modelo principal (${PRIMARY_MODEL}):`, primaryMsg);
-
-    if (usingOwnKey && isAuthError(primaryMsg)) {
-      console.error("[ai-gemini] La API key propia del usuario ha fallado por autenticación, usando la key compartida como respaldo.");
-      try {
-        text = await callGeminiWithModel(sharedApiKey, PRIMARY_MODEL, fullPrompt);
-      } catch (sharedPrimaryError) {
-        console.error(`[ai-gemini] Fallo el modelo principal con la key compartida (${PRIMARY_MODEL}):`, (sharedPrimaryError as Error).message);
-        text = await callGeminiWithModel(sharedApiKey, FALLBACK_MODEL, fullPrompt);
-      }
-    } else {
-      text = await callGeminiWithModel(ownApiKey, FALLBACK_MODEL, fullPrompt);
-    }
-  }
+  const text = await conRespaldo(ownApiKey, sharedApiKey, (clave, modelo) => callGeminiWithModel(clave, modelo, fullPrompt));
 
   return text
     .replace(/^#{1,6}\s*/gm, "")
@@ -327,6 +298,7 @@ async function callGeminiWithImage(
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    signal: AbortSignal.timeout(TIEMPO_MAXIMO_LLAMADA_MS),
     body: JSON.stringify({
       contents: [
         {
@@ -365,7 +337,6 @@ async function extractExpenseWithGemini(
   mimeType: string,
   imageBase64: string
 ): Promise<Record<string, unknown>> {
-  const usingOwnKey = ownApiKey !== sharedApiKey;
   const prompt = `Eres un asistente experto en contabilidad para autonomos en España. Analiza la imagen adjunta de un ticket o factura de un proveedor y extrae sus datos.
 
 Categorias permitidas (elige la que mejor encaje, EXACTAMENTE una de esta lista, escrita tal cual):
@@ -384,25 +355,7 @@ Devuelve UNICAMENTE un objeto JSON (sin texto adicional, sin explicaciones, sin 
 
 Si la imagen no es un ticket o factura legible, devuelve igualmente el JSON con los campos que puedas rellenar y "confidence" en 0.`;
 
-  let text: string;
-  try {
-    text = await callGeminiWithImage(ownApiKey, PRIMARY_MODEL, prompt, mimeType, imageBase64);
-  } catch (primaryError) {
-    const primaryMsg = (primaryError as Error).message;
-    console.error(`[ai-gemini] OCR: falló el modelo principal (${PRIMARY_MODEL}):`, primaryMsg);
-
-    if (usingOwnKey && isAuthError(primaryMsg)) {
-      console.error("[ai-gemini] OCR: la API key propia del usuario ha fallado por autenticación, usando la key compartida como respaldo.");
-      try {
-        text = await callGeminiWithImage(sharedApiKey, PRIMARY_MODEL, prompt, mimeType, imageBase64);
-      } catch (sharedPrimaryError) {
-        console.error(`[ai-gemini] OCR: falló el modelo principal con la key compartida (${PRIMARY_MODEL}):`, (sharedPrimaryError as Error).message);
-        text = await callGeminiWithImage(sharedApiKey, FALLBACK_MODEL, prompt, mimeType, imageBase64);
-      }
-    } else {
-      text = await callGeminiWithImage(ownApiKey, FALLBACK_MODEL, prompt, mimeType, imageBase64);
-    }
-  }
+  const text = await conRespaldo(ownApiKey, sharedApiKey, (clave, modelo) => callGeminiWithImage(clave, modelo, prompt, mimeType, imageBase64));
 
   let parsed: Record<string, unknown>;
   try {
