@@ -218,7 +218,7 @@ const handleSelectBudget = (budgetId: string) => {
       return;
     }
     try {
-      await generateInvoicePdf(invoice, client, profile, getFiscalDataForInvoice(invoice.id));
+      await generateInvoicePdf(invoice, client, profile, getFiscalDataForInvoice(invoice.id), { rectificaA: invoices.find(i => i.id === invoice.rectifies_invoice_id)?.invoice_number });
     } catch (error) {
       console.error('Error generando el PDF:', error);
       addToast('No se pudo generar el PDF de la factura.', 'error');
@@ -245,7 +245,7 @@ const handleSelectBudget = (budgetId: string) => {
 
     let pdfBase64: string;
     try {
-      pdfBase64 = await generateInvoicePdfBase64(invoice, client, profile, getFiscalDataForInvoice(invoice.id));
+      pdfBase64 = await generateInvoicePdfBase64(invoice, client, profile, getFiscalDataForInvoice(invoice.id), { rectificaA: invoices.find(i => i.id === invoice.rectifies_invoice_id)?.invoice_number });
     } catch (error) {
       console.error('Error generando el PDF:', error);
       addToast('No se pudo generar el PDF de la factura.', 'error');

@@ -6,10 +6,10 @@ import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
-import { NewInvoice } from '@/types';
+import { NewInvoice, Invoice, RecurringInvoice } from '@/types';
 import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient';
-import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon, LinkIcon, ExternalLinkIcon } from '@/components/icons/Icon';
+import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon, LinkIcon, ExternalLinkIcon, EditIcon, RefreshCwIcon, XCircleIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal';
 import CreateRecurringInvoiceModal from '@/components/modals/CreateRecurringInvoiceModal';
@@ -62,7 +62,7 @@ const PaymentLinkMenuButton: React.FC<{
       <button
         ref={buttonRef}
         onClick={handleToggle}
-        className="p-2 text-gray-400 hover:text-primary-400 transition-colors"
+        className="p-1.5 text-gray-400 hover:text-primary-400 transition-colors"
         title="Enlace de pago (Stripe)"
       >
         <LinkIcon className="w-4 h-4" />
@@ -100,12 +100,49 @@ const PaymentLinkMenuButton: React.FC<{
   );
 };
 
+type ModoFactura = 'crear' | 'editar' | 'rectificar' | 'anular';
+
+const TITULO_DEL_MODO: Record<ModoFactura, string> = {
+  crear: 'Nueva Factura',
+  editar: 'Editar factura',
+  rectificar: 'Rectificar factura',
+  anular: 'Anular factura',
+};
+
+const TEXTO_DEL_BOTON: Record<ModoFactura, string> = {
+  crear: 'Generar Factura',
+  editar: 'Guardar cambios',
+  rectificar: 'Crear factura rectificativa',
+  anular: 'Anular con factura rectificativa',
+};
+
+/** Qué se puede hacer con cada factura (exportado para las pruebas). */
+export const accionesDeFactura = (inv: Pick<Invoice, 'fiscal_locked' | 'is_rectified' | 'total_cents'>, estado: string) => {
+  const bloqueada = !!inv.fiscal_locked;
+  const rectificada = !!inv.is_rectified;
+  const conCobros = estado === 'PAGADA' || estado === 'PARCIAL';
+  return {
+    editar: !bloqueada && !rectificada && !conCobros,
+    rectificar: bloqueada && !rectificada,
+    anular: bloqueada && !rectificada,
+    borrar: !bloqueada,
+    cobrar: !rectificada && inv.total_cents > 0 && estado !== 'PAGADA',
+  };
+};
+
 const InvoicesPage: React.FC = () => {
-  const { invoices, recurringInvoices, clients, profile, fiscalRecords, getClientById, addInvoice, deleteInvoice, addRecurringInvoice, deleteRecurringInvoice } = useAppStore(useShallow(s => ({ invoices: s.invoices, recurringInvoices: s.recurringInvoices, clients: s.clients, profile: s.profile, fiscalRecords: s.fiscalRecords, getClientById: s.getClientById, addInvoice: s.addInvoice, deleteInvoice: s.deleteInvoice, addRecurringInvoice: s.addRecurringInvoice, deleteRecurringInvoice: s.deleteRecurringInvoice })));
+  const { invoices, recurringInvoices, clients, profile, fiscalRecords, getClientById, addInvoice, updateInvoice, rectificarFactura, deleteInvoice, deleteRecurringInvoice } = useAppStore(useShallow(s => ({ invoices: s.invoices, recurringInvoices: s.recurringInvoices, clients: s.clients, profile: s.profile, fiscalRecords: s.fiscalRecords, getClientById: s.getClientById, addInvoice: s.addInvoice, updateInvoice: s.updateInvoice, rectificarFactura: s.rectificarFactura, deleteInvoice: s.deleteInvoice, deleteRecurringInvoice: s.deleteRecurringInvoice })));
   const { addToast } = useToast();
 
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
   const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
+  const [recurrenteEnEdicion, setRecurrenteEnEdicion] = useState<RecurringInvoice | null>(null);
+  // El mismo formulario sirve para crear, editar, rectificar y anular.
+  const [modo, setModo] = useState<ModoFactura>('crear');
+  const [facturaBase, setFacturaBase] = useState<Invoice | null>(null);
+  const [motivo, setMotivo] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  const esCorreccion = modo === 'rectificar' || modo === 'anular';
   const [searchTerm, setSearchTerm] = useState('');
   const [sourceBudgetId, setSourceBudgetId] = useState<string>('');
   const [sourceContractId, setSourceContractId] = useState<string>('');
@@ -201,6 +238,30 @@ const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets
 
   const handleAddInvoice = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (guardando) return;
+
+    if (modo === 'rectificar' || modo === 'anular') {
+      if (!facturaBase) return;
+      if (!motivo.trim()) {
+        addToast('Indica el motivo.', 'error');
+        return;
+      }
+      if (modo === 'rectificar' && invoiceItems.some(item => !item.description.trim())) {
+        addToast('Todas las líneas necesitan una descripción.', 'error');
+        return;
+      }
+      setGuardando(true);
+      try {
+        const nueva = await rectificarFactura(facturaBase.id, modo === 'anular' ? [] : invoiceItems, motivo);
+        addToast(`Factura rectificativa ${nueva.invoice_number} creada (${formatCurrency(nueva.total_cents)}).`, 'success');
+        handleCloseInvoiceModal();
+      } catch (error) {
+        addToast((error as Error).message || 'No se pudo crear la rectificativa.', 'error');
+      } finally {
+        setGuardando(false);
+      }
+      return;
+    }
 
     if (invoiceItems.some(item => !item.description.trim())) {
       addToast('Todas las líneas necesitan una descripción.', 'error');
@@ -211,32 +272,72 @@ const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets
       return;
     }
 
+    setGuardando(true);
     try {
+      if (modo === 'editar' && facturaBase) {
+        await updateInvoice(facturaBase.id, {
+          client_id: newInvoice.client_id,
+          project_id: newInvoice.project_id || null,
+          due_date: newInvoice.due_date,
+          notes: newInvoice.notes || null,
+          items: invoiceItems,
+          tax_percent: taxPercent,
+          irpf_percent: irpfPercent,
+        });
+        addToast(`Factura ${facturaBase.invoice_number} actualizada.`, 'success');
+        handleCloseInvoiceModal();
+        return;
+      }
+
       const payload = {
-  ...newInvoice,
-  items: invoiceItems,
-  tax_percent: taxPercent,
-  irpf_percent: irpfPercent,
-  project_id: newInvoice.project_id || null,
-  notes: newInvoice.notes || null,
-  issue_date: new Date().toISOString().split('T')[0],
-  budget_id: sourceBudgetId || null,      // 🆕
-  contract_id: sourceContractId || null,  // 🆕
-};
+        ...newInvoice,
+        items: invoiceItems,
+        tax_percent: taxPercent,
+        irpf_percent: irpfPercent,
+        project_id: newInvoice.project_id || null,
+        notes: newInvoice.notes || null,
+        issue_date: new Date().toISOString().split('T')[0],
+        budget_id: sourceBudgetId || null,
+        contract_id: sourceContractId || null,
+      };
       await addInvoice(payload);
-      setIsInvoiceModalOpen(false);
-      setNewInvoice(initialInvoiceState);
-      setInvoiceItems([{ description: '', quantity: 1, price_cents: 0 }]);
-      setTaxPercent(21);
-      setIrpfPercent(0);
+      handleCloseInvoiceModal();
       addToast('Factura creada correctamente', 'success');
     } catch (error: any) {
-      addToast(error.message || 'Error al crear factura', 'error');
+      addToast(error.message || 'Error al guardar la factura', 'error');
+    } finally {
+      setGuardando(false);
     }
+  };
+
+  // Abre el formulario con los datos de una factura existente.
+  const abrirConFactura = (inv: Invoice, nuevoModo: ModoFactura) => {
+    setModo(nuevoModo);
+    setFacturaBase(inv);
+    setMotivo('');
+    setNewInvoice({
+      client_id: inv.client_id,
+      project_id: inv.project_id || '',
+      items: inv.items,
+      tax_percent: inv.tax_percent,
+      due_date: inv.due_date,
+      notes: inv.notes || '',
+    });
+    setInvoiceItems(inv.items.map(i => ({ description: i.description, quantity: i.quantity, price_cents: i.price_cents })));
+    setTaxPercent(Number(inv.tax_percent) || 0);
+    setIrpfPercent(Number(inv.irpf_percent) || 0);
+    setSourceBudgetId('');
+    setSourceContractId('');
+    setIsInvoiceModalOpen(true);
   };
 
   const handleCloseInvoiceModal = () => {
     setIsInvoiceModalOpen(false);
+    setModo('crear');
+    setFacturaBase(null);
+    setMotivo('');
+    setSourceBudgetId('');
+    setSourceContractId('');
     setNewInvoice(initialInvoiceState);
     setInvoiceItems([{ description: '', quantity: 1, price_cents: 0 }]);
     setTaxPercent(21);
@@ -293,7 +394,7 @@ const handleSelectBudget = (budgetId: string) => {
       return;
     }
     try {
-      await generateInvoicePdf(invoice, client, profile, getFiscalDataForInvoice(invoice.id));
+      await generateInvoicePdf(invoice, client, profile, getFiscalDataForInvoice(invoice.id), { rectificaA: invoices.find(i => i.id === invoice.rectifies_invoice_id)?.invoice_number });
     } catch (error) {
       console.error('Error generando el PDF:', error);
       addToast('No se pudo generar el PDF de la factura.', 'error');
@@ -320,7 +421,7 @@ const handleSelectBudget = (budgetId: string) => {
 
     let pdfBase64: string;
     try {
-      pdfBase64 = await generateInvoicePdfBase64(invoice, client, profile, getFiscalDataForInvoice(invoice.id));
+      pdfBase64 = await generateInvoicePdfBase64(invoice, client, profile, getFiscalDataForInvoice(invoice.id), { rectificaA: invoices.find(i => i.id === invoice.rectifies_invoice_id)?.invoice_number });
     } catch (error) {
       console.error('Error generando el PDF:', error);
       addToast('No se pudo generar el PDF de la factura.', 'error');
@@ -376,15 +477,21 @@ const handleSelectBudget = (budgetId: string) => {
     // CAMBIO: misma llamada huérfana que arriba, eliminada por el mismo motivo.
   };
 
-  const handleDeleteInvoice = async (id: string) => {
+  const handleDeleteInvoice = async (inv: Invoice) => {
+    const aviso = inv.rectifies_invoice_id
+      ? `¿Borrar la factura rectificativa ${inv.invoice_number}? La factura que rectificaba volverá a poder rectificarse.`
+      : `¿Borrar la factura ${inv.invoice_number}? No se puede deshacer.`;
+    if (!window.confirm(aviso)) return;
     try {
-      await deleteInvoice(id);
+      await deleteInvoice(inv.id);
+      addToast(`Factura ${inv.invoice_number} borrada.`, 'info');
     } catch (err) {
       addToast((err as Error).message || 'No se pudo eliminar la factura.', 'error');
     }
   };
 
   const handleDeleteRecurringInvoice = async (id: string) => {
+    if (!window.confirm('¿Borrar esta factura recurrente? Las facturas ya emitidas no se tocan.')) return;
     try {
       await deleteRecurringInvoice(id);
     } catch (err) {
@@ -394,7 +501,13 @@ const handleSelectBudget = (budgetId: string) => {
 
   // Devuelve el estado real de cobro combinando `paid` (booleano, sincronizado por trigger)
   // con el importe parcial acumulado, para mostrar 4 estados: pagada / parcial / pendiente / sin importe
-  const getPaymentStatus = (invoiceId: string, totalCents: number, isPaidFlag: boolean) => {
+  const getPaymentStatus = (invoiceId: string, totalCents: number, isPaidFlag: boolean, rectificada = false) => {
+    if (rectificada) {
+      return { label: 'RECTIFICADA', className: 'bg-gray-500/10 text-gray-400 border-gray-500/30', paidCents: paymentsByInvoice[invoiceId]?.paidCents ?? 0 };
+    }
+    if (totalCents < 0) {
+      return { label: 'ABONO', className: 'bg-purple-500/10 text-purple-300 border-purple-500/30', paidCents: 0 };
+    }
     const summary = paymentsByInvoice[invoiceId];
     const trackedPaidCents = summary?.paidCents ?? 0;
     const paidCents = isPaidFlag && trackedPaidCents === 0 ? totalCents : trackedPaidCents;
@@ -413,6 +526,51 @@ const handleSelectBudget = (budgetId: string) => {
     return { label: 'PENDIENTE', className: 'bg-orange-500/10 text-orange-400 border-orange-500/30', paidCents };
   };
 
+  const numeroDe = (id?: string | null) => invoices.find(i => i.id === id)?.invoice_number;
+
+  const renderAcciones = (inv: Invoice, acciones: ReturnType<typeof accionesDeFactura>) => (
+    <>
+      {acciones.cobrar && (
+        <>
+          <button onClick={() => setPaymentModalInvoiceId(inv.id)} className="p-1.5 text-gray-400 hover:text-green-400 transition-colors" title="Registrar pago">
+            <DollarSignIcon className="w-4 h-4" />
+          </button>
+          <PaymentLinkMenuButton
+            onCopy={() => handleCopyPaymentLink(inv)}
+            onEmail={() => handleSendEmailInvoice(inv)}
+            onOpen={() => handleOpenPaymentLink(inv)}
+          />
+        </>
+      )}
+      {acciones.editar && (
+        <button onClick={() => abrirConFactura(inv, 'editar')} className="p-1.5 text-gray-400 hover:text-white transition-colors" title="Editar">
+          <EditIcon className="w-4 h-4" />
+        </button>
+      )}
+      {acciones.rectificar && (
+        <button onClick={() => abrirConFactura(inv, 'rectificar')} className="p-1.5 text-gray-400 hover:text-yellow-400 transition-colors" title="Rectificar (factura rectificativa)">
+          <RefreshCwIcon className="w-4 h-4" />
+        </button>
+      )}
+      <button onClick={() => handleDownloadPdf(inv)} className="p-1.5 text-gray-400 hover:text-white transition-colors" title="Descargar PDF">
+        <Download className="w-4 h-4" />
+      </button>
+      <button onClick={() => handleSendEmailInvoice(inv)} className="p-1.5 text-gray-400 hover:text-primary-400 transition-colors" title="Enviar por email">
+        <Send className="w-4 h-4" />
+      </button>
+      {acciones.borrar && (
+        <button onClick={() => handleDeleteInvoice(inv)} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar">
+          <Trash className="w-4 h-4" />
+        </button>
+      )}
+      {acciones.anular && (
+        <button onClick={() => abrirConFactura(inv, 'anular')} className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Anular (abono total)">
+          <XCircleIcon className="w-4 h-4" />
+        </button>
+      )}
+    </>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -421,7 +579,7 @@ const handleSelectBudget = (budgetId: string) => {
           <p className="text-gray-400">Gestiona tus facturas, cobros parciales y facturación recurrente</p>
         </div>
         <div className="flex gap-3">
-          <Button variant="secondary" onClick={() => setIsRecurringModalOpen(true)}>
+          <Button variant="secondary" onClick={() => { setRecurrenteEnEdicion(null); setIsRecurringModalOpen(true); }}>
             <Repeat className="w-4 h-4 mr-2" />
             Factura Recurrente
           </Button>
@@ -451,18 +609,18 @@ const handleSelectBudget = (budgetId: string) => {
                 <table className="w-full text-left hidden md:table">
                   <thead>
                     <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
-                      <th className="px-6 py-4 font-medium">Nº Factura</th>
-                      <th className="px-6 py-4 font-medium">Cliente</th>
-                      <th className="px-6 py-4 font-medium">Vencimiento</th>
-                      <th className="px-6 py-4 font-medium text-right">Total</th>
-                      <th className="px-6 py-4 font-medium">Cobrado</th>
-                      <th className="px-6 py-4 font-medium text-center">Estado</th>
-                      <th className="px-6 py-4 font-medium text-center sticky right-0 bg-gray-900">Acciones</th>
+                      <th className="px-3 py-3 font-medium">Nº Factura</th>
+                      <th className="px-3 py-3 font-medium">Cliente</th>
+                      <th className="px-3 py-3 font-medium">Vencimiento</th>
+                      <th className="px-3 py-3 font-medium text-right">Total</th>
+                      <th className="px-3 py-3 font-medium">Estado</th>
+                      <th className="px-3 py-3 font-medium text-center sticky right-0 bg-gray-900">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-800">
                     {filteredInvoices.map((inv) => {
-                      const status = getPaymentStatus(inv.id, inv.total_cents, inv.paid);
+                      const status = getPaymentStatus(inv.id, inv.total_cents, inv.paid, inv.is_rectified);
+                      const acciones = accionesDeFactura(inv, status.label);
                       const remainingCents = Math.max(inv.total_cents - status.paidCents, 0);
                       const progressPct = inv.total_cents > 0
                         ? Math.min((status.paidCents / inv.total_cents) * 100, 100)
@@ -470,19 +628,25 @@ const handleSelectBudget = (budgetId: string) => {
 
                       return (
                         <tr key={inv.id} className="text-sm text-gray-300 hover:bg-gray-800/30 transition-colors">
-                          <td className="px-6 py-4 font-mono text-white">
+                          <td className="px-3 py-3 font-mono text-white">
                         {inv.invoice_number}
                         {inv.fiscal_locked && (
                           <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/30" title="Registro fiscal Veri*Factu generado — esta factura está bloqueada frente a ediciones">
                             🔒 Veri*Factu
                           </span>
                         )}
+                        {inv.rectifies_invoice_id && (
+                          <div className="text-[11px] font-sans text-gray-500">Rectifica a {numeroDe(inv.rectifies_invoice_id) ?? 'otra factura'}</div>
+                        )}
                       </td>
-                          <td className="px-6 py-4">{getClientName(inv.client_id)}</td>
-                          <td className="px-6 py-4">{formatearFecha(inv.due_date)}</td>
-                          <td className="px-6 py-4 text-right font-bold text-white">{formatCurrency(inv.total_cents)}</td>
+                          <td className="px-3 py-3">{getClientName(inv.client_id)}</td>
+                          <td className="px-3 py-3">{formatearFecha(inv.due_date)}</td>
+                          <td className="px-3 py-3 text-right font-bold text-white">{formatCurrency(inv.total_cents)}</td>
 
-                          <td className="px-6 py-4 min-w-[140px]">
+                          <td className="px-3 py-3 min-w-[140px]">
+                            <span className={`inline-block mb-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${status.className}`}>
+                              {status.label}
+                            </span>
                             <div className="flex justify-between text-[10px] text-gray-500 mb-1">
                               <span>{formatCurrency(status.paidCents)}</span>
                               {remainingCents > 0 && <span>Restan {formatCurrency(remainingCents)}</span>}
@@ -494,51 +658,9 @@ const handleSelectBudget = (budgetId: string) => {
                               />
                             </div>
                           </td>
-
-                          <td className="px-6 py-4 text-center">
-                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold border ${status.className}`}>
-                              {status.label}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 sticky right-0 bg-gray-900/95 backdrop-blur-sm">
-                            <div className="flex items-center justify-center gap-2">
-                              {status.label !== 'PAGADA' && (
-                                <>
-                                  <button
-                                    onClick={() => setPaymentModalInvoiceId(inv.id)}
-                                    className="p-2 text-gray-400 hover:text-green-400 transition-colors"
-                                    title="Registrar pago"
-                                  >
-                                    <DollarSignIcon className="w-4 h-4" />
-                                  </button>
-                                  <PaymentLinkMenuButton
-                                    onCopy={() => handleCopyPaymentLink(inv)}
-                                    onEmail={() => handleSendEmailInvoice(inv)}
-                                    onOpen={() => handleOpenPaymentLink(inv)}
-                                  />
-                                </>
-                              )}
-                              <button
-                                onClick={() => handleDownloadPdf(inv)}
-                                className="p-2 text-gray-400 hover:text-white transition-colors"
-                                title="Descargar PDF"
-                              >
-                                <Download className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleSendEmailInvoice(inv)}
-                                className="p-2 text-gray-400 hover:text-primary-400 transition-colors"
-                                title="Enviar por Email"
-                              >
-                                <Send className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteInvoice(inv.id)}
-                                className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                                title="Eliminar"
-                              >
-                                <Trash className="w-4 h-4" />
-                              </button>
+                          <td className="px-3 py-3 sticky right-0 bg-gray-900/95 backdrop-blur-sm">
+                            <div className="flex items-center justify-center gap-1">
+                              {renderAcciones(inv, acciones)}
                             </div>
                           </td>
                         </tr>
@@ -550,7 +672,8 @@ const handleSelectBudget = (budgetId: string) => {
                 {/* Vista de tarjetas para móvil (pantallas < md) — la tabla de arriba se oculta con hidden md:table */}
                 <div className="md:hidden divide-y divide-gray-800">
                   {filteredInvoices.map((inv) => {
-                    const status = getPaymentStatus(inv.id, inv.total_cents, inv.paid);
+                    const status = getPaymentStatus(inv.id, inv.total_cents, inv.paid, inv.is_rectified);
+                      const acciones = accionesDeFactura(inv, status.label);
                     const remainingCents = Math.max(inv.total_cents - status.paidCents, 0);
                     const progressPct = inv.total_cents > 0
                       ? Math.min((status.paidCents / inv.total_cents) * 100, 100)
@@ -568,6 +691,9 @@ const handleSelectBudget = (budgetId: string) => {
                                 </span>
                               )}
                             </p>
+                            {inv.rectifies_invoice_id && (
+                              <p className="text-[11px] text-gray-500">Rectifica a {numeroDe(inv.rectifies_invoice_id) ?? 'otra factura'}</p>
+                            )}
                             <p className="text-sm text-gray-400">{getClientName(inv.client_id)}</p>
                           </div>
                           <span className={`px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${status.className}`}>
@@ -593,28 +719,8 @@ const handleSelectBudget = (budgetId: string) => {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-end gap-1 pt-1 border-t border-gray-800/50">
-                          {status.label !== 'PAGADA' && (
-                            <>
-                              <button onClick={() => setPaymentModalInvoiceId(inv.id)} className="p-2 text-gray-400 hover:text-green-400 transition-colors" title="Registrar pago">
-                                <DollarSignIcon className="w-4 h-4" />
-                              </button>
-                              <PaymentLinkMenuButton
-                                onCopy={() => handleCopyPaymentLink(inv)}
-                                onEmail={() => handleSendEmailInvoice(inv)}
-                                onOpen={() => handleOpenPaymentLink(inv)}
-                              />
-                            </>
-                          )}
-                          <button onClick={() => handleDownloadPdf(inv)} className="p-2 text-gray-400 hover:text-white transition-colors" title="Descargar PDF">
-                            <Download className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleSendEmailInvoice(inv)} className="p-2 text-gray-400 hover:text-primary-400 transition-colors" title="Enviar por Email">
-                            <Send className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDeleteInvoice(inv.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar">
-                            <Trash className="w-4 h-4" />
-                          </button>
+                        <div className="flex flex-wrap items-center justify-end gap-1 pt-1 border-t border-gray-800/50">
+                          {renderAcciones(inv, acciones)}
                         </div>
                       </div>
                     );
@@ -643,15 +749,25 @@ const handleSelectBudget = (budgetId: string) => {
                       <div>
                         <p className="text-sm font-bold text-white">{getClientName(ri.client_id)}</p>
                         <p className="text-xs text-gray-500">
-                          {ri.frequency === 'monthly' ? 'Mensual' : ri.frequency === 'yearly' ? 'Anual' : ri.frequency} · Próxima: {ri.next_due_date}
+                          {ri.frequency === 'monthly' ? 'Mensual' : ri.frequency === 'yearly' ? 'Anual' : ri.frequency} · Próxima: {formatearFecha(ri.next_due_date)}
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleDeleteRecurringInvoice(ri.id)}
-                        className="text-gray-500 hover:text-red-500 transition-colors"
-                      >
-                        <Trash className="w-4 h-4" />
-                      </button>
+                      <div className="flex gap-1">
+                        <button
+                          onClick={() => { setRecurrenteEnEdicion(ri); setIsRecurringModalOpen(true); }}
+                          className="p-1 text-gray-500 hover:text-white transition-colors"
+                          title="Editar"
+                        >
+                          <EditIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRecurringInvoice(ri.id)}
+                          className="p-1 text-gray-500 hover:text-red-500 transition-colors"
+                          title="Eliminar"
+                        >
+                          <Trash className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     <p className="text-sm text-white font-semibold">{formatCurrency(totalCents)} <span className="text-gray-500 font-normal">por emisión</span></p>
                   </div>
@@ -662,8 +778,23 @@ const handleSelectBudget = (budgetId: string) => {
         </div>
       </div>
 
-      <Modal isOpen={isInvoiceModalOpen} onClose={handleCloseInvoiceModal} title="Nueva Factura">
+      <Modal isOpen={isInvoiceModalOpen} onClose={handleCloseInvoiceModal} title={facturaBase ? `${TITULO_DEL_MODO[modo]} ${facturaBase.invoice_number}` : TITULO_DEL_MODO[modo]}>
         <form onSubmit={handleAddInvoice} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          {esCorreccion && facturaBase && (
+            <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-100 space-y-1">
+              {modo === 'anular' ? (
+                <p>
+                  Esta factura tiene registro fiscal, así que la ley no deja borrarla. Se creará una <strong>factura rectificativa</strong> que
+                  la anula entera ({formatCurrency(-facturaBase.total_cents)}), con numeración propia (serie R).
+                </p>
+              ) : (
+                <p>
+                  Esta factura tiene registro fiscal, así que no se modifica: escribe cómo <strong>debería</strong> quedar y se creará una
+                  <strong> factura rectificativa</strong> por la diferencia, con numeración propia (serie R).
+                </p>
+              )}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Cliente</label>
             <select
@@ -671,11 +802,12 @@ const handleSelectBudget = (budgetId: string) => {
               value={newInvoice.client_id}
               onChange={(e) => setNewInvoice({ ...newInvoice, client_id: e.target.value })}
               required
+              disabled={esCorreccion}
             >
               <option value="">Seleccionar cliente</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-              {newInvoice.client_id && (
+              {newInvoice.client_id && modo === 'crear' && (
   <>
     <div>
       <label className="block text-sm font-medium text-gray-400 mb-1">
@@ -719,14 +851,32 @@ const handleSelectBudget = (budgetId: string) => {
 )}
           </div>
 
-          <Input
-            label="Fecha Vencimiento"
-            type="date"
-            value={newInvoice.due_date}
-            onChange={(e) => setNewInvoice({ ...newInvoice, due_date: e.target.value })}
-          />
+          {!esCorreccion && (
+            <Input
+              label="Fecha Vencimiento"
+              type="date"
+              value={newInvoice.due_date}
+              onChange={(e) => setNewInvoice({ ...newInvoice, due_date: e.target.value })}
+            />
+          )}
+
+          {esCorreccion && (
+            <div>
+              <label className="block text-sm font-medium text-gray-400 mb-1">Motivo {modo === 'anular' ? 'de la anulación' : 'de la rectificación'}</label>
+              <textarea
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                rows={2}
+                maxLength={500}
+                required
+                placeholder={modo === 'anular' ? 'Ej.: factura emitida por error' : 'Ej.: error en el número de horas facturadas'}
+                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
+              />
+            </div>
+          )}
 
           {/* Editor de líneas */}
+          {modo !== 'anular' && (
           <div>
             <div className="flex justify-between items-center mb-2">
               <label className="block text-sm font-medium text-gray-400">Conceptos</label>
@@ -775,8 +925,10 @@ const handleSelectBudget = (budgetId: string) => {
               ))}
             </div>
           </div>
+          )}
 
           {/* IVA / IRPF */}
+          {modo !== 'anular' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">IVA (%)</label>
@@ -784,6 +936,7 @@ const handleSelectBudget = (budgetId: string) => {
                 type="number"
                 min={0}
                 value={taxPercent}
+                disabled={esCorreccion}
                 onChange={(e) => setTaxPercent(Number(e.target.value) || 0)}
                 className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
               />
@@ -794,13 +947,17 @@ const handleSelectBudget = (budgetId: string) => {
                 type="number"
                 min={0}
                 value={irpfPercent}
+                disabled={esCorreccion}
                 onChange={(e) => setIrpfPercent(Number(e.target.value) || 0)}
                 className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
               />
             </div>
           </div>
 
+          )}
+
           {/* Resumen en vivo */}
+          {modo !== 'anular' && (
           <div className="bg-gray-800/50 rounded-lg p-3 space-y-1 text-sm">
             <div className="flex justify-between text-gray-400">
               <span>Subtotal</span><span>{formatCurrency(invoicePreview.subtotal)}</span>
@@ -816,11 +973,17 @@ const handleSelectBudget = (budgetId: string) => {
             <div className="flex justify-between text-white font-bold pt-1 border-t border-gray-700">
               <span>Total</span><span>{formatCurrency(invoicePreview.total)}</span>
             </div>
+            {modo === 'rectificar' && facturaBase && (
+              <div className="flex justify-between text-yellow-200 font-semibold pt-1">
+                <span>La rectificativa será de</span><span>{formatCurrency(invoicePreview.total - facturaBase.total_cents)}</span>
+              </div>
+            )}
           </div>
+          )}
 
           <div className="flex justify-end gap-3 mt-6">
             <Button type="button" variant="secondary" onClick={handleCloseInvoiceModal}>Cancelar</Button>
-            <Button type="submit">Generar Factura</Button>
+            <Button type="submit" disabled={guardando}>{guardando ? 'Guardando...' : TEXTO_DEL_BOTON[modo]}</Button>
           </div>
         </form>
       </Modal>
@@ -845,7 +1008,8 @@ const handleSelectBudget = (budgetId: string) => {
 
       <CreateRecurringInvoiceModal
         isOpen={isRecurringModalOpen}
-        onClose={() => setIsRecurringModalOpen(false)}
+        onClose={() => { setIsRecurringModalOpen(false); setRecurrenteEnEdicion(null); }}
+        recurrente={recurrenteEnEdicion}
       />
     </div>
   );

@@ -172,7 +172,7 @@ const ProjectPage: React.FC = () => {
         // (la base de datos lo rechazaría): la tarjeta vuelve a su sitio.
         if (finalStatus && draggedProject && draggedProject.status !== finalStatus
             && puede('editarProyecto', draggedProject.user_id, profile?.id, teamMembership)) {
-            updateProject(activeId, { status: finalStatus });
+            updateProject(activeId, { status: finalStatus }).catch(() => addToast('No se pudo mover el proyecto.', 'error'));
         }
 
         setActiveDragStatus({});

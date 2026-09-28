@@ -66,6 +66,7 @@ export interface ProjectSlice {
   getTasksByProjectId: (projectId: string) => Task[];
   addTask: (task: Omit<Task, 'id'|'user_id'|'created_at'|'status'|'invoice_id'>) => Promise<void>;
   toggleTask: (id: string) => Promise<void>;
+  updateTask: (id: string, description: string) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
   addTimeEntry: (entry: Omit<NewTimeEntry, 'user_id'>) => Promise<void>;
   updateTimeEntry: (id: string, updates: Partial<NewTimeEntry>) => Promise<void>;
@@ -114,8 +115,11 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     // ESTA ES LA NUEVA FUNCIÓN QUE ARREGLA TU ERROR EN PROJECTPAGE
     updateProject: async (id, updates) => {
         const { error } = await supabase.from('projects').update(updates).eq('id', id);
-        
-        if (!error) {
+        if (error) {
+            console.error('Error actualizando el proyecto:', error);
+            throw error;
+        }
+        {
             set(state => ({ 
                 projects: state.projects.map(p => p.id === id ? { ...p, ...updates } : p) 
             }));
@@ -186,6 +190,14 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
             // Revertir en caso de error
             set(state => ({ tasks: state.tasks.map(t => t.id === id ? { ...t, status: task.status } : t) }));
         }
+    },
+
+    updateTask: async (id, description) => {
+        const texto = description.trim();
+        if (!texto) throw new Error('La tarea no puede quedar vacía.');
+        const { error } = await supabase.from('tasks').update({ description: texto }).eq('id', id);
+        if (error) { console.error('Error actualizando la tarea:', error); throw error; }
+        set(state => ({ tasks: state.tasks.map(t => (t.id === id ? { ...t, description: texto } : t)) }));
     },
 
     deleteTask: async (id) => {

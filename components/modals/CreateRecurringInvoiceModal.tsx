@@ -3,25 +3,28 @@
 // isRecurringModalOpen, pero no existía ningún modal en el render que
 // comprobara ese estado — el botón era puramente decorativo. Este es el
 // modal que faltaba.
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
-import { InvoiceItem } from '@/types';
+import { InvoiceItem, RecurringInvoice } from '@/types';
 import { PlusIcon, TrashIcon } from '@/components/icons/Icon';
 import { formatCurrency } from '@/lib/utils';
 
 interface CreateRecurringInvoiceModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Si llega, el modal edita esta recurrente en vez de crear una. */
+  recurrente?: RecurringInvoice | null;
 }
 
 const emptyItem: InvoiceItem = { description: '', quantity: 1, price_cents: 0 };
 
-const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = ({ isOpen, onClose }) => {
-  const { clients, projects, addRecurringInvoice } = useAppStore(useShallow(s => ({ clients: s.clients, projects: s.projects, addRecurringInvoice: s.addRecurringInvoice })));
+const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = ({ isOpen, onClose, recurrente = null }) => {
+  const { clients, projects, addRecurringInvoice, updateRecurringInvoice } = useAppStore(useShallow(s => ({ clients: s.clients, projects: s.projects, addRecurringInvoice: s.addRecurringInvoice, updateRecurringInvoice: s.updateRecurringInvoice })));
+  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [clientId, setClientId] = useState(clients[0]?.id || '');
@@ -35,6 +38,18 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
   const [frequency, setFrequency] = useState<'monthly' | 'yearly'>('monthly');
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
 
+  // En edición: la fecha que se edita es la de la próxima emisión.
+  const [proximaEmision, setProximaEmision] = useState('');
+  useEffect(() => {
+    if (!isOpen || !recurrente) return;
+    setClientId(recurrente.client_id);
+    setProjectId(recurrente.project_id || '');
+    setItems(recurrente.items?.length ? recurrente.items.map(i => ({ ...i })) : [{ ...emptyItem }]);
+    setTaxPercent(Number(recurrente.tax_percent) || 0);
+    setFrequency(recurrente.frequency === 'yearly' ? 'yearly' : 'monthly');
+    setProximaEmision(recurrente.next_due_date.slice(0, 10));
+  }, [isOpen, recurrente]);
+
   const clientProjects = useMemo(() => projects.filter(p => p.client_id === clientId), [projects, clientId]);
 
   const totalCents = useMemo(
@@ -43,6 +58,7 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
   );
 
   const resetForm = () => {
+    setError(null);
     setClientId(clients[0]?.id || '');
     setProjectId('');
     setItems([{ ...emptyItem }]);
@@ -78,25 +94,38 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
     if (!clientId) return;
 
     setIsSubmitting(true);
+    setError(null);
     try {
-      await addRecurringInvoice({
-        client_id: clientId,
-        project_id: projectId || null,
-        items,
-        tax_percent: taxPercent,
-        frequency,
-        start_date: startDate,
-      });
+      if (recurrente) {
+        await updateRecurringInvoice(recurrente.id, {
+          client_id: clientId,
+          project_id: projectId || null,
+          items,
+          tax_percent: taxPercent,
+          frequency,
+          next_due_date: proximaEmision || recurrente.next_due_date,
+        });
+      } else {
+        await addRecurringInvoice({
+          client_id: clientId,
+          project_id: projectId || null,
+          items,
+          tax_percent: taxPercent,
+          frequency,
+          start_date: startDate,
+        });
+      }
       handleClose();
-    } catch (error) {
-      console.error('Error creating recurring invoice:', error);
+    } catch (err) {
+      console.error('Error guardando la factura recurrente:', err);
+      setError((err as Error)?.message || 'No se pudo guardar la factura recurrente.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Nueva Factura Recurrente">
+    <Modal isOpen={isOpen} onClose={handleClose} title={recurrente ? 'Editar factura recurrente' : 'Nueva Factura Recurrente'}>
       <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
         <div>
           <label className="block text-sm font-medium text-gray-400 mb-1">Cliente</label>
@@ -137,13 +166,23 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
               <option value="yearly">Anual</option>
             </select>
           </div>
-          <Input
-            label="Fecha de inicio"
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            required
-          />
+          {recurrente ? (
+            <Input
+              label="Próxima emisión"
+              type="date"
+              value={proximaEmision}
+              onChange={(e) => setProximaEmision(e.target.value)}
+              required
+            />
+          ) : (
+            <Input
+              label="Fecha de inicio"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              required
+            />
+          )}
         </div>
 
         <div className="space-y-2">
@@ -204,14 +243,16 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
           </span>
         </div>
 
+        {error && <p className="text-sm text-red-400">{error}</p>}
+
         <p className="text-xs text-gray-500">
-          La primera factura se generará automáticamente en la fecha de inicio, y a partir de ahí cada {frequency === 'monthly' ? 'mes' : 'año'} — no hace falta que hagas nada más.
+          {recurrente ? 'Los cambios valen para las próximas facturas; las ya emitidas no se tocan. ' : ''}La primera factura se generará automáticamente en la fecha de inicio, y a partir de ahí cada {frequency === 'monthly' ? 'mes' : 'año'} — no hace falta que hagas nada más.
         </p>
 
         <div className="flex justify-end gap-3 mt-6">
           <Button type="button" variant="secondary" onClick={handleClose}>Cancelar</Button>
           <Button type="submit" disabled={isSubmitting || !clientId}>
-            {isSubmitting ? 'Creando...' : 'Crear Factura Recurrente'}
+            {isSubmitting ? 'Guardando...' : recurrente ? 'Guardar cambios' : 'Crear Factura Recurrente'}
           </Button>
         </div>
       </form>

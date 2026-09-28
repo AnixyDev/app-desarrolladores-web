@@ -9,7 +9,8 @@ import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { Project, Task, InvoiceItem } from '@/types';
-import { PlusIcon, TrashIcon, ClockIcon, FileTextIcon, MessageSquareIcon, DollarSignIcon } from '@/components/icons/Icon';
+import { PlusIcon, TrashIcon, ClockIcon, FileTextIcon, MessageSquareIcon, DollarSignIcon, EditIcon } from '@/components/icons/Icon';
+import ProjectFormModal, { type DatosDelProyecto } from '@/components/projects/ProjectFormModal';
 import { puede } from '@/lib/permisosEquipo';
 import HitosDelProyecto from '@/components/projects/HitosDelProyecto';
 import EmptyState from '@/components/ui/EmptyState';
@@ -23,7 +24,9 @@ const ProjectDetailPage: React.FC = () => {
     const navigate = useNavigate();
     const { addToast } = useToast();
 
-    const { datosDeTrabajoCargados, getProjectById, getClientById, getTasksByProjectId, timeEntries, expenses, profile, addTask, toggleTask, deleteTask, deleteProject, updateProjectStatus, teamMembership } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getProjectById: s.getProjectById, getClientById: s.getClientById, getTasksByProjectId: s.getTasksByProjectId, timeEntries: s.timeEntries, expenses: s.expenses, profile: s.profile, addTask: s.addTask, toggleTask: s.toggleTask, deleteTask: s.deleteTask, deleteProject: s.deleteProject, updateProjectStatus: s.updateProjectStatus, teamMembership: s.teamMembership })));
+    const { datosDeTrabajoCargados, getProjectById, getClientById, getTasksByProjectId, timeEntries, expenses, profile, addTask, toggleTask, deleteTask, deleteProject, updateProjectStatus, teamMembership, updateProject, updateTask } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getProjectById: s.getProjectById, getClientById: s.getClientById, getTasksByProjectId: s.getTasksByProjectId, timeEntries: s.timeEntries, expenses: s.expenses, profile: s.profile, addTask: s.addTask, toggleTask: s.toggleTask, deleteTask: s.deleteTask, deleteProject: s.deleteProject, updateProjectStatus: s.updateProjectStatus, teamMembership: s.teamMembership, updateProject: s.updateProject, updateTask: s.updateTask })));
+    const [editandoProyecto, setEditandoProyecto] = useState(false);
+    const [tareaEnEdicion, setTareaEnEdicion] = useState<{ id: string; texto: string } | null>(null);
 
     const [newTaskDescription, setNewTaskDescription] = useState('');
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -143,6 +146,26 @@ const ProjectDetailPage: React.FC = () => {
         }
     };
 
+    const guardarProyecto = async (datos: DatosDelProyecto) => {
+        await updateProject(project.id, {
+            ...datos,
+            description: datos.description || undefined,
+            start_date: datos.start_date || undefined,
+            due_date: datos.due_date || undefined,
+        });
+        addToast('Proyecto actualizado.', 'success');
+    };
+
+    const guardarTarea = async () => {
+        if (!tareaEnEdicion) return;
+        try {
+            await updateTask(tareaEnEdicion.id, tareaEnEdicion.texto);
+            setTareaEnEdicion(null);
+        } catch (err) {
+            addToast((err as Error)?.message || 'No se pudo guardar la tarea.', 'error');
+        }
+    };
+
     const handleDeleteProject = async () => {
         setDeletingProject(true);
         try {
@@ -171,6 +194,11 @@ const ProjectDetailPage: React.FC = () => {
                             <DollarSignIcon className="w-4 h-4 mr-2"/> Facturar Presupuesto
                         </Button>
                     )}
+                    {puede('editarProyecto', project.user_id, profile?.id, teamMembership) && (
+                    <Button variant="secondary" onClick={() => setEditandoProyecto(true)} aria-label="Editar proyecto" title="Editar proyecto">
+                        <EditIcon className="w-4 h-4" />
+                    </Button>
+                    )}
                     {puede('borrarProyecto', project.user_id, profile?.id, teamMembership) && (
                     <Button
                         variant="secondary"
@@ -196,7 +224,7 @@ const ProjectDetailPage: React.FC = () => {
                                 <select 
                                     value={project.status} 
                                     disabled={!puede('editarProyecto', project.user_id, profile?.id, teamMembership)}
-                                    onChange={(e) => updateProjectStatus(project.id, e.target.value as Project['status'])}
+                                    onChange={(e) => updateProjectStatus(project.id, e.target.value as Project['status']).catch(() => addToast('No se pudo cambiar el estado.', 'error'))}
                                     className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-600 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md bg-gray-800 text-white"
                                 >
                                     <option value="planning">Planificación</option>
@@ -222,7 +250,7 @@ const ProjectDetailPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-sm font-medium text-gray-400">Fecha de Entrega</p>
-                                    <p className="text-white">{project.due_date}</p>
+                                    <p className="text-white">{project.due_date ? formatearFecha(project.due_date) : 'Sin definir'}</p>
                                 </div>
                             </div>
                             {project.budget_cents > 0 && (
@@ -316,13 +344,35 @@ const ProjectDetailPage: React.FC = () => {
                                                     {(task.status === 'done' || task.status === 'completed') && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                                                 </div>
                                             </button>
-                                            <span className={` ${(task.status === 'done' || task.status === 'completed') ? 'line-through text-gray-500' : 'text-white'}`}>{task.description}</span>
+                                            {tareaEnEdicion?.id === task.id ? (
+                                                <input
+                                                    autoFocus
+                                                    aria-label="Texto de la tarea"
+                                                    value={tareaEnEdicion.texto}
+                                                    onChange={(e) => setTareaEnEdicion({ id: task.id, texto: e.target.value })}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') { e.preventDefault(); guardarTarea(); }
+                                                        if (e.key === 'Escape') setTareaEnEdicion(null);
+                                                    }}
+                                                    onBlur={guardarTarea}
+                                                    className="flex-1 bg-gray-900 border border-gray-700 rounded-md px-2 py-1 text-sm text-white"
+                                                />
+                                            ) : (
+                                                <span className={` ${(task.status === 'done' || task.status === 'completed') ? 'line-through text-gray-500' : 'text-white'}`}>{task.description}</span>
+                                            )}
                                         </div>
+                                        <div className="flex gap-2">
+                                        {tareaEnEdicion?.id !== task.id && (
+                                        <Button size="sm" variant="secondary" onClick={() => setTareaEnEdicion({ id: task.id, texto: task.description })} aria-label={`Editar tarea '${task.description}'`}>
+                                            <EditIcon className="w-4 h-4"/>
+                                        </Button>
+                                        )}
                                         {puede('borrarTarea', task.user_id ?? project.user_id, profile?.id, teamMembership) && (
                                         <Button size="sm" variant="danger" onClick={() => handleDeleteClick(task)} aria-label={`Eliminar tarea '${task.description}'`}>
                                             <TrashIcon className="w-4 h-4"/>
                                         </Button>
                                         )}
+                                        </div>
                                     </li>
                                 ))}
                             </ul>
@@ -370,6 +420,12 @@ const ProjectDetailPage: React.FC = () => {
                     />
                 )}
             </Suspense>
+            <ProjectFormModal
+                isOpen={editandoProyecto}
+                onClose={() => setEditandoProyecto(false)}
+                proyecto={project}
+                onGuardar={guardarProyecto}
+            />
         </div>
     );
 };

@@ -14,9 +14,12 @@ import {
   TrashIcon, 
   SearchIcon,
   FileTextIcon,
-  SendIcon
+  SendIcon,
+  EditIcon,
+  DownloadIcon,
 } from '../components/icons/Icon';
-import { sendEmail } from '../services/emailService';
+import { sendDocumentEmail } from '../services/emailService';
+import { generateProposalPdf, generateProposalPdfBase64 } from '../services/pdfService';
 import { useToast } from '../hooks/useToast';
 import { Proposal } from '@/types';
 
@@ -101,31 +104,65 @@ const ProposalsPage: React.FC = () => {
     }
   };
 
-  // FIX: no existía ninguna forma de enviar la propuesta al cliente — ni
-  // link al portal, ni email. Mismo patrón que ContractsPage.tsx /
-  // BudgetsPage.tsx. También marca la propuesta como "sent" al enviarla de
-  // verdad, en vez de que ese estado solo pudiera fijarse a mano editando
-  // el formulario.
+  // Envío real desde facturas@devfreelancer.app, con el PDF adjunto y el
+  // enlace al portal (antes: borrador de mailto sin adjunto). Un borrador
+  // pasa a "Enviada"; reenviar no cambia el estado.
+  const [enviando, setEnviando] = useState<string | null>(null);
   const handleSendProposal = async (proposal: Proposal) => {
     const client = clients.find(c => c.id === proposal.client_id);
     if (!client?.email) {
       addToast('Este cliente no tiene email registrado.', 'error');
       return;
     }
-    const portalLink = `${window.location.origin}/portal/proposals/${proposal.id}`;
-    const subject = `Propuesta: ${proposal.title}`;
-    const body = `Hola ${client.name},\n\nTe envío la propuesta "${proposal.title}" por un importe de ${formatCurrency(proposal.amount_cents)}.\n\nPuedes verla y aceptarla o rechazarla aquí:\n${portalLink}\n\nUn saludo.`;
-    sendEmail(client.email, subject, body);
-
-    if (proposal.status === 'draft') {
-      try {
-        await updateProposal(proposal.id, { status: 'sent' });
-      } catch {
-        // No bloquea el envío del email si esto falla; se puede reintentar.
+    if (!profile) return;
+    setEnviando(proposal.id);
+    try {
+      await sendDocumentEmail({
+        tipo: 'propuesta',
+        documentoId: proposal.id,
+        pdfBase64: generateProposalPdfBase64(proposal, client.name, profile),
+      });
+      if (proposal.status === 'draft') {
+        try {
+          await updateProposal(proposal.id, { status: 'sent' });
+        } catch {
+          // El email ya salió; el estado se puede cambiar a mano.
+        }
       }
+      addToast(`Propuesta enviada a ${client.email}.`, 'success');
+    } catch (error) {
+      addToast((error as Error)?.message || 'No se pudo enviar la propuesta.', 'error');
+    } finally {
+      setEnviando(null);
     }
-    addToast('Se abrió tu cliente de correo con el borrador de la propuesta.', 'success');
   };
+
+  const handleDownload = (proposal: Proposal) => {
+    if (!profile) return;
+    generateProposalPdf(proposal, getClientName(proposal.client_id), profile);
+  };
+
+  const renderAcciones = (proposal: Proposal) => (
+    <>
+      <button onClick={() => handleOpenEdit(proposal)} title="Editar" className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-all">
+        <EditIcon className="w-4 h-4" />
+      </button>
+      <button onClick={() => handleDownload(proposal)} title="Descargar PDF" className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-all">
+        <DownloadIcon className="w-4 h-4" />
+      </button>
+      <button onClick={() => handleSendProposal(proposal)} disabled={enviando === proposal.id} title={proposal.status === 'draft' ? 'Enviar por email' : 'Reenviar por email'} className="p-2 text-gray-500 hover:text-primary-400 hover:bg-primary-400/10 rounded-lg transition-all disabled:opacity-50">
+        <SendIcon className="w-4 h-4" />
+      </button>
+      {proposal.status === 'accepted' && (
+        <button onClick={() => handleConvertToInvoice(proposal)} title="Convertir en factura" className="p-2 text-gray-500 hover:text-green-400 hover:bg-green-400/10 rounded-lg transition-all">
+          <FileTextIcon className="w-4 h-4" />
+        </button>
+      )}
+      <button onClick={() => handleDelete(proposal.id)} title="Eliminar" className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all">
+        <TrashIcon className="w-4 h-4" />
+      </button>
+    </>
+  );
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
@@ -305,31 +342,8 @@ const ProposalsPage: React.FC = () => {
                         <StatusChip type="proposal" status={proposal.status} />
                       </td>
                       <td className="px-6 py-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
-                        <div className="flex justify-end gap-2">
-                           <button
-                             onClick={() => handleSendProposal(proposal)}
-                             title="Enviar al cliente"
-                             className="p-2 text-gray-500 hover:text-primary-400 hover:bg-primary-400/10 rounded-lg transition-all"
-                           >
-                             <SendIcon className="w-4 h-4" />
-                           </button>
-                           {proposal.status === 'accepted' && (
-                             <button
-                               onClick={() => handleConvertToInvoice(proposal)}
-                               title="Convertir en Factura"
-                               className="p-2 text-gray-500 hover:text-green-400 hover:bg-green-400/10 rounded-lg transition-all"
-                             >
-                               <FileTextIcon className="w-4 h-4" />
-                             </button>
-                           )}
-                           <button
-                             onClick={() => handleOpenEdit(proposal)}
-                             title="Editar"
-                             className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-all"
-                           >
-                             <FileSignatureIcon className="w-4 h-4" />
-                           </button>
-                           <button onClick={() => handleDelete(proposal.id)} className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"><TrashIcon className="w-4 h-4" /></button>
+                        <div className="flex justify-end gap-1">
+                          {renderAcciones(proposal)}
                         </div>
                       </td>
                     </tr>
@@ -353,21 +367,8 @@ const ProposalsPage: React.FC = () => {
                       <span className="font-mono font-bold text-white">{formatCurrency(proposal.amount_cents)}</span>
                     </div>
                     <p className="text-xs text-gray-500">{formatDate(proposal.created_at)}</p>
-                    <div className="flex justify-end gap-2 pt-1 border-t border-gray-800/50">
-                      <button onClick={() => handleSendProposal(proposal)} title="Enviar al cliente" className="p-2 text-gray-500 hover:text-primary-400 hover:bg-primary-400/10 rounded-lg transition-all">
-                        <SendIcon className="w-4 h-4" />
-                      </button>
-                      {proposal.status === 'accepted' && (
-                        <button onClick={() => handleConvertToInvoice(proposal)} title="Convertir en Factura" className="p-2 text-gray-500 hover:text-green-400 hover:bg-green-400/10 rounded-lg transition-all">
-                          <FileTextIcon className="w-4 h-4" />
-                        </button>
-                      )}
-                      <button onClick={() => handleOpenEdit(proposal)} title="Editar" className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-all">
-                        <FileSignatureIcon className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDelete(proposal.id)} className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all">
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
+                    <div className="flex flex-wrap justify-end gap-1 pt-1 border-t border-gray-800/50">
+                      {renderAcciones(proposal)}
                     </div>
                   </div>
                 ))}
@@ -400,6 +401,8 @@ const ProposalsPage: React.FC = () => {
               <select name="status" value={form.status} onChange={handleChange} className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white focus:border-primary-500 outline-none cursor-pointer">
                 <option value="draft">Borrador</option>
                 <option value="sent">Enviada</option>
+                <option value="accepted">Aceptada</option>
+                <option value="rejected">Rechazada</option>
               </select>
             </div>
           </div>

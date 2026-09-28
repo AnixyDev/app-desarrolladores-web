@@ -2,7 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
-import { Building, Briefcase, TrashIcon, Users, Star } from 'lucide-react';
+import { Building, Briefcase, TrashIcon, Users, Star, Pencil as EditIcon } from 'lucide-react';
 import { Job } from '@/types';
 import EmptyState from '@/components/ui/EmptyState';
 import Button from '@/components/ui/Button';
@@ -128,7 +128,10 @@ const MyJobPostsPage: React.FC = () => {
                                                             <Star className="w-4 h-4 text-fuchsia-500" />
                                                         </Button>
                                                     )}
-                                                    <Button size="sm" variant="danger" onClick={() => setJobToDelete(job)}><TrashIcon className="w-4 h-4"/></Button>
+                                                    <Link to={`/post-job/${job.id}`} title="Editar oferta" className="inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 hover:text-white">
+                                                        <EditIcon className="w-4 h-4" />
+                                                    </Link>
+                                                    <Button size="sm" variant="danger" onClick={() => setJobToDelete(job)} title="Eliminar"><TrashIcon className="w-4 h-4"/></Button>
                                                 </div>
                                             </td>
                                         </tr>

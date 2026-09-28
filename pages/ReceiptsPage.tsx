@@ -11,10 +11,10 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import EmptyState from '@/components/ui/EmptyState';
-import { Receipt as ReceiptIcon, Plus, Download, Send, Trash2 } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
-import { generateReceiptPdf } from '@/services/pdfService';
-import { sendEmail } from '@/services/emailService';
+import { Receipt as ReceiptIcon, Plus, Download, Send, Trash2, Pencil } from 'lucide-react';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
+import { generateReceiptPdf, generateReceiptPdfBase64 } from '@/services/pdfService';
+import { sendDocumentEmail } from '@/services/emailService';
 import { Receipt } from '@/types';
 
 const initialFormState = {
@@ -28,13 +28,16 @@ const initialFormState = {
 };
 
 const ReceiptsPage: React.FC = () => {
-  const { receipts, clients, projects, profile, addReceipt, deleteReceipt } = useAppStore(useShallow(s => ({ receipts: s.receipts, clients: s.clients, projects: s.projects, profile: s.profile, addReceipt: s.addReceipt, deleteReceipt: s.deleteReceipt })));
+  const { receipts, clients, projects, profile, addReceipt, updateReceipt, deleteReceipt } = useAppStore(useShallow(s => ({ receipts: s.receipts, clients: s.clients, projects: s.projects, profile: s.profile, addReceipt: s.addReceipt, updateReceipt: s.updateReceipt, deleteReceipt: s.deleteReceipt })));
   const { addToast } = useToast();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState(initialFormState);
   const [saving, setSaving] = useState(false);
   const [receiptToDelete, setReceiptToDelete] = useState<Receipt | null>(null);
+  // Recibo que se está editando (null = crear uno nuevo).
+  const [enEdicion, setEnEdicion] = useState<Receipt | null>(null);
+  const [enviando, setEnviando] = useState<string | null>(null);
 
   const getClientName = (clientId: string | null) => clients.find(c => c.id === clientId)?.name || 'Cliente sin especificar';
   const getClientEmail = (clientId: string | null) => clients.find(c => c.id === clientId)?.email;
@@ -45,7 +48,22 @@ const ReceiptsPage: React.FC = () => {
   );
 
   const openModal = () => {
-    setForm(initialFormState);
+    setEnEdicion(null);
+    setForm({ ...initialFormState, paid_at: new Date().toISOString().slice(0, 10) });
+    setIsModalOpen(true);
+  };
+
+  const openEdit = (receipt: Receipt) => {
+    setEnEdicion(receipt);
+    setForm({
+      client_id: receipt.client_id || '',
+      project_id: receipt.project_id || '',
+      concept: receipt.concept,
+      amount: String(receipt.amount_cents / 100),
+      paid_at: receipt.paid_at.slice(0, 10),
+      method: receipt.method || 'Efectivo',
+      notes: receipt.notes || '',
+    });
     setIsModalOpen(true);
   };
 
@@ -63,7 +81,7 @@ const ReceiptsPage: React.FC = () => {
 
     setSaving(true);
     try {
-      await addReceipt({
+      const datos = {
         client_id: form.client_id || null,
         project_id: form.project_id || null,
         concept: form.concept.trim(),
@@ -71,9 +89,16 @@ const ReceiptsPage: React.FC = () => {
         paid_at: form.paid_at,
         method: form.method,
         notes: form.notes.trim() || null,
-      });
-      addToast('Recibo creado correctamente.', 'success');
+      };
+      if (enEdicion) {
+        await updateReceipt(enEdicion.id, datos);
+        addToast(`Recibo ${enEdicion.receipt_number} actualizado.`, 'success');
+      } else {
+        await addReceipt(datos);
+        addToast('Recibo creado correctamente.', 'success');
+      }
       setIsModalOpen(false);
+      setEnEdicion(null);
     } catch (err) {
       addToast((err as Error).message || 'No se pudo crear el recibo.', 'error');
     } finally {
@@ -86,19 +111,32 @@ const ReceiptsPage: React.FC = () => {
     generateReceiptPdf(receipt, getClientName(receipt.client_id), profile);
   };
 
-  const handleSendEmail = (receipt: Receipt) => {
+  // Envío real con el PDF adjunto (antes: se descargaba el PDF y se abría un
+  // borrador de mailto para adjuntarlo a mano).
+  const handleSendEmail = async (receipt: Receipt) => {
+    if (!receipt.client_id) {
+      addToast('Este recibo no tiene cliente: edítalo y elige uno para poder enviarlo.', 'error');
+      return;
+    }
     const email = getClientEmail(receipt.client_id);
     if (!email) {
       addToast('Este cliente no tiene email registrado.', 'error');
       return;
     }
     if (!profile) return;
-    generateReceiptPdf(receipt, getClientName(receipt.client_id), profile);
-
-    const subject = `Recibo ${receipt.receipt_number}`;
-    const body = `Hola ${getClientName(receipt.client_id)},\n\nTe envío el recibo ${receipt.receipt_number} por un importe de ${formatCurrency(receipt.amount_cents)}, en concepto de: ${receipt.concept}.\n\nAdjunto el PDF a este email.\n\nUn saludo.`;
-    sendEmail(email, subject, body);
-    addToast('PDF descargado y borrador de email abierto. Adjunta el PDF descargado antes de enviarlo.', 'success');
+    setEnviando(receipt.id);
+    try {
+      await sendDocumentEmail({
+        tipo: 'recibo',
+        documentoId: receipt.id,
+        pdfBase64: generateReceiptPdfBase64(receipt, getClientName(receipt.client_id), profile),
+      });
+      addToast(`Recibo enviado a ${email}.`, 'success');
+    } catch (err) {
+      addToast((err as Error)?.message || 'No se pudo enviar el recibo.', 'error');
+    } finally {
+      setEnviando(null);
+    }
   };
 
   const confirmDelete = async () => {
@@ -169,14 +207,17 @@ const ReceiptsPage: React.FC = () => {
                       <td className="p-4 font-mono text-sm text-gray-400">{receipt.receipt_number}</td>
                       <td className="p-4 text-white font-medium">{getClientName(receipt.client_id)}</td>
                       <td className="p-4 text-gray-300 max-w-xs truncate">{receipt.concept}</td>
-                      <td className="p-4 text-gray-400">{receipt.paid_at}</td>
+                      <td className="p-4 text-gray-400">{formatearFecha(receipt.paid_at)}</td>
                       <td className="p-4 text-right font-semibold text-white">{formatCurrency(receipt.amount_cents)}</td>
                       <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                         <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="secondary" onClick={() => openEdit(receipt)} title="Editar">
+                            <Pencil className="w-4 h-4" />
+                          </Button>
                           <Button size="sm" variant="secondary" onClick={() => handleDownload(receipt)} title="Descargar PDF">
                             <Download className="w-4 h-4" />
                           </Button>
-                          <Button size="sm" variant="secondary" onClick={() => handleSendEmail(receipt)} title="Enviar por email">
+                          <Button size="sm" variant="secondary" onClick={() => handleSendEmail(receipt)} title="Enviar por email" disabled={enviando === receipt.id}>
                             <Send className="w-4 h-4" />
                           </Button>
                           <Button size="sm" variant="danger" onClick={() => setReceiptToDelete(receipt)} title="Eliminar">
@@ -193,7 +234,7 @@ const ReceiptsPage: React.FC = () => {
         </Card>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nuevo Recibo">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={enEdicion ? `Editar recibo ${enEdicion.receipt_number}` : 'Nuevo Recibo'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-1">Cliente (opcional)</label>
@@ -275,7 +316,7 @@ const ReceiptsPage: React.FC = () => {
 
           <div className="flex justify-end gap-3 pt-2">
             <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-            <Button type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Crear Recibo'}</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Guardando…' : enEdicion ? 'Guardar cambios' : 'Crear Recibo'}</Button>
           </div>
         </form>
       </Modal>

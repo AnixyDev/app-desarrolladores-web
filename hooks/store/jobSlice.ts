@@ -46,6 +46,7 @@ export interface JobSlice {
   
   addJob: (job: Omit<Job, 'id' | 'created_at' | 'postedByUserId'>) => Promise<{ success: boolean; message?: string }>;
   deleteJob: (jobId: string) => Promise<{ success: boolean; message?: string }>;
+  updateJob: (jobId: string, cambios: Pick<Job, 'titulo' | 'descripcionCorta' | 'descripcionLarga' | 'presupuesto' | 'duracionSemanas' | 'habilidades'>) => Promise<{ success: boolean; message?: string }>;
   applyForJob: (jobId: string, userId: string, proposalText: string) => Promise<{ success: boolean; message?: string }>;
   viewApplication: (applicationId: string) => Promise<void>;
   updateApplicationStatus: (applicationId: string, status: 'accepted' | 'rejected') => Promise<{ success: boolean; message?: string }>;
@@ -170,6 +171,30 @@ export const createJobSlice: StateCreator<AppState, [], [], JobSlice> = (set, ge
 
         console.error('Error al publicar la oferta:', error?.message);
         return { success: false, message: error?.message || 'No se pudo publicar la oferta.' };
+    },
+
+    // Editar una oferta publicada. No toca isfeatured ni user_id (los protege
+    // un disparador: destacar es de pago).
+    updateJob: async (jobId, cambios) => {
+        const { data, error } = await supabase
+            .from('jobs')
+            .update({
+                titulo: cambios.titulo,
+                descripcioncorta: cambios.descripcionCorta,
+                descripcionlarga: cambios.descripcionLarga,
+                presupuesto: cambios.presupuesto,
+                duracionsemanas: cambios.duracionSemanas,
+                habilidades: cambios.habilidades,
+            })
+            .eq('id', jobId)
+            .select(JOB_SELECT)
+            .single();
+        if (error || !data) {
+            console.error('Error al editar la oferta:', error?.message);
+            return { success: false, message: error?.message || 'No se pudo guardar la oferta.' };
+        }
+        set(state => ({ jobs: state.jobs.map(j => (j.id === jobId ? (data as unknown as Job) : j)) }));
+        return { success: true };
     },
 
     // FIX: no existía. MyJobPostsPage tenía un botón "Eliminar" sin onClick.

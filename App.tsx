@@ -236,6 +236,7 @@ function App() {
                         <Route path="job-market/:jobId" element={<JobDetailPage />} />
                         <Route path="job-market/:jobId/applicants" element={<JobApplicantsPage />} />
                         <Route path="post-job" element={<JobPostForm />} />
+                        <Route path="post-job/:jobId" element={<JobPostForm />} />
                         <Route path="my-job-posts" element={<MyJobPostsPage />} />
                         <Route path="public-profile" element={<PublicProfilePage />} />
                         <Route path="my-applications" element={<MyApplicationsPage />} />
