@@ -18,6 +18,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { nivelDeCaducidad, hayQueAvisar } from '../_shared/caducidad-certificado.ts';
+import { esLlamadaDelServicio } from '../_shared/llamada-servicio.ts';
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 const FROM_ADDRESS = 'alertas@devfreelancer.app';
@@ -93,7 +94,7 @@ function cuerpo(nombre: string, dias: number, fechaTexto: string, titular: strin
 
 Deno.serve(async (req: Request) => {
   const authHeader = req.headers.get('Authorization');
-  if (authHeader !== `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`) {
+  if (!esLlamadaDelServicio(authHeader, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))) {
     return new Response('Unauthorized', { status: 401 });
   }
 

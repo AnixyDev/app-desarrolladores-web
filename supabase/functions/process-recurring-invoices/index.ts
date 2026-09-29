@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { esLlamadaDelServicio } from '../_shared/llamada-servicio.ts'
 // El calculo de fechas vive aparte para que vitest pueda cubrirlo en CI.
 // Ver src/test/fechas-recurrentes.test.ts
 import { siguienteFecha } from './fechas.ts'
@@ -8,7 +9,7 @@ serve(async (req) => {
   // Solo permitir solicitudes autorizadas (la tarea programada de pg_cron
   // envia la clave de servicio en la cabecera Authorization).
   const authHeader = req.headers.get('Authorization')
-  if (authHeader !== `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`) {
+  if (!esLlamadaDelServicio(authHeader, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))) {
     return new Response('Unauthorized', { status: 401 })
   }
 
@@ -28,10 +29,42 @@ serve(async (req) => {
 
     if (fetchError) throw fetchError
 
+    // CAMBIO (29/09): el cliente y el proyecto de cada recurrente se comprueban
+    // contra su dueño antes de emitir. Esta función usa la clave de servicio
+    // (sin RLS): una fila con el cliente de OTRO usuario habría producido una
+    // factura a nombre de ese cliente ajeno. El disparador de referencias
+    // propias ya impide crear filas así, pero las antiguas no pasaron por él.
+    const filas = recurringInvoices || []
+    const idsClientes = [...new Set(filas.map((r: any) => r.client_id).filter(Boolean))]
+    const idsProyectos = [...new Set(filas.map((r: any) => r.project_id).filter(Boolean))]
+    const dueñoDeCliente = new Map<string, string>()
+    const dueñoDeProyecto = new Map<string, string>()
+    if (idsClientes.length) {
+      const { data, error } = await supabase.from('clients').select('id, user_id').in('id', idsClientes)
+      if (error) throw error
+      for (const c of data ?? []) dueñoDeCliente.set(c.id, c.user_id)
+    }
+    if (idsProyectos.length) {
+      const { data, error } = await supabase.from('projects').select('id, user_id').in('id', idsProyectos)
+      if (error) throw error
+      for (const p of data ?? []) dueñoDeProyecto.set(p.id, p.user_id)
+    }
+
     const results: Array<{ recurring_id: string; invoice_id: string }> = []
     const omitidas: Array<{ recurring_id: string; motivo: string }> = []
 
-    for (const rec of (recurringInvoices || [])) {
+    for (const rec of filas) {
+      if (!rec.client_id || dueñoDeCliente.get(rec.client_id) !== rec.user_id) {
+        console.error(`Recurrente ${rec.id}: el cliente no existe o no es del mismo usuario — se omite`)
+        omitidas.push({ recurring_id: rec.id, motivo: 'cliente no valido' })
+        continue
+      }
+      if (rec.project_id && dueñoDeProyecto.get(rec.project_id) !== rec.user_id) {
+        console.error(`Recurrente ${rec.id}: el proyecto no existe o no es del mismo usuario — se omite`)
+        omitidas.push({ recurring_id: rec.id, motivo: 'proyecto no valido' })
+        continue
+      }
+
       // 2. Calcular la fecha siguiente ANTES de emitir nada. Si no sabemos
       //    avanzarla, no se genera factura: mas vale no emitir que emitir en
       //    bucle todos los dias.
@@ -143,7 +176,7 @@ serve(async (req) => {
     )
   } catch (error: any) {
     console.error('Error processing recurring invoices:', error)
-    return new Response(JSON.stringify({ error: error?.message ?? String(error) }), {
+    return new Response(JSON.stringify({ error: 'Error procesando las facturas recurrentes' }), {
       headers: { 'Content-Type': 'application/json' },
       status: 500,
     })

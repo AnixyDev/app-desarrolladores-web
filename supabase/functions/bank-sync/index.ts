@@ -106,7 +106,23 @@ Deno.serve(async (req) => {
 
       // Confirmar dos veces el mismo cotejo insertaba dos pagos, y con el
       // trigger sumando eso descuadra el total de la factura.
-      if (tx.match_status === 'confirmed') {
+      //
+      // CAMBIO (29/09): la comprobación era «leer y luego escribir», así que
+      // dos confirmaciones a la vez (doble clic, dos pestañas) pasaban las dos
+      // y creaban dos pagos. Ahora el movimiento se RESERVA primero con un
+      // UPDATE condicionado: solo una petición puede pasarlo de no confirmado
+      // a confirmado. Si el pago falla después, se deshace la reserva.
+      const estadoAnterior = tx.match_status;
+      const { data: reservado, error: reservaError } = await supabaseAdmin
+        .from('bank_transactions')
+        .update({ match_status: 'confirmed', matched_invoice_id: invoice_id })
+        .eq('id', transaction_id)
+        .eq('user_id', user.id)
+        .neq('match_status', 'confirmed')
+        .select('id')
+        .maybeSingle();
+      if (reservaError) throw reservaError;
+      if (!reservado) {
         return jsonResponse({ success: true, already_confirmed: true });
       }
 
@@ -118,14 +134,14 @@ Deno.serve(async (req) => {
         method: 'Transferencia bancaria',
         notes: `Conciliado automáticamente con movimiento bancario: ${tx.description || tx.counterparty_name || ''}`.trim(),
       });
-      if (paymentError) throw paymentError;
-
-      const { error: updateError } = await supabaseAdmin
-        .from('bank_transactions')
-        .update({ match_status: 'confirmed', matched_invoice_id: invoice_id })
-        .eq('id', transaction_id)
-        .eq('user_id', user.id);
-      if (updateError) throw updateError;
+      if (paymentError) {
+        await supabaseAdmin
+          .from('bank_transactions')
+          .update({ match_status: estadoAnterior, matched_invoice_id: tx.matched_invoice_id ?? null })
+          .eq('id', transaction_id)
+          .eq('user_id', user.id);
+        throw paymentError;
+      }
 
       return jsonResponse({ success: true });
     }
