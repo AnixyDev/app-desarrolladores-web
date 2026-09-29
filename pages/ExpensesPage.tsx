@@ -12,6 +12,8 @@ import { PlusIcon, TrashIcon, RepeatIcon, SparklesIcon, EditIcon } from '@/compo
 import { useToast } from '@/hooks/useToast';
 import { ExtractedExpenseData } from '@/services/geminiService';
 
+import CuotaAutonomoCard from '@/components/CuotaAutonomoCard';
+
 const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 const ExpenseOcrModal = lazy(() => import('@/components/modals/ExpenseOcrModal'));
 
@@ -206,6 +208,8 @@ const ExpensesPage: React.FC = () => {
                 </div>
             </div>
 
+            <CuotaAutonomoCard />
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card>
                     <CardHeader>
@@ -225,7 +229,10 @@ const ExpensesPage: React.FC = () => {
                             <tbody>
                                 {expenses.map(expense => (
                                     <tr key={expense.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                                        <td className="p-4 text-white">{(expense as any).description}</td>
+                                        <td className="p-4 text-white">
+                                            {(expense as any).description}
+                                            {expense.cuota_autonomo_mes && <span className="ml-2 inline-block rounded bg-primary-600/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-300 align-middle">Autónomo</span>}
+                                        </td>
                                         <td className="p-4 text-gray-300">{formatearFecha(expense.date)}</td>
                                         <td className="p-4 text-white font-semibold">{formatCurrency(expense.amount_cents)}</td>
                                         <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
