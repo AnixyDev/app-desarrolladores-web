@@ -76,7 +76,7 @@ async function createEnableBankingJWT(appId: string, privateKeyPem: string): Pro
   try {
     key = await importEnableBankingPrivateKey(privateKeyPem);
   } catch (e) {
-    throw new Error('No se pudo leer la clave privada de Enable Banking. Verifica que el archivo .pem sea el correcto (formato PKCS8).');
+    throw new ErrorVisible('No se pudo leer la clave privada de Enable Banking. Verifica que el archivo .pem sea el correcto (formato PKCS8).');
   }
   const iat = Math.floor(Date.now() / 1000);
   const header = { typ: 'JWT', alg: 'RS256', kid: appId };
@@ -94,7 +94,7 @@ async function getUserCredentials(supabaseAdmin: any, userId: string, aesKey: Cr
     .maybeSingle();
 
   if (!secrets?.enablebanking_app_id || !secrets?.enablebanking_private_key_encrypted) {
-    throw new Error('No has configurado tus credenciales de Enable Banking todavía.');
+    throw new ErrorVisible('No has configurado tus credenciales de Enable Banking todavía.');
   }
 
   const privateKeyPem = await descifrarTexto(secrets.enablebanking_private_key_encrypted, aesKey);
@@ -102,11 +102,17 @@ async function getUserCredentials(supabaseAdmin: any, userId: string, aesKey: Cr
   return jwt;
 }
 
+/** Error con un mensaje pensado para el usuario. Cualquier otro error se
+ *  registra y al navegador le llega un texto genérico (29/09): antes se
+ *  devolvía tal cual el mensaje interno, que podía incluir detalles de la
+ *  base de datos o de la librería. */
+class ErrorVisible extends Error {}
+
 /** El cuerpo de error del banco va al log; al navegador, un mensaje generico. */
 async function registrarErrorRemoto(contexto: string, res: Response): Promise<never> {
   const detalle = await res.text();
   console.error(`[bank-connect] ${contexto}: ${res.status} ${detalle}`);
-  throw new Error(`${contexto}. Inténtalo de nuevo en unos minutos.`);
+  throw new ErrorVisible(`${contexto}. Inténtalo de nuevo en unos minutos.`);
 }
 
 Deno.serve(async (req) => {
@@ -201,6 +207,22 @@ Deno.serve(async (req) => {
         if (!code) return jsonResponse({ error: 'Falta el código de autorización.' }, 400);
         if (!state) return jsonResponse({ error: 'Falta el identificador de sesión.' }, 400);
 
+        // CAMBIO (29/09): primero se comprueba que exista una conexión de este
+        // usuario con ese state y todavía PENDIENTE; solo entonces se canjea
+        // el código. Antes se canjeaba primero y se actualizaba cualquier
+        // conexión con ese state, aunque ya estuviera vinculada o revocada.
+        const { data: pendiente } = await supabaseAdmin
+          .from('bank_connections')
+          .select('id')
+          .eq('gocardless_requisition_id', String(state))
+          .eq('user_id', user.id)
+          .eq('status', 'pending')
+          .maybeSingle();
+        if (!pendiente) {
+          console.error(`[bank-connect] finalize sin conexión pendiente para ${user.id}, state=${state}`);
+          return jsonResponse({ error: 'No se encontró la conexión iniciada. Vuelve a empezar el proceso.' }, 404);
+        }
+
         const res = await fetch(`${EB_BASE_URL}/sessions`, {
           method: 'POST',
           headers: ebHeaders,
@@ -209,20 +231,19 @@ Deno.serve(async (req) => {
         if (!res.ok) await registrarErrorRemoto('No se pudo completar la conexión', res);
         const session = await res.json();
 
+        // El filtro por status hace que dos «finalize» a la vez no vinculen
+        // dos veces: solo el primero encuentra la fila pendiente.
         const { data: connection } = await supabaseAdmin
           .from('bank_connections')
           .update({ status: 'linked', enablebanking_session_id: session.session_id })
-          .eq('gocardless_requisition_id', state)
-          .eq('user_id', user.id)
+          .eq('id', pendiente.id)
+          .eq('status', 'pending')
           .select()
           .maybeSingle();
 
-        // Si el state no corresponde a una conexión de este usuario no se
-        // vincula ninguna cuenta: antes se seguía con connection_id nulo y las
-        // cuentas quedaban huérfanas.
         if (!connection) {
-          console.error(`[bank-connect] finalize sin conexión previa para ${user.id}, state=${state}`);
-          return jsonResponse({ error: 'No se encontró la conexión iniciada. Vuelve a empezar el proceso.' }, 404);
+          console.error(`[bank-connect] la conexión ${pendiente.id} dejó de estar pendiente durante finalize`);
+          return jsonResponse({ error: 'Esta conexión ya se completó. Recarga la página.' }, 409);
         }
 
         const accountsList = session.accounts || [];
@@ -270,6 +291,7 @@ Deno.serve(async (req) => {
     }
   } catch (e) {
     console.error('[bank-connect] Error:', (e as Error)?.message ?? e);
-    return jsonResponse({ error: (e as Error)?.message || 'No se pudo conectar con el banco.' }, 500);
+    const visible = e instanceof ErrorVisible ? e.message : 'No se pudo conectar con el banco. Inténtalo de nuevo en unos minutos.';
+    return jsonResponse({ error: visible }, 500);
   }
 });

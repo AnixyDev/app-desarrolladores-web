@@ -106,12 +106,16 @@ Deno.serve(async (req) => {
     // CUALQUIER dirección, saltándose la aplicación entera. Ahora la
     // dirección tiene que corresponder a una fila de `team_members` que ese
     // mismo usuario haya creado — filas que RLS ya limita a las suyas.
-    const { data: fila, error: errorFila } = await supabaseAdmin
+    // CAMBIO (29/09): antes se buscaba con `ilike` sin escapar comodines, y
+    // una dirección con «%», «_» o «*» (válidos en un email; PostgREST además
+    // trata «*» como comodín) podía coincidir con OTRA fila. Ahora se traen
+    // las filas del equipo (como mucho unas pocas) y se compara exacto, sin
+    // distinguir mayúsculas.
+    const { data: equipo, error: errorFila } = await supabaseAdmin
       .from('team_members')
-      .select('id, status')
-      .eq('user_id', inviter.id)
-      .ilike('email', destinatario)
-      .maybeSingle();
+      .select('id, status, email')
+      .eq('user_id', inviter.id);
+    const fila = (equipo ?? []).find((m: { email: string | null }) => String(m.email ?? '').trim().toLowerCase() === destinatario) ?? null;
 
     if (errorFila) {
       console.error('No se pudo comprobar la invitación:', errorFila.message);
@@ -182,6 +186,35 @@ Deno.serve(async (req) => {
 
     const inviterName = inviterProfile?.business_name || inviterProfile?.full_name || 'Tu equipo';
 
+    // CAMBIO (29/09): el cupo diario se leía y el envío se apuntaba DESPUÉS,
+    // así que varias peticiones a la vez pasaban todas la comprobación. Ahora
+    // el envío se apunta ANTES (reserva) y se vuelve a contar: si con la
+    // reserva se pasa del tope, se anula. Si el correo falla, se borra la
+    // reserva para no gastar cupo.
+    const { data: reserva, error: errorReserva } = await supabaseAdmin
+      .from('invitaciones_enviadas')
+      .insert({ user_id: inviter.id, email: destinatario })
+      .select('id')
+      .single();
+    if (errorReserva || !reserva) {
+      console.error('No se pudo apuntar la invitación:', errorReserva?.message);
+      return new Response(JSON.stringify({ error: 'Error interno' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const anularReserva = () => supabaseAdmin.from('invitaciones_enviadas').delete().eq('id', reserva.id);
+
+    const { count: conLaReserva } = await supabaseAdmin
+      .from('invitaciones_enviadas')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', inviter.id)
+      .gte('enviada_en', hace24h);
+    if ((conLaReserva ?? 0) > INVITACIONES_POR_DIA) {
+      await anularReserva();
+      return rechazo(`Has llegado al máximo de ${INVITACIONES_POR_DIA} invitaciones en 24 horas. Inténtalo mañana.`);
+    }
+
     // Esto es lo que dispara el email real, vía el SMTP (Resend) ya
     // configurado en Supabase Auth. Usa la plantilla "Invite user" —
     // personalizable en Supabase Dashboard → Authentication → Email Templates.
@@ -195,6 +228,7 @@ Deno.serve(async (req) => {
     });
 
     if (inviteError) {
+      await anularReserva();
       // Si el email ya tiene cuenta, Supabase devuelve error — no es un fallo
       // real del sistema de invitación, solo que esa persona ya existe.
       // Se devuelve 200 (no 400) con success:false para que el frontend
@@ -204,26 +238,13 @@ Deno.serve(async (req) => {
       return rechazo(inviteError.message);
     }
 
-    // Solo se registra si el correo ha salido: un fallo de Resend no debe
-    // gastar cupo del usuario.
-    const { error: errorRegistro } = await supabaseAdmin
-      .from('invitaciones_enviadas')
-      .insert({ user_id: inviter.id, email: destinatario });
-
-    if (errorRegistro) {
-      // No se revierte la invitación: el correo ya ha salido. Queda el aviso
-      // en los logs — si esto fallara siempre, el tope diario dejaría de
-      // contar y habría que mirarlo.
-      console.error('Invitación enviada pero no registrada:', errorRegistro.message);
-    }
-
     return new Response(
-      JSON.stringify({ success: true, restantesHoy: INVITACIONES_POR_DIA - (enviadasHoy ?? 0) - 1 }),
+      JSON.stringify({ success: true, restantesHoy: Math.max(0, INVITACIONES_POR_DIA - (conLaReserva ?? 0)) }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
     console.error('Error enviando invitación de equipo:', error);
-    return new Response(JSON.stringify({ success: false, message: error.message || 'Error interno' }), {
+    return new Response(JSON.stringify({ success: false, message: 'No se pudo enviar la invitación. Inténtalo de nuevo en unos minutos.' }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

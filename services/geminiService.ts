@@ -162,8 +162,9 @@ export const generateItemsForDocument = async (
 ========================= */
 
 export const generateFinancialForecast = async (
-  data: ForecastDataPoint[]
+  data: ForecastDataPoint[] | Record<string, unknown>[]
 ): Promise<{ summary: string; potentialRisks: string[]; suggestions: string[] }> => {
+  // Los importes deben ir en campos *_cents: la Edge Function los pasa a euros.
   const res = await callAI('generateFinancialForecast', { data: data as unknown as Record<string, unknown>[] });
   return res as unknown as { summary: string; potentialRisks: string[]; suggestions: string[] };
 };
