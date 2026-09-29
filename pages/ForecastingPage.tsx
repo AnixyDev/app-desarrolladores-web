@@ -1,655 +1,374 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useAppStore } from '@/hooks/useAppStore';
+// pages/ForecastingPage.tsx
+//
+// Previsión de tesorería (29/09/2026). Hasta hoy esta ruta mostraba una copia
+// antigua de la página de facturas. El cálculo vive en lib/prevision.ts, que
+// tiene sus propias pruebas; aquí solo se reúnen los datos y se pintan.
+import React, { useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import { Link } from 'react-router-dom';
 import { useShallow } from 'zustand/react/shallow';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, ReferenceLine } from 'recharts';
+
+import { useAppStore } from '@/hooks/useAppStore';
+import { useToast } from '@/hooks/useToast';
+import { supabase } from '@/lib/supabaseClient';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
+import { calcularPrevision, type TipoMovimiento } from '@/lib/prevision';
+import { generateFinancialForecast, AI_CREDIT_COSTS } from '@/services/geminiService';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import Modal from '@/components/ui/Modal';
-import Input from '@/components/ui/Input';
-import { NewInvoice } from '@/types';
-import { formatCurrency, formatearFecha } from '@/lib/utils';
-import { supabase } from '@/lib/supabaseClient';
-import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon } from '@/components/icons/Icon';
-import { useToast } from '@/hooks/useToast';
-import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal';
-import CreateRecurringInvoiceModal from '@/components/modals/CreateRecurringInvoiceModal';
-import { generateInvoicePdf, generateInvoicePdfBase64 } from '@/services/pdfService';
-import { sendEmail, sendDocumentEmail } from '@/services/emailService';
+import {
+  AlertTriangleIcon, ArrowDownCircleIcon, ArrowUpCircleIcon, TrendingUpIcon, SparklesIcon, RefreshCwIcon, DollarSignIcon,
+} from '@/components/icons/Icon';
 
-interface PaymentSummary {
-  paidCents: number;
-  count: number;
-}
+const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
 
-interface InvoiceItemDraft {
-  description: string;
-  quantity: number;
-  price_cents: number;
-}
+// Validado con el validador de paletas (modo oscuro): rosa de marca y azul.
+const COLOR_COBROS = '#f000b8';
+const COLOR_PAGOS = '#0284c7';
 
-const InvoicesPage: React.FC = () => {
-  const { invoices, recurringInvoices, clients, profile, fiscalRecords, getClientById, addInvoice, deleteInvoice, addRecurringInvoice, deleteRecurringInvoice } = useAppStore(useShallow(s => ({ invoices: s.invoices, recurringInvoices: s.recurringInvoices, clients: s.clients, profile: s.profile, fiscalRecords: s.fiscalRecords, getClientById: s.getClientById, addInvoice: s.addInvoice, deleteInvoice: s.deleteInvoice, addRecurringInvoice: s.addRecurringInvoice, deleteRecurringInvoice: s.deleteRecurringInvoice })));
+const NOMBRE_TIPO: Record<TipoMovimiento, string> = {
+  factura: 'Facturas pendientes',
+  vencida: 'Facturas vencidas',
+  recurrente: 'Facturas recurrentes',
+  presupuesto: 'Presupuestos aceptados',
+  'gasto-recurrente': 'Gastos recurrentes',
+  'gastos-variables': 'Gastos variables (estimados)',
+  iva: 'IVA trimestral (estimado)',
+};
+
+const HORIZONTES = [3, 6, 12] as const;
+
+const euros = (cents: number) => formatCurrency(cents);
+const ejeEuros = (cents: number) =>
+  new Intl.NumberFormat('es-ES', { notation: 'compact', maximumFractionDigits: 1 }).format(cents / 100) + ' €';
+
+const Kpi: React.FC<{ icono: React.ElementType; titulo: string; valor: string; nota?: string; tono?: string }> = ({ icono: Icono, titulo, valor, nota, tono = 'text-white' }) => (
+  <Card>
+    <CardContent className="p-4 flex items-center gap-4">
+      <div className="p-3 rounded-full bg-primary-600/20 text-primary-400 shrink-0">
+        <Icono className="w-6 h-6" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm text-gray-400 truncate">{titulo}</p>
+        <p className={`text-2xl font-bold ${tono} truncate`}>{valor}</p>
+        {nota && <p className="text-xs text-gray-500 truncate">{nota}</p>}
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const ForecastingPage: React.FC = () => {
+  const { invoices, recurringInvoices, recurringExpenses, expenses, budgets, profile, getClientById, consumeCredits } = useAppStore(useShallow(s => ({
+    invoices: s.invoices, recurringInvoices: s.recurringInvoices, recurringExpenses: s.recurringExpenses, expenses: s.expenses,
+    budgets: s.budgets, profile: s.profile, getClientById: s.getClientById, consumeCredits: s.consumeCredits,
+  })));
   const { addToast } = useToast();
 
-  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
-  const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sourceBudgetId, setSourceBudgetId] = useState<string>('');
-  const [sourceContractId, setSourceContractId] = useState<string>('');
+  const [meses, setMeses] = useState<number>(6);
+  const [incluirPresupuestos, setIncluirPresupuestos] = useState(true);
+  const [saldoTexto, setSaldoTexto] = useState('');
+  const [cobrado, setCobrado] = useState<Record<string, number>>({});
+  const [analisis, setAnalisis] = useState<string | null>(null);
+  const [analizando, setAnalizando] = useState(false);
+  const [comprarCreditos, setComprarCreditos] = useState(false);
+  const [verTodos, setVerTodos] = useState(false);
 
-const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets, contracts: s.contracts }))); // añade budgets y contracts a la desestructuración de arriba
-  // Estado de pagos: mapa invoice_id -> { paidCents, count }
-  const [paymentsByInvoice, setPaymentsByInvoice] = useState<Record<string, PaymentSummary>>({});
-  const [paymentModalInvoiceId, setPaymentModalInvoiceId] = useState<string | null>(null);
-
-  const initialInvoiceState: NewInvoice = {
-    client_id: '',
-    project_id: '',
-    items: [{ description: '', quantity: 1, price_cents: 0 }],
-    tax_percent: 21,
-    due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    notes: '',
-  };
-
-  const [newInvoice, setNewInvoice] = useState<NewInvoice>(initialInvoiceState);
-
-  // Editor de líneas de la factura nueva
-  const [invoiceItems, setInvoiceItems] = useState<InvoiceItemDraft[]>([
-    { description: '', quantity: 1, price_cents: 0 },
-  ]);
-  const [taxPercent, setTaxPercent] = useState(21);
-  const [irpfPercent, setIrpfPercent] = useState(0);
-
-  const addItemRow = () => {
-    setInvoiceItems(prev => [...prev, { description: '', quantity: 1, price_cents: 0 }]);
-  };
-
-  const removeItemRow = (index: number) => {
-    setInvoiceItems(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const updateItemRow = (index: number, field: 'description' | 'quantity' | 'price_cents', value: string) => {
-    setInvoiceItems(prev => prev.map((item, i) => {
-      if (i !== index) return item;
-      if (field === 'description') return { ...item, description: value };
-      if (field === 'quantity') return { ...item, quantity: Number(value) || 0 };
-      // price_cents: el usuario escribe en euros, lo convertimos a céntimos
-      return { ...item, price_cents: Math.round(Number(value) * 100) || 0 };
-    }));
-  };
-
-  // Cálculo en vivo para mostrar en el modal
-  const invoicePreview = useMemo(() => {
-    const subtotal = invoiceItems.reduce((sum, item) => sum + item.price_cents * item.quantity, 0);
-    const taxAmount = Math.round(subtotal * (taxPercent / 100));
-    const irpfAmount = Math.round(subtotal * (irpfPercent / 100));
-    const total = subtotal + taxAmount - irpfAmount;
-    return { subtotal, taxAmount, irpfAmount, total };
-  }, [invoiceItems, taxPercent, irpfPercent]);
-
-  // Carga la suma de pagos de todas las facturas visibles de una sola vez
-  const fetchPaymentsSummary = useCallback(async () => {
-    if (invoices.length === 0) return;
-    const invoiceIds = invoices.map(inv => inv.id);
-
-    const { data, error } = await supabase
-      .from('payments')
-      .select('invoice_id, amount_cents')
-      .in('invoice_id', invoiceIds);
-
-    if (error) {
-      console.error('Error cargando pagos:', error);
-      return;
-    }
-
-    const summary: Record<string, PaymentSummary> = {};
-    (data || []).forEach(p => {
-      if (!summary[p.invoice_id]) summary[p.invoice_id] = { paidCents: 0, count: 0 };
-      summary[p.invoice_id].paidCents += p.amount_cents;
-      summary[p.invoice_id].count += 1;
-    });
-
-    setPaymentsByInvoice(summary);
-  }, [invoices]);
-
+  // Cobros parciales: una factura pendiente solo aporta lo que falta por cobrar.
+  const idsPendientes = useMemo(() => (invoices ?? []).filter(i => !i.paid).map(i => i.id), [invoices]);
   useEffect(() => {
-    fetchPaymentsSummary();
-  }, [fetchPaymentsSummary]);
-
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter(inv => {
-      const client = clients.find(c => c.id === inv.client_id);
-      return (
-        inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        client?.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+    if (!idsPendientes.length) { setCobrado({}); return; }
+    let vivo = true;
+    supabase.from('payments').select('invoice_id, amount_cents').in('invoice_id', idsPendientes).then(({ data, error }) => {
+      if (!vivo) return;
+      if (error) { console.error('Error cargando cobros parciales:', error.message); return; }
+      const suma: Record<string, number> = {};
+      for (const p of data ?? []) suma[p.invoice_id] = (suma[p.invoice_id] ?? 0) + (p.amount_cents ?? 0);
+      setCobrado(suma);
     });
-  }, [invoices, clients, searchTerm]);
+    return () => { vivo = false; };
+  }, [idsPendientes]);
 
-  const handleAddInvoice = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const saldoInicialCents = useMemo(() => {
+    const n = Number(saldoTexto.replace(/\./g, '').replace(',', '.'));
+    return Number.isFinite(n) ? Math.round(n * 100) : 0;
+  }, [saldoTexto]);
 
-    if (invoiceItems.some(item => !item.description.trim())) {
-      addToast('Todas las líneas necesitan una descripción.', 'error');
-      return;
-    }
-    if (invoicePreview.subtotal <= 0) {
-      addToast('El importe de la factura no puede ser 0€.', 'error');
-      return;
-    }
+  const presupuestosSinFacturar = useMemo(() => {
+    const facturados = new Set((invoices ?? []).map(i => i.budget_id).filter(Boolean));
+    return (budgets ?? []).filter(b => b.status === 'accepted' && !facturados.has(b.id))
+      .map(b => ({ id: b.id, amount_cents: b.amount_cents, description: b.description }));
+  }, [budgets, invoices]);
 
+  const hoy = new Date().toLocaleDateString('sv-SE'); // AAAA-MM-DD en la zona del navegador
+
+  const prevision = useMemo(() => calcularPrevision({
+    hoy,
+    meses,
+    facturas: invoices ?? [],
+    cobradoPorFactura: cobrado,
+    recurrentes: recurringInvoices ?? [],
+    gastosRecurrentes: recurringExpenses ?? [],
+    gastos: expenses ?? [],
+    presupuestosSinFacturar,
+    incluirPresupuestos,
+    saldoInicialCents,
+    nombreCliente: id => getClientById(id)?.name ?? 'Cliente',
+  }), [hoy, meses, invoices, cobrado, recurringInvoices, recurringExpenses, expenses, presupuestosSinFacturar, incluirPresupuestos, saldoInicialCents, getClientById]);
+
+  const hayDatos = prevision.movimientos.length > 0;
+  const netoTotal = prevision.totalCobros - prevision.totalPagos;
+  const saldoFinal = prevision.meses[prevision.meses.length - 1]?.saldo ?? 0;
+  const conSaldo = saldoTexto.trim() !== '';
+  const movimientosVisibles = verTodos ? prevision.movimientos : prevision.movimientos.slice(0, 12);
+
+  const analizar = async () => {
+    if ((profile?.ai_credits ?? 0) < AI_CREDIT_COSTS.generateForecast) { setComprarCreditos(true); return; }
+    setAnalizando(true);
+    setAnalisis(null);
     try {
-      const payload = {
-  ...newInvoice,
-  items: invoiceItems,
-  tax_percent: taxPercent,
-  irpf_percent: irpfPercent,
-  project_id: newInvoice.project_id || null,
-  notes: newInvoice.notes || null,
-  issue_date: new Date().toISOString().split('T')[0],
-  budget_id: sourceBudgetId || null,      // 🆕
-  contract_id: sourceContractId || null,  // 🆕
-};
-      await addInvoice(payload);
-      setIsInvoiceModalOpen(false);
-      setNewInvoice(initialInvoiceState);
-      setInvoiceItems([{ description: '', quantity: 1, price_cents: 0 }]);
-      setTaxPercent(21);
-      setIrpfPercent(0);
-      addToast('Factura creada correctamente', 'success');
-    } catch (error: any) {
-      addToast(error.message || 'Error al crear factura', 'error');
+      // Campos en *_cents: la Edge Function los pasa a euros antes de dárselos a la IA.
+      const datos = prevision.meses.map(m => ({
+        mes: m.etiqueta,
+        cobros_previstos_cents: m.cobros,
+        pagos_previstos_cents: m.pagos,
+        neto_cents: m.neto,
+        saldo_acumulado_cents: m.saldo,
+        facturas_vencidas_cents: m.porTipo.vencida,
+        iva_cents: -m.porTipo.iva,
+      }));
+      const res = await generateFinancialForecast([
+        ...datos,
+        { resumen: 'contexto', saldo_inicial_indicado: conSaldo, facturas_vencidas: prevision.vencidas.cantidad, facturas_vencidas_total_cents: prevision.vencidas.totalCents, gastos_variables_media_mensual_cents: prevision.mediaGastosVariablesCents },
+      ]);
+      setAnalisis(res.summary);
+      consumeCredits(AI_CREDIT_COSTS.generateForecast);
+    } catch (e) {
+      addToast((e as Error).message, 'error');
+    } finally {
+      setAnalizando(false);
     }
   };
 
-  const handleCloseInvoiceModal = () => {
-    setIsInvoiceModalOpen(false);
-    setNewInvoice(initialInvoiceState);
-    setInvoiceItems([{ description: '', quantity: 1, price_cents: 0 }]);
-    setTaxPercent(21);
-    setIrpfPercent(0);
-  };
-
-  const availableBudgets = useMemo(() => {
-  if (!newInvoice.client_id) return [];
-  return budgets.filter(b => b.client_id === newInvoice.client_id && b.status === 'accepted');
-}, [budgets, newInvoice.client_id]);
-
-const availableContracts = useMemo(() => {
-  if (!newInvoice.client_id) return [];
-  return contracts.filter(c => c.client_id === newInvoice.client_id && c.status === 'signed');
-}, [contracts, newInvoice.client_id]);
-
-const handleSelectBudget = (budgetId: string) => {
-  setSourceBudgetId(budgetId);
-  if (!budgetId) return;
-
-  const budget = budgets.find(b => b.id === budgetId);
-  if (budget?.items && Array.isArray(budget.items) && budget.items.length > 0) {
-    setInvoiceItems(budget.items.map((item: any) => ({
-      description: item.description,
-      quantity: item.quantity,
-      price_cents: item.price_cents,
-    })));
-    addToast('Líneas e importe autorrellenados desde el presupuesto.', 'success');
-  }
-};
-
-
-  const getClientName = (clientId: string) => {
-    return clients.find(c => c.id === clientId)?.name || 'Cliente desconocido';
-  };
-
-  const getFiscalDataForInvoice = (invoiceId: string) => {
-    const record = fiscalRecords.find(r => r.invoice_id === invoiceId && r.record_type === 'alta');
-    if (!record) return null;
-    return { modalidad: record.modalidad, hash: record.hash };
-  };
-
-  // Genera y descarga el PDF de la factura usando el servicio ya existente
-  // (pdfService.ts) que hasta ahora no estaba conectado a ningún botón.
-  const handleDownloadPdf = async (invoice: typeof invoices[number]) => {
-    const client = getClientById(invoice.client_id);
-    if (!client) {
-      addToast('No se encontró el cliente de esta factura.', 'error');
-      return;
-    }
-    if (!profile) {
-      addToast('No se pudo cargar tu perfil para generar el PDF.', 'error');
-      return;
-    }
-    try {
-      await generateInvoicePdf(invoice, client, profile, getFiscalDataForInvoice(invoice.id), { rectificaA: invoices.find(i => i.id === invoice.rectifies_invoice_id)?.invoice_number });
-    } catch (error) {
-      console.error('Error generando el PDF:', error);
-      addToast('No se pudo generar el PDF de la factura.', 'error');
-    }
-  };
-
-  // Abre el cliente de correo del usuario con un borrador prellenado (mailto:).
-  // FIX: un enlace mailto: nunca puede adjuntar archivos (limitación del
-  // navegador/SO, no del código) — antes el cuerpo decía "Adjunto la
-  // factura..." sin haberse descargado ni adjuntado nada, y esta función
-  // nunca llamaba a generateInvoicePdf (esa llamada solo se había añadido
-  // al botón separado "Descargar PDF", handleDownloadPdf). Ahora descarga
-  // el PDF primero y avisa explícitamente de que hay que adjuntarlo a mano.
-  const handleSendEmailInvoice = async (invoice: typeof invoices[number]) => {
-    const client = getClientById(invoice.client_id);
-    if (!client?.email) {
-      addToast('Este cliente no tiene email registrado.', 'error');
-      return;
-    }
-    if (!profile) {
-      addToast('No se pudo cargar tu perfil para generar el PDF.', 'error');
-      return;
-    }
-
-    let pdfBase64: string;
-    try {
-      pdfBase64 = await generateInvoicePdfBase64(invoice, client, profile, getFiscalDataForInvoice(invoice.id), { rectificaA: invoices.find(i => i.id === invoice.rectifies_invoice_id)?.invoice_number });
-    } catch (error) {
-      console.error('Error generando el PDF:', error);
-      addToast('No se pudo generar el PDF de la factura.', 'error');
-      return;
-    }
-
-    try {
-      await sendDocumentEmail({
-        tipo: 'factura',
-        documentoId: invoice.id,
-        pdfBase64,
-      });
-      addToast('Email enviado con la factura adjunta.', 'success');
-    } catch (error) {
-      console.error('Error enviando el email:', error);
-      addToast((error as Error)?.message || 'No se pudo enviar el email. Inténtalo de nuevo.', 'error');
-    }
-  };
-
-  // Devuelve el estado real de cobro combinando `paid` (booleano, sincronizado por trigger)
-  // con el importe parcial acumulado, para mostrar 4 estados: pagada / parcial / pendiente / sin importe
-  const handleDeleteInvoice = async (id: string) => {
-    try {
-      await deleteInvoice(id);
-    } catch (err) {
-      addToast((err as Error).message || 'No se pudo eliminar la factura.', 'error');
-    }
-  };
-
-  const handleDeleteRecurringInvoice = async (id: string) => {
-    try {
-      await deleteRecurringInvoice(id);
-    } catch (err) {
-      addToast((err as Error).message || 'No se pudo eliminar la factura recurrente.', 'error');
-    }
-  };
-
-  const getPaymentStatus = (invoiceId: string, totalCents: number, isPaidFlag: boolean) => {
-    const summary = paymentsByInvoice[invoiceId];
-    const trackedPaidCents = summary?.paidCents ?? 0;
-    const paidCents = isPaidFlag && trackedPaidCents === 0 ? totalCents : trackedPaidCents;
-
-    // Una factura sin importe nunca debe considerarse "pagada" —
-    // exigimos totalCents > 0 explícitamente para evitar el caso 0 >= 0
-    if (totalCents > 0 && (isPaidFlag || paidCents >= totalCents)) {
-      return { label: 'PAGADA', className: 'bg-green-500/10 text-green-400 border-green-500/30', paidCents };
-    }
-    if (paidCents > 0) {
-      return { label: 'PARCIAL', className: 'bg-blue-500/10 text-blue-400 border-blue-500/30', paidCents };
-    }
-    if (totalCents === 0) {
-      return { label: 'SIN IMPORTE', className: 'bg-gray-500/10 text-gray-400 border-gray-500/30', paidCents };
-    }
-    return { label: 'PENDIENTE', className: 'bg-orange-500/10 text-orange-400 border-orange-500/30', paidCents };
-  };
+  const datosGrafico = prevision.meses.map(m => ({ mes: m.etiqueta, Cobros: m.cobros, Pagos: m.pagos, Saldo: m.saldo }));
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Facturación</h1>
-          <p className="text-gray-400">Gestiona tus facturas, cobros parciales y facturación recurrente</p>
+          <h1 className="text-2xl font-bold text-white">Previsión de tesorería</h1>
+          <p className="text-sm text-gray-400 mt-1 max-w-2xl">
+            Lo que va a entrar y salir de tu cuenta en los próximos meses, con tus facturas pendientes, recurrentes,
+            presupuestos aceptados, gastos e IVA trimestral.
+          </p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="secondary" onClick={() => setIsRecurringModalOpen(true)}>
-            <Repeat className="w-4 h-4 mr-2" />
-            Factura Recurrente
-          </Button>
-          <Button onClick={() => setIsInvoiceModalOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nueva Factura
-          </Button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3 space-y-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
-            <input
-              type="text"
-              placeholder="Buscar por número o cliente..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl pl-10 pr-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
-            />
-          </div>
-
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="border-b border-gray-800 text-gray-400 text-xs uppercase tracking-wider">
-                      <th className="px-6 py-4 font-medium">Nº Factura</th>
-                      <th className="px-6 py-4 font-medium">Cliente</th>
-                      <th className="px-6 py-4 font-medium">Vencimiento</th>
-                      <th className="px-6 py-4 font-medium text-right">Total</th>
-                      <th className="px-6 py-4 font-medium">Cobrado</th>
-                      <th className="px-6 py-4 font-medium text-center">Estado</th>
-                      <th className="px-6 py-4 font-medium text-center sticky right-0 bg-gray-900">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-800">
-                    {filteredInvoices.map((inv) => {
-                      const status = getPaymentStatus(inv.id, inv.total_cents, inv.paid);
-                      const remainingCents = Math.max(inv.total_cents - status.paidCents, 0);
-                      const progressPct = inv.total_cents > 0
-                        ? Math.min((status.paidCents / inv.total_cents) * 100, 100)
-                        : 0;
-
-                      return (
-                        <tr key={inv.id} className="text-sm text-gray-300 hover:bg-gray-800/30 transition-colors">
-                          <td className="px-6 py-4 font-mono text-white">{inv.invoice_number}</td>
-                          <td className="px-6 py-4">{getClientName(inv.client_id)}</td>
-                          <td className="px-6 py-4">{formatearFecha(inv.due_date)}</td>
-                          <td className="px-6 py-4 text-right font-bold text-white">{formatCurrency(inv.total_cents)}</td>
-
-                          <td className="px-6 py-4 min-w-[140px]">
-                            <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                              <span>{formatCurrency(status.paidCents)}</span>
-                              {remainingCents > 0 && <span>Restan {formatCurrency(remainingCents)}</span>}
-                            </div>
-                            <div className="w-full bg-gray-800 h-1.5 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full transition-all duration-500 ${status.label === 'PAGADA' ? 'bg-green-500' : 'bg-blue-500'}`}
-                                style={{ width: `${progressPct}%` }}
-                              />
-                            </div>
-                          </td>
-
-                          <td className="px-6 py-4 text-center">
-                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold border ${status.className}`}>
-                              {status.label}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 sticky right-0 bg-gray-900/95 backdrop-blur-sm">
-                            <div className="flex items-center justify-center gap-2">
-                              {status.label !== 'PAGADA' && (
-                                <button
-                                  onClick={() => setPaymentModalInvoiceId(inv.id)}
-                                  className="p-2 text-gray-400 hover:text-green-400 transition-colors"
-                                  title="Registrar pago"
-                                >
-                                  <DollarSignIcon className="w-4 h-4" />
-                                </button>
-                              )}
-                              <button
-                                onClick={() => handleDownloadPdf(inv)}
-                                className="p-2 text-gray-400 hover:text-white transition-colors"
-                                title="Descargar PDF"
-                              >
-                                <Download className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleSendEmailInvoice(inv)}
-                                className="p-2 text-gray-400 hover:text-primary-400 transition-colors"
-                                title="Enviar por Email"
-                              >
-                                <Send className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteInvoice(inv.id)}
-                                className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                                title="Eliminar"
-                              >
-                                <Trash className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-bold text-white">Facturación Recurrente</h3>
-            </CardHeader>
-            <CardContent className="p-4 space-y-4">
-              {recurringInvoices.length === 0 && (
-                <p className="text-sm text-gray-500">No tienes facturas recurrentes configuradas.</p>
-              )}
-              {recurringInvoices.map((ri) => {
-                const amountCents = (ri.items || []).reduce((sum, it) => sum + it.price_cents * it.quantity, 0);
-                const totalCents = Math.round(amountCents * (1 + (ri.tax_percent || 0) / 100));
-                return (
-                  <div key={ri.id} className="p-3 bg-gray-800/50 rounded-lg border border-gray-700 space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm font-bold text-white">{getClientName(ri.client_id)}</p>
-                        <p className="text-xs text-gray-500">
-                          {ri.frequency === 'monthly' ? 'Mensual' : ri.frequency === 'yearly' ? 'Anual' : ri.frequency} · Próxima: {ri.next_due_date}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteRecurringInvoice(ri.id)}
-                        className="text-gray-500 hover:text-red-500 transition-colors"
-                      >
-                        <Trash className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <p className="text-sm text-white font-semibold">{formatCurrency(totalCents)} <span className="text-gray-500 font-normal">por emisión</span></p>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      <Modal isOpen={isInvoiceModalOpen} onClose={handleCloseInvoiceModal} title="Nueva Factura">
-        <form onSubmit={handleAddInvoice} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+        <div className="flex flex-wrap items-end gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1">Cliente</label>
-            <select
-              className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
-              value={newInvoice.client_id}
-              onChange={(e) => setNewInvoice({ ...newInvoice, client_id: e.target.value })}
-              required
-            >
-              <option value="">Seleccionar cliente</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-              {newInvoice.client_id && (
-  <>
-    <div>
-      <label className="block text-sm font-medium text-gray-400 mb-1">
-        Origen — Presupuesto (opcional, autorrellena importe)
-      </label>
-      <select
-        className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
-        value={sourceBudgetId}
-        onChange={(e) => handleSelectBudget(e.target.value)}
-      >
-        <option value="">Sin presupuesto — rellenar manualmente</option>
-        {availableBudgets.map(b => (
-          <option key={b.id} value={b.id}>
-            {b.description} — {formatCurrency(b.amount_cents || 0)}
-          </option>
-        ))}
-      </select>
-      {availableBudgets.length === 0 && (
-        <p className="text-xs text-gray-500 mt-1">Este cliente no tiene presupuestos aceptados.</p>
-      )}
-    </div>
-
-    <div>
-      <label className="block text-sm font-medium text-gray-400 mb-1">
-        Contrato relacionado (opcional, solo trazabilidad)
-      </label>
-      <select
-        className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
-        value={sourceContractId}
-        onChange={(e) => setSourceContractId(e.target.value)}
-      >
-        <option value="">Sin contrato vinculado</option>
-        {availableContracts.map(c => (
-          <option key={c.id} value={c.id}>
-            Contrato firmado el {c.signed_at ? formatearFecha(c.signed_at) : '—'}
-          </option>
-        ))}
-      </select>
-    </div>
-  </>
-)}
-          </div>
-
-          <Input
-            label="Fecha Vencimiento"
-            type="date"
-            value={newInvoice.due_date}
-            onChange={(e) => setNewInvoice({ ...newInvoice, due_date: e.target.value })}
-          />
-
-          {/* Editor de líneas */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium text-gray-400">Conceptos</label>
-              <button type="button" onClick={addItemRow} className="text-xs text-primary-400 hover:underline">
-                + Añadir línea
-              </button>
-            </div>
-            <div className="space-y-2">
-              {invoiceItems.map((item, index) => (
-                <div key={index} className="flex gap-2 items-start">
-                  <input
-                    type="text"
-                    placeholder="Descripción"
-                    value={item.description}
-                    onChange={(e) => updateItemRow(index, 'description', e.target.value)}
-                    className="flex-1 bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
-                    required
-                  />
-                  <input
-                    type="number"
-                    min={1}
-                    placeholder="Cant."
-                    value={item.quantity}
-                    onChange={(e) => updateItemRow(index, 'quantity', e.target.value)}
-                    className="w-16 bg-gray-800 border border-gray-700 rounded-md px-2 py-2 text-sm text-white"
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    placeholder="€/ud"
-                    value={item.price_cents / 100}
-                    onChange={(e) => updateItemRow(index, 'price_cents', e.target.value)}
-                    className="w-24 bg-gray-800 border border-gray-700 rounded-md px-2 py-2 text-sm text-white"
-                  />
-                  {invoiceItems.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeItemRow(index)}
-                      className="text-gray-500 hover:text-red-500 px-2"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
+            <span className="block text-xs text-gray-400 mb-1">Horizonte</span>
+            <div className="inline-flex rounded-lg border border-gray-700 overflow-hidden" role="group" aria-label="Horizonte de la previsión">
+              {HORIZONTES.map(h => (
+                <button key={h} type="button" onClick={() => setMeses(h)}
+                  className={`px-3 py-2 text-sm ${meses === h ? 'bg-primary-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+                  aria-pressed={meses === h}>
+                  {h} meses
+                </button>
               ))}
             </div>
           </div>
+          <label className="block">
+            <span className="block text-xs text-gray-400 mb-1">Saldo actual en el banco (opcional)</span>
+            <input inputMode="decimal" value={saldoTexto} onChange={e => setSaldoTexto(e.target.value)} placeholder="Ej. 4.250,00"
+              className="w-40 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm" />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-gray-300 pb-2">
+            <input type="checkbox" checked={incluirPresupuestos} onChange={e => setIncluirPresupuestos(e.target.checked)} className="accent-primary-500" />
+            Presupuestos aceptados sin facturar
+          </label>
+        </div>
+      </div>
 
-          {/* IVA / IRPF */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">IVA (%)</label>
-              <input
-                type="number"
-                min={0}
-                value={taxPercent}
-                onChange={(e) => setTaxPercent(Number(e.target.value) || 0)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-400 mb-1">IRPF (%)</label>
-              <input
-                type="number"
-                min={0}
-                value={irpfPercent}
-                onChange={(e) => setIrpfPercent(Number(e.target.value) || 0)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
-              />
-            </div>
+      {prevision.vencidas.cantidad > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+          <AlertTriangleIcon className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="text-amber-100">
+            Tienes <strong>{prevision.vencidas.cantidad} {prevision.vencidas.cantidad === 1 ? 'factura vencida' : 'facturas vencidas'}</strong> sin cobrar por{' '}
+            <strong>{euros(prevision.vencidas.totalCents)}</strong>. La previsión las cuenta como cobro de este mes; si no las reclamas, no llegarán.{' '}
+            <Link to="/invoices" className="underline text-amber-300 hover:text-amber-200">Ver facturas</Link>
+          </div>
+        </div>
+      )}
+      {conSaldo && prevision.mesesEnNegativo.length > 0 && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-sm">
+          <AlertTriangleIcon className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+          <p className="text-red-100">
+            Con estos datos, tu saldo se quedaría en negativo en <strong>{prevision.mesesEnNegativo.join(', ')}</strong>
+            {prevision.saldoMinimo ? <> (mínimo {euros(prevision.saldoMinimo.saldo)} en {prevision.saldoMinimo.mes})</> : null}.
+          </p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <Kpi icono={ArrowUpCircleIcon} titulo="Cobros previstos" valor={euros(prevision.totalCobros)} nota={`${meses} meses, incluido el actual`} />
+        <Kpi icono={ArrowDownCircleIcon} titulo="Pagos previstos" valor={euros(prevision.totalPagos)} nota="Gastos e IVA estimados" />
+        <Kpi icono={TrendingUpIcon} titulo="Resultado del periodo" valor={euros(netoTotal)} tono={netoTotal < 0 ? 'text-red-400' : 'text-green-400'} />
+        <Kpi icono={DollarSignIcon} titulo={conSaldo ? 'Saldo al final' : 'Mes más ajustado'}
+          valor={conSaldo ? euros(saldoFinal) : (prevision.saldoMinimo?.mes ?? '—')}
+          nota={conSaldo ? undefined : 'Indica tu saldo para ver el acumulado real'}
+          tono={conSaldo && saldoFinal < 0 ? 'text-red-400' : 'text-white'} />
+      </div>
+
+      {!hayDatos ? (
+        <Card>
+          <CardContent className="p-8 text-center text-gray-400">
+            Todavía no hay nada que prever: no tienes facturas pendientes, recurrentes, presupuestos aceptados ni gastos registrados.
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <Card className="xl:col-span-2">
+              <CardHeader><h2 className="text-lg font-semibold text-white">Cobros y pagos por mes</h2></CardHeader>
+              <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={datosGrafico} barGap={2}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#2c2c2c" vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fill: '#a0a0a0', fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={ejeEuros} tick={{ fill: '#a0a0a0', fontSize: 12 }} axisLine={false} tickLine={false} width={64} />
+                      <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #2c2c2c', borderRadius: 8 }} labelStyle={{ color: '#e5e7eb' }}
+                        itemStyle={{ color: '#e5e7eb' }} cursor={{ fill: 'rgba(255,255,255,0.06)' }} formatter={(v: number) => euros(v)} />
+                      <Legend wrapperStyle={{ color: '#a0a0a0', fontSize: 12 }} />
+                      <Bar dataKey="Cobros" fill={COLOR_COBROS} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                      <Bar dataKey="Pagos" fill={COLOR_PAGOS} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <h2 className="text-lg font-semibold text-white">{conSaldo ? 'Saldo previsto' : 'Resultado acumulado'}</h2>
+              </CardHeader>
+              <CardContent>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={datosGrafico}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#2c2c2c" vertical={false} />
+                      <XAxis dataKey="mes" tick={{ fill: '#a0a0a0', fontSize: 12 }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={ejeEuros} tick={{ fill: '#a0a0a0', fontSize: 12 }} axisLine={false} tickLine={false} width={64} />
+                      <ReferenceLine y={0} stroke="#6b7280" />
+                      <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #2c2c2c', borderRadius: 8 }} labelStyle={{ color: '#e5e7eb' }}
+                        itemStyle={{ color: '#e5e7eb' }} formatter={(v: number) => euros(v)} />
+                      <Line type="monotone" dataKey="Saldo" name={conSaldo ? 'Saldo' : 'Acumulado'} stroke={COLOR_COBROS} strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Resumen en vivo */}
-          <div className="bg-gray-800/50 rounded-lg p-3 space-y-1 text-sm">
-            <div className="flex justify-between text-gray-400">
-              <span>Subtotal</span><span>{formatCurrency(invoicePreview.subtotal)}</span>
-            </div>
-            <div className="flex justify-between text-gray-400">
-              <span>IVA ({taxPercent}%)</span><span>+{formatCurrency(invoicePreview.taxAmount)}</span>
-            </div>
-            {irpfPercent > 0 && (
-              <div className="flex justify-between text-gray-400">
-                <span>IRPF ({irpfPercent}%)</span><span>-{formatCurrency(invoicePreview.irpfAmount)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-white font-bold pt-1 border-t border-gray-700">
-              <span>Total</span><span>{formatCurrency(invoicePreview.total)}</span>
-            </div>
+          <Card>
+            <CardHeader><h2 className="text-lg font-semibold text-white">Detalle por mes</h2></CardHeader>
+            <CardContent className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="text-left text-gray-400 border-b border-gray-800">
+                    <th className="py-2 pr-4 font-medium">Concepto</th>
+                    {prevision.meses.map(m => <th key={m.mes} className="py-2 px-2 font-medium text-right whitespace-nowrap">{m.etiqueta}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(Object.keys(NOMBRE_TIPO) as TipoMovimiento[])
+                    .filter(t => prevision.meses.some(m => m.porTipo[t] !== 0))
+                    .map(t => (
+                      <tr key={t} className="border-b border-gray-800/60">
+                        <td className="py-2 pr-4 text-gray-300 whitespace-nowrap">{NOMBRE_TIPO[t]}</td>
+                        {prevision.meses.map(m => (
+                          <td key={m.mes} className={`py-2 px-2 text-right tabular-nums ${m.porTipo[t] < 0 ? 'text-gray-400' : 'text-gray-200'}`}>
+                            {m.porTipo[t] ? euros(m.porTipo[t]) : '—'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  <tr className="border-b border-gray-800 font-semibold">
+                    <td className="py-2 pr-4 text-white">Resultado del mes</td>
+                    {prevision.meses.map(m => (
+                      <td key={m.mes} className={`py-2 px-2 text-right tabular-nums ${m.neto < 0 ? 'text-red-400' : 'text-green-400'}`}>{euros(m.neto)}</td>
+                    ))}
+                  </tr>
+                  <tr className="font-semibold">
+                    <td className="py-2 pr-4 text-white">{conSaldo ? 'Saldo al final del mes' : 'Acumulado'}</td>
+                    {prevision.meses.map(m => (
+                      <td key={m.mes} className={`py-2 px-2 text-right tabular-nums ${m.saldo < 0 ? 'text-red-400' : 'text-white'}`}>{euros(m.saldo)}</td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader><h2 className="text-lg font-semibold text-white">Próximos movimientos</h2></CardHeader>
+              <CardContent>
+                <ul className="divide-y divide-gray-800">
+                  {movimientosVisibles.map((m, i) => (
+                    <li key={`${m.fecha}-${i}`} className="flex items-center justify-between gap-3 py-2 text-sm">
+                      <div className="min-w-0">
+                        <p className="text-gray-200 truncate">{m.concepto}</p>
+                        <p className="text-xs text-gray-500">{formatearFecha(m.fecha)} · {NOMBRE_TIPO[m.tipo]}</p>
+                      </div>
+                      <span className={`tabular-nums shrink-0 font-medium ${m.importeCents < 0 ? 'text-gray-400' : 'text-green-400'}`}>
+                        {m.importeCents > 0 ? '+' : ''}{euros(m.importeCents)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {prevision.movimientos.length > 12 && (
+                  <button type="button" onClick={() => setVerTodos(v => !v)} className="mt-3 text-sm text-primary-400 hover:text-primary-300">
+                    {verTodos ? 'Ver menos' : `Ver los ${prevision.movimientos.length} movimientos`}
+                  </button>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-lg font-semibold text-white">Análisis con IA</h2>
+                  <Button onClick={analizar} disabled={analizando} size="sm">
+                    {analizando ? <RefreshCwIcon className="w-4 h-4 mr-2 animate-spin" /> : <SparklesIcon className="w-4 h-4 mr-2" />}
+                    {analisis ? 'Volver a analizar' : 'Analizar'} ({AI_CREDIT_COSTS.generateForecast} créditos)
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {analisis ? (
+                  <div className="text-sm text-gray-200 whitespace-pre-line leading-relaxed">{analisis}</div>
+                ) : (
+                  <p className="text-sm text-gray-400">
+                    La IA revisa esta previsión y te dice qué riesgos ve (meses flojos, dependencia de un cliente, facturas por reclamar) y qué puedes hacer.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
           </div>
+        </>
+      )}
 
-          <div className="flex justify-end gap-3 mt-6">
-            <Button type="button" variant="secondary" onClick={handleCloseInvoiceModal}>Cancelar</Button>
-            <Button type="submit">Generar Factura</Button>
-          </div>
-        </form>
-      </Modal>
+      <p className="text-xs text-gray-500">
+        Cómo se calcula: las facturas pendientes, en su vencimiento (las vencidas, este mes); las recurrentes se cobran 30 días después de emitirse;
+        los presupuestos aceptados sin factura, a mitad del mes que viene; los gastos variables son la media de los 3 meses anteriores
+        ({euros(prevision.mediaGastosVariablesCents)} al mes); el IVA es el repercutido menos el soportado de cada trimestre, en su plazo
+        del modelo 303. No incluye el IRPF (modelo 130) ni la cuota de autónomos. Es una estimación: confírmala con tu gestoría.
+      </p>
 
-      {/* Modal de registro de pagos parciales */}
-      {paymentModalInvoiceId && (() => {
-        const inv = invoices.find(i => i.id === paymentModalInvoiceId);
-        if (!inv) return null;
-        const paidCents = paymentsByInvoice[inv.id]?.paidCents ?? 0;
-        const remainingCents = Math.max(inv.total_cents - paidCents, 0);
-
-        return (
-          <RegisterPaymentModal
-            isOpen={true}
-            onClose={() => setPaymentModalInvoiceId(null)}
-            invoiceId={inv.id}
-            remainingCents={remainingCents}
-            onPaymentRegistered={fetchPaymentsSummary}
-          />
-        );
-      })()}
-
-      <CreateRecurringInvoiceModal
-        isOpen={isRecurringModalOpen}
-        onClose={() => setIsRecurringModalOpen(false)}
-      />
+      {comprarCreditos && (
+        <Suspense fallback={null}>
+          <BuyCreditsModal isOpen={comprarCreditos} creditosNecesarios={AI_CREDIT_COSTS.generateForecast} onClose={() => setComprarCreditos(false)} />
+        </Suspense>
+      )}
     </div>
   );
 };
 
-export default InvoicesPage;
+export default ForecastingPage;
