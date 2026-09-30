@@ -11,7 +11,7 @@ do $prueba$
 declare
   v_u uuid := gen_random_uuid();          -- la cuenta que se da de baja
   v_otro uuid;                            -- otra cuenta (freelancer y afiliada)
-  v_cli uuid; v_proy uuid; v_fac uuid; v_ficha_ajena uuid; v_ref uuid; v_arch record;
+  v_cli uuid; v_proy uuid; v_fac uuid; v_ficha_ajena uuid; v_ref uuid; v_arch record; v_neg uuid := gen_random_uuid();
   v_quedan text := ''; v_n bigint; v_res text := ''; v_fallos int := 0; r record;
 begin
   select id into v_otro from public.profiles where id <> v_u order by id limit 1;
@@ -34,6 +34,10 @@ begin
   insert into public.expenses (user_id, description, amount_cents, tax_percent, date, category) values (v_u, 'Gasto', 100, 21, current_date, 'Otros');
   insert into public.jobs (user_id, titulo) values (v_u, 'Oferta de la baja');
   insert into public.platform_payments (user_id, user_email, plan_name, amount_cents, stripe_session_id) values (v_u, 'baja-prueba@example.com', 'Pro', 395, 'cs_prueba_baja');
+  -- Lo que falló en la primera baja real (30/09): cascadas de segundo nivel y auth.flow_state.
+  insert into public.businesses (id, user_id, name) values (v_neg, v_u, 'Negocio de Lead Hunter');
+  insert into public.processed_resend_events (event_id, type, business_id) values ('evt_prueba_baja', 'email.opened', v_neg);
+  insert into auth.flow_state (id, user_id, provider_type, authentication_method) values (gen_random_uuid(), v_u, 'email', 'magiclink');
 
   -- Lo que es de otros y la nombra
   insert into public.clients (user_id, name, email, portal_user_id) values (v_otro, 'Ficha de otro freelancer', 'baja-prueba@example.com', v_u) returning id into v_ficha_ajena;
@@ -48,14 +52,15 @@ begin
   for r in
     select c.table_schema, c.table_name, c.column_name from information_schema.columns c
     join information_schema.tables t on t.table_schema = c.table_schema and t.table_name = c.table_name and t.table_type = 'BASE TABLE'
-    where c.table_schema = 'public' and c.data_type = 'uuid' and c.table_name <> 'archivo_fiscal_cuentas_eliminadas'
+    where c.table_schema in ('public', 'auth') and c.data_type = 'uuid' and c.table_name <> 'archivo_fiscal_cuentas_eliminadas'
       and c.column_name in ('id','user_id','owner_id','author_id','applicant_id','buyer_id','seller_id','actor_id','accepted_user_id','portal_user_id','logged_by','referrer_id','referred_user_id','invited_by','creado_por')
   loop
     execute format('select count(*) from %I.%I where %I = $1', r.table_schema, r.table_name, r.column_name) into v_n using v_u;
     if v_n > 0 then v_quedan := v_quedan || format(' %s.%s=%s', r.table_name, r.column_name, v_n); end if;
   end loop;
   if v_quedan = '' and not exists (select 1 from public.clients where id = v_cli) and not exists (select 1 from public.projects where id = v_proy)
-  then v_res := v_res || E'\nOK  1 no queda ninguna fila suya en public';
+     and not exists (select 1 from public.processed_resend_events where event_id = 'evt_prueba_baja')
+  then v_res := v_res || E'\nOK  1 no queda ninguna fila suya en public ni en auth (con Lead Hunter y eventos de Resend)';
   else v_res := v_res || E'\nMAL 1 quedan:' || v_quedan; v_fallos := v_fallos + 1; end if;
 
   -- 2) lo fiscal está en el archivo, hasta el 31/12 del cuarto año
