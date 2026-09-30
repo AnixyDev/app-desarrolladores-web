@@ -113,7 +113,7 @@ const RUTAS = ['/','/clients','/projects','/invoices','/receipts','/fiscal','/ba
 '/time-tracking','/reports','/reports/profitability','/tax-ledger','/ai-assistant','/job-market',
 '/post-job','/my-job-posts','/public-profile','/my-applications','/saved-jobs','/team',
 '/knowledge-base','/inbox','/roles','/integrations','/forecasting','/affiliate','/billing',
-'/portal-branding','/settings','/admin',
+'/portal-branding','/settings','/admin','/cuenta/eliminar',
 // Detalle de un proyecto (con sus hitos). El id es el de la primera fila simulada.
 '/projects/00000000-0000-4000-8000-000000000001',
 // Editar una oferta de empleo publicada.
@@ -226,6 +226,7 @@ const PUBLICAS = {
   '/privacy':                            /Política de Privacidad/,
   '/terms':                              /Términos del Servicio/,
   '/pricing':                            /Precios Transparentes/,
+  '/cuenta-eliminada':                   /Tu cuenta se ha eliminado/,
   [`/pay/${FACTURA_PUBLICA}`]:           /Factura F-PRUEBA-1/,
 };
 

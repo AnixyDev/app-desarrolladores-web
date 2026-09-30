@@ -238,3 +238,10 @@ select cron.schedule(
   ) as request_id;
   $$
 );
+
+-- Eliminar cuenta (30/09/2026): borra cada día el archivo fiscal de cuentas
+-- eliminadas cuyo plazo de conservación (4 años) ha vencido.
+select cron.unschedule('purgar-archivo-fiscal')
+where exists (select 1 from cron.job where jobname = 'purgar-archivo-fiscal');
+
+select cron.schedule('purgar-archivo-fiscal', '20 4 * * *', $$select public.purgar_archivo_fiscal();$$);
