@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand';
 import { Project, NewProject, Task, TimeEntry, NewTimeEntry } from '@/types';
 import { AppState } from '../useAppStore';
 import { supabase } from '@/lib/supabaseClient';
+import { proyectosDeTrabajo } from '@/lib/datosPropios';
 import { notifyTimerStarted, notifyTimerStopped } from '@/services/timerNotifications';
 
 // NUEVO: el cronómetro vivía en useState local de MyTeamTimesheet.tsx —
@@ -83,8 +84,19 @@ export const createProjectSlice: StateCreator<AppState, [], [], ProjectSlice> = 
     activeTimer: loadPersistedActiveTimer(),
 
     fetchProjects: async () => {
-        const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
-        if (!error && data) set({ projects: data as Project[] });
+        // FIX (30/09/2026): fuera los proyectos que solo se ven por ser cliente
+        // del portal de otro freelancer. Se mantienen los propios y los del
+        // equipo del que se es miembro (esos no llevan una ficha de cliente
+        // enlazada a esta cuenta).
+        const uid = get().profile?.id;
+        if (!uid) return;
+        const [{ data, error }, { data: fichasComoCliente }] = await Promise.all([
+            supabase.from('projects').select('*').order('created_at', { ascending: false }),
+            supabase.from('clients').select('id').eq('portal_user_id', uid).neq('user_id', uid),
+        ]);
+        if (error || !data) return;
+        const ajenas = new Set((fichasComoCliente ?? []).map(c => c.id));
+        set({ projects: proyectosDeTrabajo(data as Project[], uid, ajenas) });
     },
 
     fetchTasks: async () => {

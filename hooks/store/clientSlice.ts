@@ -23,10 +23,16 @@ export const createClientSlice: StateCreator<AppState, [], [], ClientSlice> = (s
         // y competía por el Web Lock interno de supabase-js contra refreshProfile(),
         // causando "AbortError: Lock broken by another request" y sesiones
         // que parecían cerrarse solas al refrescar la página.
+        // FIX (30/09/2026): solo las fichas de esta cuenta. La RLS también deja
+        // leer la ficha en la que uno figura como cliente del portal de otro
+        // freelancer, y esa ficha ajena aparecía en la lista de Clientes.
+        const uid = get().profile?.id;
+        if (!uid) return;
         try {
             const { data, error } = await supabase
                 .from('clients')
                 .select('*')
+                .eq('user_id', uid)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;

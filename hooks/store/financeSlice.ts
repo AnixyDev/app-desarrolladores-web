@@ -125,15 +125,23 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
     // Era redundante (la RLS ya protege estas consultas con auth.uid()) y
     // competía por el Web Lock de supabase-js contra refreshProfile(),
     // pudiendo hacer que esta función se saliera en silencio sin cargar nada.
+    //
+    // FIX (30/09/2026): solo lo que EMITE esta cuenta. La RLS de facturas,
+    // presupuestos, propuestas, contratos y recibos también deja leer lo que
+    // uno RECIBE como cliente del portal de otro freelancer; sin este filtro
+    // esos documentos ajenos aparecían mezclados en las pantallas de trabajo
+    // (y al pulsar Anular o Borrar el servidor respondía «no es tuya»).
+    const uid = get().profile?.id;
+    if (!uid) return;
     const results = await Promise.allSettled([
-      supabase.from('invoices').select('*').order('created_at', { ascending: false }),
-      supabase.from('expenses').select('*').order('created_at', { ascending: false }),
-      supabase.from('budgets').select('*').order('created_at', { ascending: false }),
-      supabase.from('proposals').select('*').order('created_at', { ascending: false }),
-      supabase.from('contracts').select('*').order('created_at', { ascending: false }),
-      supabase.from('recurring_invoices').select('*'),
-      supabase.from('recurring_expenses').select('*'),
-      supabase.from('receipts').select('*').order('created_at', { ascending: false }),
+      supabase.from('invoices').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('expenses').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('budgets').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('contracts').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      supabase.from('recurring_invoices').select('*').eq('user_id', uid),
+      supabase.from('recurring_expenses').select('*').eq('user_id', uid),
+      supabase.from('receipts').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
     ]);
 
     // Helper tipado: extrae datos o devuelve [] logueando el error
@@ -158,14 +166,18 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
   },
 
   fetchReceipts: async () => {
-    const { data, error } = await supabase.from('receipts').select('*').order('created_at', { ascending: false });
+    const uid = get().profile?.id;
+    if (!uid) return;
+    const { data, error } = await supabase.from('receipts').select('*').eq('user_id', uid).order('created_at', { ascending: false });
     if (error) { console.error('Error cargando recibos:', error); return; }
     set({ receipts: (data ?? []) as Receipt[] });
   },
 
   // --- Cumplimiento Veri*Factu ---
   fetchFiscalRecords: async () => {
-    const { data, error } = await supabase.from('fiscal_records').select('*').order('created_at', { ascending: true });
+    const uid = get().profile?.id;
+    if (!uid) return;
+    const { data, error } = await supabase.from('fiscal_records').select('*').eq('user_id', uid).order('created_at', { ascending: true });
     if (error) { console.error('Error cargando registros fiscales:', error); return; }
     set({ fiscalRecords: (data ?? []) as FiscalRecord[] });
   },
@@ -393,7 +405,9 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
   checkAndGenerateRecurringInvoices: async () => {
     // Esta función ahora solo refresca los datos, ya que la lógica real 
     // se ejecuta en una Supabase Edge Function mediante un CRON job.
-    const { data } = await supabase.from('recurring_invoices').select('*');
+    const uid = get().profile?.id;
+    if (!uid) return;
+    const { data } = await supabase.from('recurring_invoices').select('*').eq('user_id', uid);
     if (data) set({ recurringInvoices: data as RecurringInvoice[] });
   },
 
@@ -425,7 +439,9 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
   },
 
   recargarGastos: async () => {
-    const { data, error } = await supabase.from('expenses').select('*').order('created_at', { ascending: false });
+    const uid = get().profile?.id;
+    if (!uid) return;
+    const { data, error } = await supabase.from('expenses').select('*').eq('user_id', uid).order('created_at', { ascending: false });
     if (error) { console.error('Error recargando gastos:', error.message); return; }
     set({ expenses: (data ?? []) as Expense[] });
   },
