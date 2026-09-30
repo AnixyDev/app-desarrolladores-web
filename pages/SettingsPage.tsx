@@ -9,6 +9,7 @@ import Input from '@/components/ui/Input';
 import { UserIcon as User, BellIcon as Bell, ShieldIcon as Shield, CreditCard, Globe, RefreshCwIcon, ShieldCheckIcon, TrashIcon, UploadIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 import { nivelDeCaducidad } from '../supabase/functions/_shared/caducidad-certificado';
+import { correoDeRecordatorio, PLANTILLA_PROXIMA_POR_DEFECTO, PLANTILLA_VENCIDA_POR_DEFECTO, MAX_LONGITUD_PLANTILLA } from '../supabase/functions/_shared/recordatorios-cobro';
 
 import { formatearFecha } from '@/lib/utils';
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal' | 'connect';
@@ -219,6 +220,8 @@ const SettingsPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const [verEjemplo, setVerEjemplo] = useState(false);
 
   const handleUpdateNotifications = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -447,15 +450,28 @@ const SettingsPage: React.FC = () => {
                     />
                     Enviar recordatorios de pago automáticos a mis clientes
                   </label>
+                  <div className="rounded-lg bg-gray-800/60 p-3 text-sm text-gray-300 space-y-1">
+                    <p>Cada mañana se revisan tus facturas sin cobrar y se envía al email del cliente, <strong>una sola vez cada uno</strong>:</p>
+                    <ul className="list-disc pl-5 text-gray-400">
+                      <li>3 días antes del vencimiento (si la factura se emitió con al menos una semana de margen).</li>
+                      <li>A los 3, 15 y 30 días de vencer, si sigue pendiente.</li>
+                    </ul>
+                    <p className="text-gray-400">
+                      Sale en tu nombre («{(profile?.business_name || profile?.full_name || 'Tu negocio')} vía DevFreelancer») y las respuestas te llegan a ti.
+                      {profile?.stripe_onboarding_complete ? ' Incluye el enlace para pagar con tarjeta.' : ' Cuando actives los cobros con tarjeta, incluirá el enlace de pago.'}
+                      {' '}Puedes desactivarlos en una factura concreta desde su menú de acciones.
+                    </p>
+                  </div>
 
                   <div>
                     <label className="block text-sm text-gray-400 mb-1">Mensaje para facturas próximas a vencer</label>
                     <textarea
                       className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white text-sm"
                       rows={3}
+                      maxLength={MAX_LONGITUD_PLANTILLA}
                       value={notifData.reminder_template_upcoming}
                       onChange={(e) => setNotifData({ ...notifData, reminder_template_upcoming: e.target.value })}
-                      placeholder="Ej: Hola, te recordamos que la factura {numero} vence el {fecha}..."
+                      placeholder={PLANTILLA_PROXIMA_POR_DEFECTO}
                     />
                   </div>
 
@@ -464,10 +480,36 @@ const SettingsPage: React.FC = () => {
                     <textarea
                       className="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white text-sm"
                       rows={3}
+                      maxLength={MAX_LONGITUD_PLANTILLA}
                       value={notifData.reminder_template_overdue}
                       onChange={(e) => setNotifData({ ...notifData, reminder_template_overdue: e.target.value })}
-                      placeholder="Ej: Hola, la factura {numero} está pendiente de pago desde el {fecha}..."
+                      placeholder={PLANTILLA_VENCIDA_POR_DEFECTO}
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Puedes usar [ClientName], [InvoiceNumber], [Amount] y [DueDate]. Los enlaces que escribas se quitan: el único enlace del correo es el de pago.
+                    </p>
+                  </div>
+
+                  <div>
+                    <button type="button" onClick={() => setVerEjemplo(v => !v)} className="text-sm text-primary-400 hover:text-primary-300">
+                      {verEjemplo ? 'Ocultar ejemplo' : 'Ver cómo le llega al cliente'}
+                    </button>
+                    {verEjemplo && (() => {
+                      const ejemplo = correoDeRecordatorio({
+                        nivel: 3, cliente: 'Acme S.L.', numero: 'INV-2026-0007', pendienteCents: 121000,
+                        vencimiento: new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10),
+                        enlacePago: profile?.stripe_onboarding_complete ? 'https://devfreelancer.app/pay/…' : null,
+                        plantillaProxima: notifData.reminder_template_upcoming, plantillaVencida: notifData.reminder_template_overdue,
+                        firma: profile?.business_name || profile?.full_name || 'Tu negocio',
+                      });
+                      return (
+                        <div className="mt-2 rounded-lg border border-gray-700 bg-white p-4 text-sm text-gray-800">
+                          <p className="text-xs text-gray-500 mb-2">Asunto: <strong className="text-gray-800">{ejemplo.asunto}</strong></p>
+                          {/* HTML generado con escaparHtml: el texto del usuario está escapado. */}
+                          <div className="[&_a]:text-blue-600 [&_a]:underline [&_p]:mb-2" dangerouslySetInnerHTML={{ __html: ejemplo.html }} />
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex justify-end pt-2">

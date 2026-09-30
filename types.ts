@@ -153,6 +153,8 @@ export interface Invoice {
   motivo_rectificacion?: string | null;
   notes?: string | null;
   budget_id?: string | null;
+  /** Recordatorios de cobro automáticos para esta factura (por defecto, sí). */
+  recordatorios_activos?: boolean;
   contract_id?: string | null;
 }
 

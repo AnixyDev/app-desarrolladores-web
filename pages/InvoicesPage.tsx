@@ -9,7 +9,7 @@ import Input from '@/components/ui/Input';
 import { NewInvoice, Invoice, RecurringInvoice } from '@/types';
 import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { supabase } from '@/lib/supabaseClient';
-import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon, LinkIcon, ExternalLinkIcon, EditIcon, RefreshCwIcon, XCircleIcon } from '@/components/icons/Icon';
+import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon, LinkIcon, ExternalLinkIcon, EditIcon, RefreshCwIcon, XCircleIcon, BellIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal';
 import CreateRecurringInvoiceModal from '@/components/modals/CreateRecurringInvoiceModal';
@@ -132,6 +132,7 @@ export const accionesDeFactura = (inv: Pick<Invoice, 'fiscal_locked' | 'is_recti
 
 const InvoicesPage: React.FC = () => {
   const { invoices, recurringInvoices, clients, profile, fiscalRecords, getClientById, addInvoice, updateInvoice, rectificarFactura, deleteInvoice, deleteRecurringInvoice } = useAppStore(useShallow(s => ({ invoices: s.invoices, recurringInvoices: s.recurringInvoices, clients: s.clients, profile: s.profile, fiscalRecords: s.fiscalRecords, getClientById: s.getClientById, addInvoice: s.addInvoice, updateInvoice: s.updateInvoice, rectificarFactura: s.rectificarFactura, deleteInvoice: s.deleteInvoice, deleteRecurringInvoice: s.deleteRecurringInvoice })));
+  const cambiarRecordatoriosFactura = useAppStore(s => s.cambiarRecordatoriosFactura);
   const { addToast } = useToast();
 
   const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
@@ -151,6 +152,7 @@ const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets
   // Estado de pagos: mapa invoice_id -> { paidCents, count }
   const [paymentsByInvoice, setPaymentsByInvoice] = useState<Record<string, PaymentSummary>>({});
   const [paymentModalInvoiceId, setPaymentModalInvoiceId] = useState<string | null>(null);
+  const [recordatorios, setRecordatorios] = useState<Record<string, { nivel: number; enviado_en: string }>>({});
 
   const initialInvoiceState: NewInvoice = {
     client_id: '',
@@ -220,7 +222,28 @@ const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets
     });
 
     setPaymentsByInvoice(summary);
+
+    // Último recordatorio de cobro enviado de cada factura.
+    const { data: enviados } = await supabase
+      .from('recordatorios_cobro_enviados')
+      .select('invoice_id, nivel, enviado_en')
+      .in('invoice_id', invoiceIds);
+    const ultimo: Record<string, { nivel: number; enviado_en: string }> = {};
+    for (const r of enviados ?? []) {
+      if (!ultimo[r.invoice_id] || r.nivel > ultimo[r.invoice_id].nivel) ultimo[r.invoice_id] = r;
+    }
+    setRecordatorios(ultimo);
   }, [invoices]);
+
+  const alternarRecordatorios = async (inv: Invoice) => {
+    const activos = inv.recordatorios_activos === false;
+    try {
+      await cambiarRecordatoriosFactura(inv.id, activos);
+      addToast(activos ? 'Recordatorios activados para esta factura.' : 'Esta factura ya no enviará recordatorios.', 'success');
+    } catch (e) {
+      addToast((e as Error).message, 'error');
+    }
+  };
 
   useEffect(() => {
     fetchPaymentsSummary();
@@ -540,6 +563,16 @@ const handleSelectBudget = (budgetId: string) => {
             onEmail={() => handleSendEmailInvoice(inv)}
             onOpen={() => handleOpenPaymentLink(inv)}
           />
+          {profile?.payment_reminders_enabled && (
+            <button
+              onClick={() => alternarRecordatorios(inv)}
+              className={`p-1.5 transition-colors ${inv.recordatorios_activos === false ? 'text-gray-600 hover:text-gray-300' : 'text-primary-400 hover:text-primary-300'}`}
+              title={inv.recordatorios_activos === false ? 'Recordatorios desactivados en esta factura (pulsa para activarlos)' : 'Recordatorios automáticos activos (pulsa para desactivarlos en esta factura)'}
+              aria-pressed={inv.recordatorios_activos !== false}
+            >
+              <BellIcon className="w-4 h-4" />
+            </button>
+          )}
         </>
       )}
       {acciones.editar && (
@@ -657,6 +690,11 @@ const handleSelectBudget = (budgetId: string) => {
                                 style={{ width: `${progressPct}%` }}
                               />
                             </div>
+                            {recordatorios[inv.id] && status.label !== 'PAGADA' && (
+                              <div className="mt-1 text-[10px] text-gray-500" title={`Último recordatorio enviado el ${formatearFecha(recordatorios[inv.id].enviado_en)}`}>
+                                Recordada · {recordatorios[inv.id].nivel < 0 ? 'antes' : `${recordatorios[inv.id].nivel} d`}
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 py-3 sticky right-0 bg-gray-900/95 backdrop-blur-sm">
                             <div className="flex items-center justify-center gap-1">
