@@ -217,3 +217,24 @@ select cron.schedule(
   '10 6 * * *',
   $$select public.registrar_cuotas_autonomo_todas();$$
 );
+
+-- Recordatorios de cobro (30/09/2026): la Edge Function recordatorios-cobro,
+-- cada día a las 07:30 UTC.
+select cron.unschedule('recordatorios-cobro-diario')
+where exists (select 1 from cron.job where jobname = 'recordatorios-cobro-diario');
+
+select cron.schedule(
+  'recordatorios-cobro-diario',
+  '30 7 * * *',
+  $$
+  select net.http_post(
+    url := 'https://umqsjycqypxvhbhmidma.supabase.co/functions/v1/recordatorios-cobro',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || (
+        select decrypted_secret from vault.decrypted_secrets where name = 'cron_service_role_key'
+      )
+    )
+  ) as request_id;
+  $$
+);

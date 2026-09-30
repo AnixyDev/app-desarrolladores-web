@@ -61,6 +61,8 @@ export interface FinanceSlice {
   /** Factura rectificativa por diferencias. Sin líneas = abono total (anulación). */
   rectificarFactura: (id: string, items: InvoiceItem[], motivo: string) => Promise<Invoice>;
   deleteInvoice: (id: string) => Promise<void>;
+  /** Activa o desactiva los recordatorios de cobro automáticos de una factura. */
+  cambiarRecordatoriosFactura: (id: string, activos: boolean) => Promise<void>;
   markInvoiceAsPaid: (id: string) => Promise<void>;
 
   addRecurringInvoice: (recurringData: Omit<RecurringInvoice, 'id' | 'user_id' | 'created_at' | 'next_due_date'>) => Promise<void>;
@@ -316,6 +318,13 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
 
   // Una factura con registro fiscal no se borra: se anula con una
   // rectificativa (rectificarFactura sin líneas), que queda en el registro.
+  cambiarRecordatoriosFactura: async (id, activos) => {
+    // Columna fuera del bloqueo fiscal: se puede cambiar también en facturas con Veri*Factu.
+    const { error } = await supabase.from('invoices').update({ recordatorios_activos: activos }).eq('id', id);
+    if (error) { console.error('Error cambiando recordatorios:', error.message); throw new Error('No se pudieron cambiar los recordatorios de esta factura.'); }
+    set(state => ({ invoices: state.invoices.map(i => (i.id === id ? { ...i, recordatorios_activos: activos } : i)) }));
+  },
+
   deleteInvoice: async (id) => {
     const invoice = get().invoices.find(i => i.id === id);
     if (invoice?.fiscal_locked) {
