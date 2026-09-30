@@ -14,6 +14,8 @@ import { supabase } from '@/lib/supabaseClient';
 import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { calcularPrevision, type TipoMovimiento } from '@/lib/prevision';
 import { generateFinancialForecast, AI_CREDIT_COSTS } from '@/services/geminiService';
+import { cargarCuotasAutonomo } from '@/services/cuotaAutonomoService';
+import type { CuotaAutonomo } from '@/types';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import {
@@ -32,6 +34,7 @@ const NOMBRE_TIPO: Record<TipoMovimiento, string> = {
   recurrente: 'Facturas recurrentes',
   presupuesto: 'Presupuestos aceptados',
   'gasto-recurrente': 'Gastos recurrentes',
+  'cuota-autonomo': 'Cuota de autónomo',
   'gastos-variables': 'Gastos variables (estimados)',
   iva: 'IVA trimestral (estimado)',
 };
@@ -72,6 +75,11 @@ const ForecastingPage: React.FC = () => {
   const [analizando, setAnalizando] = useState(false);
   const [comprarCreditos, setComprarCreditos] = useState(false);
   const [verTodos, setVerTodos] = useState(false);
+  const [cuotas, setCuotas] = useState<CuotaAutonomo[]>([]);
+
+  useEffect(() => {
+    cargarCuotasAutonomo().then(setCuotas).catch(() => setCuotas([]));
+  }, []);
 
   // Cobros parciales: una factura pendiente solo aporta lo que falta por cobrar.
   const idsPendientes = useMemo(() => (invoices ?? []).filter(i => !i.paid).map(i => i.id), [invoices]);
@@ -112,8 +120,9 @@ const ForecastingPage: React.FC = () => {
     presupuestosSinFacturar,
     incluirPresupuestos,
     saldoInicialCents,
+    cuotasAutonomo: cuotas,
     nombreCliente: id => getClientById(id)?.name ?? 'Cliente',
-  }), [hoy, meses, invoices, cobrado, recurringInvoices, recurringExpenses, expenses, presupuestosSinFacturar, incluirPresupuestos, saldoInicialCents, getClientById]);
+  }), [hoy, meses, invoices, cobrado, recurringInvoices, recurringExpenses, expenses, presupuestosSinFacturar, incluirPresupuestos, saldoInicialCents, cuotas, getClientById]);
 
   const hayDatos = prevision.movimientos.length > 0;
   const netoTotal = prevision.totalCobros - prevision.totalPagos;
@@ -135,6 +144,7 @@ const ForecastingPage: React.FC = () => {
         saldo_acumulado_cents: m.saldo,
         facturas_vencidas_cents: m.porTipo.vencida,
         iva_cents: -m.porTipo.iva,
+        cuota_autonomo_cents: -m.porTipo['cuota-autonomo'],
       }));
       const res = await generateFinancialForecast([
         ...datos,
@@ -359,7 +369,8 @@ const ForecastingPage: React.FC = () => {
         Cómo se calcula: las facturas pendientes, en su vencimiento (las vencidas, este mes); las recurrentes se cobran 30 días después de emitirse;
         los presupuestos aceptados sin factura, a mitad del mes que viene; los gastos variables son la media de los 3 meses anteriores
         ({euros(prevision.mediaGastosVariablesCents)} al mes); el IVA es el repercutido menos el soportado de cada trimestre, en su plazo
-        del modelo 303. No incluye el IRPF (modelo 130) ni la cuota de autónomos. Es una estimación: confírmala con tu gestoría.
+        del modelo 303; la cuota de autónomo, el último día hábil de cada mes según lo que tengas en Gastos
+        {cuotas.length ? '' : ' (aún no la has configurado)'}. No incluye el IRPF (modelo 130). Es una estimación: confírmala con tu gestoría.
       </p>
 
       {comprarCreditos && (

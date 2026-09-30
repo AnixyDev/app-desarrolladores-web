@@ -207,3 +207,13 @@ select cron.schedule(
   '15 5 * * *',
   $$select public.recargar_creditos_mensuales();$$
 );
+
+-- Cuota de autónomo (29/09/2026): apunta cada día los meses ya cargados.
+select cron.unschedule('registrar-cuotas-autonomo')
+where exists (select 1 from cron.job where jobname = 'registrar-cuotas-autonomo');
+
+select cron.schedule(
+  'registrar-cuotas-autonomo',
+  '10 6 * * *',
+  $$select public.registrar_cuotas_autonomo_todas();$$
+);

@@ -71,6 +71,8 @@ export interface FinanceSlice {
   addExpense: (expense: Omit<Expense, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   updateExpense: (id: string, cambios: Partial<Omit<Expense, 'id' | 'user_id' | 'created_at'>>) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
+  /** Vuelve a leer los gastos (p. ej. tras apuntar cuotas de autónomo en el servidor). */
+  recargarGastos: () => Promise<void>;
 
   addRecurringExpense: (expense: Omit<RecurringExpense, 'id' | 'user_id' | 'created_at' | 'next_date'>) => Promise<void>;
   updateRecurringExpense: (id: string, cambios: Partial<Omit<RecurringExpense, 'id' | 'user_id' | 'created_at'>>) => Promise<void>;
@@ -411,6 +413,12 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
     const { error } = await supabase.from('expenses').delete().eq('id', id);
     if (error) { console.error('Error deleting expense:', error); throw error; }
     set(state => ({ expenses: state.expenses.filter(e => e.id !== id) }));
+  },
+
+  recargarGastos: async () => {
+    const { data, error } = await supabase.from('expenses').select('*').order('created_at', { ascending: false });
+    if (error) { console.error('Error recargando gastos:', error.message); return; }
+    set({ expenses: (data ?? []) as Expense[] });
   },
 
   addRecurringExpense: async (expense) => {

@@ -8,14 +8,16 @@
 //   - facturas recurrentes (se emiten en su fecha y se cobran a 30 días, que es
 //     el vencimiento que les pone process-recurring-invoices),
 //   - presupuestos aceptados que aún no tienen factura (opcional),
-//   - gastos recurrentes, gastos variables (media de los 3 meses anteriores),
+//   - gastos recurrentes, la cuota de autónomo (con su histórico), gastos
+//     variables (media de los 3 meses anteriores),
 //   - el IVA trimestral a ingresar (modelo 303), estimado.
 // No es contabilidad: es una estimación para ver con tiempo un mes flojo.
 
 import type { Invoice, RecurringInvoice, RecurringExpense, Expense, InvoiceItem } from '@/types';
 import { siguienteFecha } from '../supabase/functions/process-recurring-invoices/fechas';
+import { cargosFuturos, type TramoCuota } from './cuotaAutonomo';
 
-export type TipoMovimiento = 'factura' | 'vencida' | 'recurrente' | 'presupuesto' | 'gasto-recurrente' | 'gastos-variables' | 'iva';
+export type TipoMovimiento = 'factura' | 'vencida' | 'recurrente' | 'presupuesto' | 'gasto-recurrente' | 'cuota-autonomo' | 'gastos-variables' | 'iva';
 
 export interface MovimientoPrevisto {
   fecha: string; // AAAA-MM-DD
@@ -50,7 +52,7 @@ export interface ResultadoPrevision {
 export type FacturaPrevision = Pick<Invoice, 'id' | 'invoice_number' | 'client_id' | 'issue_date' | 'due_date' | 'subtotal_cents' | 'tax_percent' | 'total_cents' | 'paid'>;
 export type RecurrentePrevision = Pick<RecurringInvoice, 'id' | 'client_id' | 'items' | 'tax_percent' | 'frequency' | 'start_date' | 'next_due_date'>;
 export type GastoRecurrentePrevision = Pick<RecurringExpense, 'id' | 'amount_cents' | 'frequency' | 'start_date' | 'next_date' | 'description'>;
-export type GastoPrevision = Pick<Expense, 'amount_cents' | 'date' | 'tax_percent'>;
+export type GastoPrevision = Pick<Expense, 'amount_cents' | 'date' | 'tax_percent'> & { cuota_autonomo_mes?: string | null };
 
 export interface EntradaPrevision {
   hoy: string; // AAAA-MM-DD
@@ -63,10 +65,12 @@ export interface EntradaPrevision {
   presupuestosSinFacturar: { id: string; amount_cents: number; description?: string }[];
   incluirPresupuestos: boolean;
   saldoInicialCents: number;
+  /** Histórico de la cuota de autónomo («desde este mes pago X»). */
+  cuotasAutonomo?: TramoCuota[];
   nombreCliente?: (id: string) => string;
 }
 
-const TIPOS: TipoMovimiento[] = ['factura', 'vencida', 'recurrente', 'presupuesto', 'gasto-recurrente', 'gastos-variables', 'iva'];
+const TIPOS: TipoMovimiento[] = ['factura', 'vencida', 'recurrente', 'presupuesto', 'gasto-recurrente', 'cuota-autonomo', 'gastos-variables', 'iva'];
 const MESES_CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const DIA_MS = 86_400_000;
 
@@ -176,10 +180,19 @@ export function calcularPrevision(e: EntradaPrevision): ResultadoPrevision {
     }
   }
 
-  // 5) Gastos variables: media de los 3 meses completos anteriores.
-  const anteriores = mesesDesde(sumarDias(`${mesDe(e.hoy)}-01`, -85), 3); // los 3 meses previos
+  // 4b) Cuota de autónomo: último día hábil de cada mes, según su histórico.
+  //     Un mes que el servidor ya apuntó como gasto no se cuenta otra vez.
+  const cuotasApuntadas = new Set(e.gastos.map(g => g.cuota_autonomo_mes?.slice(0, 7)).filter(Boolean));
+  for (const c of cargosFuturos(e.cuotasAutonomo ?? [], e.hoy, fin)) {
+    if (cuotasApuntadas.has(c.mes.slice(0, 7))) continue;
+    empuja(c.fecha, 'cuota-autonomo', 'Cuota de autónomo (Seguridad Social)', -c.importe_cents);
+  }
+
+  // 5) Gastos variables: media de los 3 meses completos anteriores. Sin la
+  //    cuota de autónomo, que ya va aparte.
+    const anteriores = mesesDesde(sumarDias(`${mesDe(e.hoy)}-01`, -85), 3); // los 3 meses previos
   const sumaAnteriores = e.gastos
-    .filter(g => anteriores.includes(mesDe(g.date)))
+    .filter(g => anteriores.includes(mesDe(g.date)) && !g.cuota_autonomo_mes)
     .reduce((s, g) => s + (Number(g.amount_cents) || 0), 0);
   const media = Math.round(sumaAnteriores / 3);
   if (media > 0) {
