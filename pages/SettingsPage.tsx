@@ -543,6 +543,16 @@ const SettingsPage: React.FC = () => {
                     Cerrar sesión
                   </Button>
                 </div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-red-800/60 bg-red-950/20 p-4">
+                  <div>
+                    <p className="text-white font-medium">Eliminar mi cuenta</p>
+                    <p className="text-sm text-gray-400">Borra tu cuenta y tus datos para siempre. Antes podrás descargar tus facturas.</p>
+                  </div>
+                  <Button variant="danger" onClick={() => navigate('/cuenta/eliminar')}>
+                    <TrashIcon className="w-4 h-4 mr-2" />
+                    Eliminar mi cuenta
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

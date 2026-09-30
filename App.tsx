@@ -74,6 +74,8 @@ const AffiliateProgramPage = safeLazy(() => import('./pages/AffiliateProgramPage
 const BillingPage = safeLazy(() => import('./pages/BillingPage'));
 const PortalBrandingPage = safeLazy(() => import('./pages/PortalBrandingPage'));
 const SettingsPage = safeLazy(() => import('./pages/SettingsPage'));
+const EliminarCuentaPage = safeLazy(() => import('./pages/EliminarCuentaPage'));
+const CuentaEliminadaPage = safeLazy(() => import('./pages/CuentaEliminadaPage'));
 const AdminDashboard = safeLazy(() => import('./pages/AdminDashboard'));
 
 const PortalLayout = safeLazy(() => import('./pages/portal/PortalLayout'));
@@ -203,6 +205,7 @@ function App() {
                     <Route path="/privacy" element={<PrivacyPolicyPage />} />
                     <Route path="/terms" element={<TermsOfService />} />
                     <Route path="/pricing" element={<PricingPage />} />
+                    <Route path="/cuenta-eliminada" element={<Suspense fallback={<LoadingFallback />}><CuentaEliminadaPage /></Suspense>} />
                     {/* NUEVO: pago de facturas sin login del cliente — ver
                         PublicInvoicePayPage.tsx para el porqué. */}
                     <Route path="/pay/:invoiceId" element={<PublicInvoicePayPage />} />
@@ -251,6 +254,7 @@ function App() {
                         <Route path="billing" element={<BillingPage />} />
                         <Route path="portal-branding" element={<PortalBrandingPage />} />
                         <Route path="settings" element={<SettingsPage />} />
+                        <Route path="cuenta/eliminar" element={<EliminarCuentaPage />} />
                         <Route path="admin" element={<AdminDashboard />} />
                     </Route>
 
