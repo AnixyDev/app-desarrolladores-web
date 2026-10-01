@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/useToast';
 import { generateItemsForDocument, AI_CREDIT_COSTS } from '@/services/geminiService';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
 import { esClienteExtranjero, mencionSinIva } from '@/lib/ivaClientes';
+import AvisoNifFactura from '@/components/AvisoNifFactura';
 
 // Carga diferida — el modal de créditos solo se descarga si el usuario lo necesita
 const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
@@ -212,6 +213,7 @@ const CreateInvoicePage: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto pb-20">
+      <AvisoNifFactura nif={profile?.tax_id} />
 
       {/* Cabecera */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
