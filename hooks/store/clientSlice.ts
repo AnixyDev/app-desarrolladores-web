@@ -88,6 +88,8 @@ export const createClientSlice: StateCreator<AppState, [], [], ClientSlice> = (s
                 phone: client.phone,
                 tax_id: client.tax_id,
                 address: client.address,
+                tipo_fiscal: client.tipo_fiscal ?? 'nacional',
+                nif_iva: client.nif_iva ?? null,
             })
             .eq('id', client.id)
             .select()

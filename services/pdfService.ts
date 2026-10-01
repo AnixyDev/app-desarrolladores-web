@@ -1,6 +1,7 @@
 // services/pdfService.ts
 import type { Invoice, Client, Profile, Receipt, Contract } from '@/types';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
+import { mencionSinIva } from '@/lib/ivaClientes';
 import jsPDF from 'jspdf';
 import * as autoTableNamespace from 'jspdf-autotable';
 import QRCode from 'qrcode';
@@ -191,6 +192,8 @@ async function buildInvoicePdfDocument(
     doc.text(client.company || '', 14, 70);
     doc.text(client.email, 14, 75);
     if(client.tax_id) doc.text(`NIF/CIF: ${client.tax_id}`, 14, 80);
+    // NIF-IVA europeo: obligatorio en las facturas sin IVA a empresas de la UE.
+    if (client.nif_iva) doc.text(`NIF-IVA: ${client.nif_iva}`, 14, client.tax_id ? 85 : 80);
 
     // --- Table ---
     const tableColumn = ["Descripción", "Cant.", "Precio", "Total"];
@@ -233,6 +236,14 @@ async function buildInvoicePdfDocument(
     doc.setFontSize(12);
     doc.text('TOTAL:', labelX, currentY, { align: 'right' });
     doc.text(formatCurrency(totals.total), valueX, currentY, { align: 'right' });
+
+    // --- Mención legal de la factura sin IVA (RD 1619/2012, art. 6.1.j/m) ---
+    const mencion = mencionSinIva(invoice.motivo_sin_iva);
+    if (mencion) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text(doc.splitTextToSize(mencion, 182), 14, currentY + 12);
+    }
 
     // --- Footer ---
     doc.setFontSize(8);

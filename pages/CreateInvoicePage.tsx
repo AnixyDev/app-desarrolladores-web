@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -11,6 +11,7 @@ import { PlusIcon, TrashIcon, SparklesIcon, RepeatIcon } from '@/components/icon
 import { useToast } from '@/hooks/useToast';
 import { generateItemsForDocument, AI_CREDIT_COSTS } from '@/services/geminiService';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
+import { esClienteExtranjero, mencionSinIva } from '@/lib/ivaClientes';
 
 // Carga diferida — el modal de créditos solo se descarga si el usuario lo necesita
 const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
@@ -90,6 +91,29 @@ const CreateInvoicePage: React.FC = () => {
     () => projects.filter((p) => p.client_id === newInvoice.client_id),
     [projects, newInvoice.client_id]
   );
+
+  // ── Cliente extranjero: la factura va sin IVA español ─────────────────────
+  // Al elegir un cliente de la UE o de fuera, el IVA y el IRPF pasan a 0 %
+  // (siguen siendo editables). La base de datos deduce el motivo y el PDF
+  // imprime la mención legal. Si se vuelve a un cliente nacional, IVA al 21 %.
+  const clienteSeleccionado = clients.find((c) => c.id === newInvoice.client_id);
+  const tipoFiscal = clienteSeleccionado?.tipo_fiscal ?? 'nacional';
+  const extranjero = esClienteExtranjero(tipoFiscal);
+  const tipoFiscalAnterior = useRef<typeof tipoFiscal>('nacional');
+
+  useEffect(() => {
+    const antes = esClienteExtranjero(tipoFiscalAnterior.current);
+    tipoFiscalAnterior.current = tipoFiscal;
+    if (extranjero && !antes) {
+      setNewInvoice((prev) => ({ ...prev, tax_percent: 0, irpf_percent: 0 }));
+    } else if (!extranjero && antes) {
+      setNewInvoice((prev) => ({ ...prev, tax_percent: 21 }));
+    }
+  }, [tipoFiscal, extranjero]);
+
+  const mencionPrevista = extranjero && Number(newInvoice.tax_percent) === 0
+    ? mencionSinIva(tipoFiscal === 'empresa_ue' ? 'inversion_sujeto_pasivo_ue' : 'no_sujeta_fuera_ue')
+    : null;
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -248,6 +272,21 @@ const CreateInvoicePage: React.FC = () => {
           <Input label="Fecha vencimiento" type="date" name="due_date" value={newInvoice.due_date} onChange={handleInputChange} />
           <Input label="IVA (%)" type="number" name="tax_percent" value={newInvoice.tax_percent} onChange={handleInputChange} min={0} max={100} />
           <Input label="IRPF (%)" type="number" name="irpf_percent" value={newInvoice.irpf_percent} onChange={handleInputChange} min={0} max={100} />
+          {mencionPrevista && (
+            <p className="col-span-2 sm:col-span-4 text-xs text-gray-400">
+              Cliente fuera de España: la factura sale sin IVA español y con esta mención: «{mencionPrevista}»
+            </p>
+          )}
+          {extranjero && Number(newInvoice.tax_percent) !== 0 && (
+            <p className="col-span-2 sm:col-span-4 text-xs text-yellow-400">
+              Este cliente está marcado como extranjero, pero la factura lleva IVA. Revísalo antes de emitirla.
+            </p>
+          )}
+          {tipoFiscal === 'empresa_ue' && !clienteSeleccionado?.nif_iva && (
+            <p className="col-span-2 sm:col-span-4 text-xs text-red-400">
+              Falta el NIF-IVA de este cliente: añádelo en su ficha para poder facturarle sin IVA.
+            </p>
+          )}
         </CardContent>
       </Card>
 

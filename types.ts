@@ -95,7 +95,14 @@ export interface Client {
    * navegador es de solo lectura.
    */
   portal_invitado_en?: string | null;
+  /** Decide si sus facturas llevan IVA español (ver lib/ivaClientes.ts). */
+  tipo_fiscal?: TipoFiscalCliente;
+  /** NIF-IVA europeo (prefijo de país + número). Obligatorio para empresa_ue. */
+  nif_iva?: string | null;
 }
+
+export type TipoFiscalCliente = 'nacional' | 'empresa_ue' | 'fuera_ue';
+export type MotivoSinIva = 'inversion_sujeto_pasivo_ue' | 'no_sujeta_fuera_ue';
 
 export interface Project {
   id: string;
@@ -156,6 +163,12 @@ export interface Invoice {
   /** Recordatorios de cobro automáticos para esta factura (por defecto, sí). */
   recordatorios_activos?: boolean;
   contract_id?: string | null;
+  /**
+   * Por qué la factura no lleva IVA español. Lo deduce la base de datos a
+   * partir del tipo fiscal del cliente cuando el IVA es 0 %; el PDF imprime
+   * la mención legal. Inmutable tras el registro fiscal.
+   */
+  motivo_sin_iva?: MotivoSinIva | null;
 }
 
 export interface Receipt {
@@ -335,7 +348,7 @@ export interface ProjectMessage {
   created_at: string;
 }
 export interface Notification { id: string; message: string; link?: string; isRead: boolean; createdAt: string; }
-export interface NewClient { name: string; email: string; company?: string; phone?: string; tax_id?: string; address?: string; }
+export interface NewClient { name: string; email: string; company?: string; phone?: string; tax_id?: string; address?: string; tipo_fiscal?: TipoFiscalCliente; nif_iva?: string | null; }
 export interface GoogleJwtPayload { email: string; name?: string; picture?: string; sub: string; }
 export interface TeamMembership {
   membershipId: string;

@@ -7,11 +7,12 @@ import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
-import { Client, NewClient } from '@/types';
+import { Client, NewClient, TipoFiscalCliente } from '@/types';
 // FIX: Aliased Users to UsersIcon to match usage.
 import { EditIcon, TrashIcon, PhoneIcon, MailIcon, Users as UsersIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
 import EmptyState from '@/components/ui/EmptyState';
+import { TIPOS_FISCALES, normalizarNifIva, nifIvaValido } from '@/lib/ivaClientes';
 
 const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
 const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
@@ -24,6 +25,8 @@ const initialClientState: NewClient = {
     phone: '',
     tax_id: '',
     address: '',
+    tipo_fiscal: 'nacional',
+    nif_iva: '',
 };
 
 const ClientsPage: React.FC = () => {
@@ -39,7 +42,7 @@ const ClientsPage: React.FC = () => {
     // mientras la llamada a Supabase está en curso.
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
@@ -76,13 +79,28 @@ const ClientsPage: React.FC = () => {
         e.preventDefault();
         if (!formData.name || !formData.email) return;
 
+        // El NIF-IVA solo se guarda para empresas de la UE, donde es obligatorio
+        // (sin él no se puede facturar sin IVA). Un cliente de fuera de la UE
+        // usa el campo NIF/CIF para su número fiscal.
+        const tipoFiscal: TipoFiscalCliente = formData.tipo_fiscal ?? 'nacional';
+        const nifIva = tipoFiscal === 'empresa_ue' ? normalizarNifIva(formData.nif_iva) : null;
+        if (tipoFiscal === 'empresa_ue' && !nifIva) {
+            addToast('Indica el NIF-IVA de la empresa (por ejemplo, DE123456789).', 'error');
+            return;
+        }
+        if (nifIva && !nifIvaValido(nifIva)) {
+            addToast('El NIF-IVA debe empezar por el código del país (por ejemplo, FR12345678901).', 'error');
+            return;
+        }
+        const datos = { ...formData, tipo_fiscal: tipoFiscal, nif_iva: nifIva };
+
         setIsSaving(true);
         try {
             if (editingClient) {
-                await updateClient(formData as Client);
+                await updateClient(datos as Client);
                 addToast('Cliente actualizado con éxito', 'success');
             } else {
-                const created = await addClient(formData as NewClient);
+                const created = await addClient(datos as NewClient);
                 if (!created) {
                     // addClient devuelve null si algo falló en el store.
                     throw new Error('No se pudo crear el cliente');
@@ -174,6 +192,33 @@ const ClientsPage: React.FC = () => {
                     <Input name="email" label="Email" type="email" value={formData.email} onChange={handleInputChange} required />
                     <Input name="phone" label="Teléfono (Opcional)" value={formData.phone} onChange={handleInputChange} />
                     <Input name="address" label="Dirección (Opcional)" value={formData.address || ''} onChange={handleInputChange} />
+                    <div>
+                        <label htmlFor="tipo_fiscal" className="block text-sm text-gray-400 mb-1">¿Dónde está el cliente?</label>
+                        <select
+                            id="tipo_fiscal"
+                            name="tipo_fiscal"
+                            value={formData.tipo_fiscal ?? 'nacional'}
+                            onChange={handleInputChange}
+                            className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        >
+                            {TIPOS_FISCALES.map(t => (
+                                <option key={t.valor} value={t.valor}>{t.etiqueta}</option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                            {TIPOS_FISCALES.find(t => t.valor === (formData.tipo_fiscal ?? 'nacional'))?.ayuda}
+                        </p>
+                    </div>
+                    {formData.tipo_fiscal === 'empresa_ue' && (
+                        <Input
+                            name="nif_iva"
+                            label="NIF-IVA europeo"
+                            value={formData.nif_iva || ''}
+                            onChange={handleInputChange}
+                            placeholder="Ej: DE123456789"
+                            required
+                        />
+                    )}
                     <div className="flex justify-end pt-4">
                         <Button type="submit" isLoading={isSaving} disabled={isSaving}>
                             {isSaving ? 'Guardando...' : 'Guardar Cliente'}
