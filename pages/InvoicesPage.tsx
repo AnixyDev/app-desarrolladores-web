@@ -9,6 +9,7 @@ import Input from '@/components/ui/Input';
 import { NewInvoice, Invoice, RecurringInvoice } from '@/types';
 import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { esClienteExtranjero, mencionSinIva } from '@/lib/ivaClientes';
+import AvisoNifFactura from '@/components/AvisoNifFactura';
 import { supabase } from '@/lib/supabaseClient';
 import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon, LinkIcon, ExternalLinkIcon, EditIcon, RefreshCwIcon, XCircleIcon, BellIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
@@ -835,6 +836,7 @@ const handleSelectBudget = (budgetId: string) => {
 
       <Modal isOpen={isInvoiceModalOpen} onClose={handleCloseInvoiceModal} title={facturaBase ? `${TITULO_DEL_MODO[modo]} ${facturaBase.invoice_number}` : TITULO_DEL_MODO[modo]}>
         <form onSubmit={handleAddInvoice} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+          {modo === 'crear' && <AvisoNifFactura nif={profile?.tax_id} />}
           {esCorreccion && facturaBase && (
             <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-100 space-y-1">
               {modo === 'anular' ? (

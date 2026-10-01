@@ -219,6 +219,13 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Usuario no autenticado");
 
+  // El NIF del emisor es obligatorio en toda factura (RD 1619/2012, art. 6.1.d)
+  // y sin él no se puede generar el registro fiscal ni el QR. Se comprueba
+  // antes de pedir el número para no dejar huecos en la serie.
+  if (!get().profile?.tax_id?.trim()) {
+    throw new Error('Añade tu NIF en Ajustes antes de emitir facturas: es obligatorio en toda factura.');
+  }
+
   // Cálculos de negocio (mantener lógica)
   const { subtotal, total } = totalesDeFactura(invoiceData.items, invoiceData.tax_percent, invoiceData.irpf_percent ?? 0);
 
