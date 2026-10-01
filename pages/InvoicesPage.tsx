@@ -8,6 +8,7 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { NewInvoice, Invoice, RecurringInvoice } from '@/types';
 import { formatCurrency, formatearFecha } from '@/lib/utils';
+import { esClienteExtranjero, mencionSinIva } from '@/lib/ivaClientes';
 import { supabase } from '@/lib/supabaseClient';
 import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon, LinkIcon, ExternalLinkIcon, EditIcon, RefreshCwIcon, XCircleIcon, BellIcon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/useToast';
@@ -366,6 +367,22 @@ const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets
     setTaxPercent(21);
     setIrpfPercent(0);
   };
+
+  // Cliente extranjero: al elegirlo, IVA e IRPF pasan a 0 % (siguen editables);
+  // al volver a un cliente nacional, IVA al 21 %. La base de datos deduce el
+  // motivo y el PDF imprime la mención legal.
+  const tipoFiscalDe = (clientId: string) => clients.find(c => c.id === clientId)?.tipo_fiscal ?? 'nacional';
+  const cambiarCliente = (clientId: string) => {
+    const antes = esClienteExtranjero(tipoFiscalDe(newInvoice.client_id));
+    const ahora = esClienteExtranjero(tipoFiscalDe(clientId));
+    setNewInvoice({ ...newInvoice, client_id: clientId });
+    if (ahora && !antes) { setTaxPercent(0); setIrpfPercent(0); }
+    else if (!ahora && antes) { setTaxPercent(21); }
+  };
+  const tipoFiscalElegido = tipoFiscalDe(newInvoice.client_id);
+  const mencionPrevista = esClienteExtranjero(tipoFiscalElegido) && taxPercent === 0
+    ? mencionSinIva(tipoFiscalElegido === 'empresa_ue' ? 'inversion_sujeto_pasivo_ue' : 'no_sujeta_fuera_ue')
+    : null;
 
   const availableBudgets = useMemo(() => {
   if (!newInvoice.client_id) return [];
@@ -838,7 +855,7 @@ const handleSelectBudget = (budgetId: string) => {
             <select
               className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
               value={newInvoice.client_id}
-              onChange={(e) => setNewInvoice({ ...newInvoice, client_id: e.target.value })}
+              onChange={(e) => cambiarCliente(e.target.value)}
               required
               disabled={esCorreccion}
             >
@@ -990,6 +1007,16 @@ const handleSelectBudget = (budgetId: string) => {
                 className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white"
               />
             </div>
+            {mencionPrevista && (
+              <p className="sm:col-span-2 text-xs text-gray-400">
+                Cliente fuera de España: la factura sale sin IVA español y con esta mención: «{mencionPrevista}»
+              </p>
+            )}
+            {esClienteExtranjero(tipoFiscalElegido) && taxPercent !== 0 && (
+              <p className="sm:col-span-2 text-xs text-yellow-400">
+                Este cliente está marcado como extranjero, pero la factura lleva IVA. Revísalo antes de emitirla.
+              </p>
+            )}
           </div>
 
           )}

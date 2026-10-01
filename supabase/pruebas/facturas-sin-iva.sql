@@ -116,5 +116,17 @@ begin
     v_res := v_res || E'\n  OK   11) cliente nacional al 0 % no recibe motivo';
   else v_res := v_res || E'\n  FALLA 11) cliente nacional recibió motivo'; v_f := v_f + 1; end if;
 
+  -- 12) Un borrador al 0 % sigue al cliente si cambia su tipo fiscal.
+  update public.clients set tipo_fiscal = 'fuera_ue' where id = v_usa;
+  if (select motivo_sin_iva from public.invoices where id = v_fac) = 'no_sujeta_fuera_ue' then
+    v_res := v_res || E'\n  OK   12) el borrador toma el motivo del nuevo tipo fiscal';
+  else v_res := v_res || E'\n  FALLA 12) el borrador no siguió al cliente'; v_f := v_f + 1; end if;
+
+  -- 13) Una factura con registro fiscal no cambia aunque cambie el cliente.
+  update public.clients set tipo_fiscal = 'fuera_ue' where id = v_ue;
+  if (select count(*) from public.invoices where client_id = v_ue and fiscal_locked and motivo_sin_iva = 'inversion_sujeto_pasivo_ue') = 1 then
+    v_res := v_res || E'\n  OK   13) la factura registrada conserva su motivo';
+  else v_res := v_res || E'\n  FALLA 13) cambió una factura registrada'; v_f := v_f + 1; end if;
+
   raise exception E'RESULTADO (se deshace todo): % fallos%', v_f, v_res;
 end $$;
