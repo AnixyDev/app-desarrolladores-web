@@ -11,6 +11,7 @@ import { GoogleIcon } from '../../components/icons/GoogleIcon';
 import CaptchaTurnstile, { type CaptchaTurnstileHandle } from '../../components/auth/CaptchaTurnstile';
 import { puedeEnviarConCaptcha } from '../../lib/captcha';
 import { codigoDeLaUrl, guardarCodigoPendiente, leerCodigoPendiente } from '../../lib/afiliados';
+import { guardarIntencionFundadores, pideFundadores } from '../../lib/intencionFundadores';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -34,6 +35,13 @@ const RegisterPage: React.FC = () => {
         const codigo = codigoDeLaUrl(location.search);
         if (codigo) guardarCodigoPendiente(codigo);
     }, [location.search]);
+
+    // Enlace con ?oferta=fundadores (desde /pricing o compartido en redes):
+    // tras crear la cuenta, la app lleva directamente al pago de fundadores.
+    const vieneAFundadores = pideFundadores(location.search);
+    useEffect(() => {
+        if (vieneAFundadores) guardarIntencionFundadores();
+    }, [vieneAFundadores]);
 
     const emailInvalid = emailTouched && email.length > 0 && !EMAIL_REGEX.test(email);
 
@@ -89,6 +97,11 @@ const RegisterPage: React.FC = () => {
             <div className="mb-6 text-center">
                 <h2 className="text-2xl font-black italic tracking-tight text-white">Crear cuenta</h2>
                 <p className="mt-1 text-sm text-gray-400">Empieza a gestionar tu negocio freelance</p>
+                {vieneAFundadores && (
+                    <p className="mt-3 rounded-lg border border-primary-500/40 bg-primary-500/10 px-3 py-2 text-sm text-primary-200">
+                        Plan Fundadores: al entrar en tu cuenta te llevamos directamente al pago.
+                    </p>
+                )}
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
