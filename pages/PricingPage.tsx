@@ -20,6 +20,7 @@ import Button from '@/components/ui/Button';
 import { CheckCircleIcon, CreditCard, Users, SettingsIcon } from '@/components/icons/Icon';
 // Los precios salen del catalogo, junto al priceId con el que Stripe cobra.
 import { precioDe } from '../supabase/functions/_shared/catalogo-stripe';
+import OfertaFundadores from '@/components/OfertaFundadores';
 
 const PricingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -96,6 +97,12 @@ const PricingPage: React.FC = () => {
             <button onClick={() => setBillingCycle('yearly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Anual <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-lg border border-green-500/30">-20%</span></button>
           </div>
         </div>
+
+        {/* Plan Fundadores: contador real del servidor; se oculta solo si no hay plazas o ha cerrado. */}
+        <OfertaFundadores
+          textoBoton="Crear cuenta para conseguirla"
+          onElegir={() => navigate('/auth/register')}
+        />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto">
           <PlanCard

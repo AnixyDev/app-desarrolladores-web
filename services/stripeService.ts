@@ -181,3 +181,58 @@ export const redirectToCustomerPortal = async () => {
     window.location.href = data.url;
   }
 };
+
+/* -------------------------
+   Plan Fundadores
+-------------------------- */
+
+// El contador y la comprobación viven en el servidor (Edge Functions
+// plazas-fundadores y checkout-fundadores). Aquí no hay ningún número fijo:
+// si el servidor no responde, la oferta no se muestra.
+
+export interface PlazasFundadores {
+  total: number;
+  restantes: number;
+  disponible: boolean;
+  /** Instante de cierre de la oferta (ISO), tal y como lo fija el servidor. */
+  cierre: string;
+}
+
+export const obtenerPlazasFundadores = async (): Promise<PlazasFundadores | null> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('plazas-fundadores', { method: 'GET' });
+    if (error || !data) return null;
+    if (typeof data.total !== 'number' || typeof data.restantes !== 'number' || typeof data.disponible !== 'boolean') {
+      return null;
+    }
+    return data as PlazasFundadores;
+  } catch {
+    return null;
+  }
+};
+
+/** Lee el mensaje de error que devuelve una Edge Function con estado no 2xx. */
+const mensajeDelServidor = async (error: any, porDefecto: string): Promise<string> => {
+  try {
+    const cuerpo = await error?.context?.json?.();
+    if (cuerpo?.error && typeof cuerpo.error === 'string') return cuerpo.error;
+  } catch { /* cuerpo ilegible */ }
+  return porDefecto;
+};
+
+export const redirectToCheckoutFundadores = async () => {
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !session) throw new Error('Inicia sesión para continuar.');
+
+  const { data, error } = await supabase.functions.invoke('checkout-fundadores', {
+    body: {},
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+
+  // El servidor explica por qué no se puede (sin plazas, oferta cerrada, ya
+  // suscrito): se enseña ese mensaje tal cual.
+  if (error) throw new Error(await mensajeDelServidor(error, 'Error al conectar con el servicio de pago.'));
+  if (!data?.url) throw new Error('URL de sesión no generada.');
+
+  window.location.href = data.url;
+};

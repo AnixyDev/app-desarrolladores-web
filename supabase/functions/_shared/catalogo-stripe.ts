@@ -39,6 +39,11 @@ export interface ArticuloStripe {
   precio?: string;
   /** 'mes' o 'ano' para las suscripciones. Vacio en los pagos unicos. */
   periodo?: 'mes' | 'año';
+  /**
+   * Edge Function propia que vende este articulo cuando no va por
+   * create-checkout-session (p. ej. el Plan Fundadores, con plazas limitadas).
+   */
+  checkoutPropio?: 'checkout-fundadores';
 }
 
 // CAMBIO (subida de precios, ago 2026): priceId de proPlan y teamsPlan
@@ -75,6 +80,19 @@ export const STRIPE_ITEMS = {
     name: 'Plan de equipos (Anual)',
     precio: '395€',
     periodo: 'año',
+  },
+  // Plan Fundadores (oct 2026): Pro a 59 €/año para siempre, 50 plazas hasta
+  // el 31/12/2026. priceId null A PROPÓSITO: no se puede comprar por
+  // create-checkout-session. Solo por checkout-fundadores, que busca el precio
+  // en Stripe por su lookup key y comprueba plazas y fecha en el servidor
+  // (ver _shared/fundadores.ts).
+  proPlanFundadores: {
+    priceId: null,
+    mode: 'subscription',
+    name: 'Freelancer Pro — Plan Fundadores (Anual)',
+    precio: '59€',
+    periodo: 'año',
+    checkoutPropio: 'checkout-fundadores',
   },
   aiCredits100: {
     priceId: 'price_1SOgpy8oC5awQy15TW22fBot',
