@@ -6,7 +6,8 @@ import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Skeleton from '@/components/ui/Skeleton';
 import { CheckCircleIcon, CreditCard, Users, RefreshCwIcon, SettingsIcon } from '@/components/icons/Icon';
-import { redirectToCheckout, redirectToCustomerPortal, StripeItemKey } from '@/services/stripeService';
+import { redirectToCheckout, redirectToCheckoutFundadores, redirectToCustomerPortal, StripeItemKey } from '@/services/stripeService';
+import OfertaFundadores from '@/components/OfertaFundadores';
 import { useToast } from '@/hooks/useToast';
 // Los precios salen del catalogo, junto al priceId con el que Stripe cobra.
 import { precioDe } from '../supabase/functions/_shared/catalogo-stripe';
@@ -60,6 +61,18 @@ const BillingPage: React.FC = () => {
         } catch (error: any) {
             addToast('No se pudo abrir el portal de facturación en este momento.', 'error');
             setIsPortalLoading(false);
+        }
+    };
+
+    // Plan Fundadores: plazas, fecha y suscripción previa se comprueban en el
+    // servidor (checkout-fundadores); aquí solo se muestra su mensaje.
+    const handleFundadores = async () => {
+        setIsLoadingAction('proPlanFundadores');
+        try {
+            await redirectToCheckoutFundadores();
+        } catch (error: any) {
+            addToast(error.message || 'Error al conectar con Stripe. Revisa tu conexión.', 'error');
+            setIsLoadingAction(null);
         }
     };
 
@@ -138,6 +151,15 @@ const BillingPage: React.FC = () => {
                         Configurar suscripción y métodos de pago
                     </button>
                 </div>
+            )}
+
+            {/* Solo quien no tiene plan de pago: la oferta es para nuevas suscripciones. */}
+            {!isPro && !isTeams && (
+                <OfertaFundadores
+                    textoBoton="Quiero mi plaza de fundador"
+                    onElegir={handleFundadores}
+                    cargando={isLoadingAction === 'proPlanFundadores'}
+                />
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 max-w-5xl mx-auto">

@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@13.10.0?target=deno'
 import { suscripcionDeLaFactura, precioDeLaFactura } from '../_shared/stripe-facturas.ts'
 import { articulo } from '../_shared/catalogo-stripe.ts'
+import { ITEM_KEY_FUNDADORES, LOOKUP_KEY_FUNDADORES, precioFundadores } from '../_shared/fundadores.ts'
 
 declare const Deno: any;
 
@@ -50,6 +51,32 @@ function resolvePlanFromPriceId(priceId: string | undefined | null): 'Pro' | 'Te
   if (TEAMS_PRICE_IDS.has(priceId)) return 'Teams'
   if (PRO_PRICE_IDS.has(priceId)) return 'Pro'
   return null
+}
+
+// Plan Fundadores (oct 2026): su precio no está en los sets de arriba porque
+// se identifica por lookup key (la misma en modo prueba y real). En las
+// suscripciones el precio llega con su lookup_key; en las facturas (API
+// clover) solo llega el id, así que se compara con el id del precio de
+// fundadores, buscado una vez en Stripe y guardado mientras viva la función.
+let idPrecioFundadores: string | null = null
+async function esPrecioFundadores(priceId: string | null | undefined): Promise<boolean> {
+  if (!priceId) return false
+  if (!idPrecioFundadores) {
+    // Solo sirve para la etiqueta del ingreso: si Stripe falla aquí, no se
+    // bloquea el evento (la factura se apunta como «Suscripción»).
+    try {
+      idPrecioFundadores = (await precioFundadores(stripe))?.id ?? null
+    } catch (e) {
+      console.error('⚠️ No se pudo buscar el precio de fundadores:', e)
+      return false
+    }
+  }
+  return priceId === idPrecioFundadores
+}
+
+function planDeLaSuscripcion(price: { id?: string; lookup_key?: string | null } | undefined | null): 'Pro' | 'Teams' | null {
+  if (price?.lookup_key === LOOKUP_KEY_FUNDADORES) return 'Pro'
+  return resolvePlanFromPriceId(price?.id)
 }
 
 serve(async (req) => {
@@ -183,8 +210,14 @@ serve(async (req) => {
           // hacia bien con Math.max y un comentario que dice justo esto; a
           // esta se le habia olvidado. Ahora usan el mismo criterio: los
           // creditos de bienvenida son un SUELO, nunca un techo.
-          if (itemKey === 'proPlan' || itemKey === 'teamsPlan' || itemKey === 'teamsPlanYearly') {
-            const esTeams = itemKey !== 'proPlan'
+          // CAMBIO (oct 2026): se añaden 'proPlanYearly', que no estaba y
+          // recibía el plan solo cuando llegaba customer.subscription.updated
+          // (unos segundos tarde), y el Plan Fundadores. esTeams se decide por
+          // el prefijo: antes era `itemKey !== 'proPlan'`, que con más claves
+          // Pro las habría tratado como Teams.
+          const CLAVES_DE_PLAN = ['proPlan', 'proPlanYearly', ITEM_KEY_FUNDADORES, 'teamsPlan', 'teamsPlanYearly']
+          if (itemKey && CLAVES_DE_PLAN.includes(itemKey)) {
+            const esTeams = itemKey.startsWith('teamsPlan')
             const bienvenida = esTeams ? TEAMS_PLAN_WELCOME_CREDITS : PRO_PLAN_WELCOME_CREDITS
             const { data: profile } = await supabase
               .from('profiles').select('ai_credits').eq('id', userId).maybeSingle()
@@ -281,8 +314,7 @@ serve(async (req) => {
 
           // FIX: resolver el plan real (Pro vs Teams) mirando el price_id
           // de la suscripcion, en vez de asumir 'Pro' siempre.
-          const priceId = subscription.items.data[0]?.price?.id
-          const resolvedPlan = resolvePlanFromPriceId(priceId)
+          const resolvedPlan = planDeLaSuscripcion(subscription.items.data[0]?.price)
 
           const { data: currentProfile } = await supabase
             .from('profiles')
@@ -338,7 +370,8 @@ serve(async (req) => {
           break
         }
 
-        const plan = resolvePlanFromPriceId(precioDeLaFactura(invoice))
+        const precioFactura = precioDeLaFactura(invoice)
+        const plan = resolvePlanFromPriceId(precioFactura) ?? ((await esPrecioFundadores(precioFactura)) ? 'Pro' : null)
         await apuntarIngreso({
           userId,
           email: invoice.customer_email ?? null,

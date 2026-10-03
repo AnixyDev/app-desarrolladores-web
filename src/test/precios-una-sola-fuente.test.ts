@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { STRIPE_ITEMS, precioDe, esComprablePorCheckout } from '../../supabase/functions/_shared/catalogo-stripe';
+import { STRIPE_ITEMS, articulo, precioDe, esComprablePorCheckout } from '../../supabase/functions/_shared/catalogo-stripe';
 
 // El modal de conversion a Teams —el que abren OCHO paginas cuando un usuario
 // Free topa con un limite— anunciaba 35,95 euros por un plan que cobra 45,95.
@@ -19,6 +19,7 @@ const PANTALLAS_CON_PRECIO = [
   'pages/BillingPage.tsx',
   'components/modals/UpgradeModal.tsx',
   'components/modals/BuyCreditsModal.tsx',
+  'components/OfertaFundadores.tsx',
 ];
 
 describe('el catalogo tiene el precio de todo lo que se vende', () => {
@@ -61,7 +62,9 @@ describe('el catalogo tiene el precio de todo lo que se vende', () => {
   it('todo lo que tiene precio se puede comprar de verdad', () => {
     for (const clave of Object.keys(STRIPE_ITEMS)) {
       if (precioDe(clave) !== null) {
-        expect(esComprablePorCheckout(clave), `${clave} tiene precio pero no priceId`).toBe(true);
+        // O va por create-checkout-session, o declara la funcion que lo vende.
+        const vendible = esComprablePorCheckout(clave) || !!articulo(clave)?.checkoutPropio;
+        expect(vendible, `${clave} tiene precio pero no se puede comprar`).toBe(true);
       }
     }
   });
