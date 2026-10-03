@@ -21,9 +21,24 @@ import { CheckCircleIcon, CreditCard, Users, SettingsIcon } from '@/components/i
 // Los precios salen del catalogo, junto al priceId con el que Stripe cobra.
 import { precioDe } from '../supabase/functions/_shared/catalogo-stripe';
 import OfertaFundadores from '@/components/OfertaFundadores';
+import { useAppStore } from '@/hooks/useAppStore';
+import { RUTA_PAGO_FUNDADORES, guardarIntencionFundadores } from '@/lib/intencionFundadores';
 
 const PricingPage: React.FC = () => {
   const navigate = useNavigate();
+  const isAuthenticated = useAppStore(state => state.isAuthenticated);
+
+  // Plan Fundadores: con sesión, directo al pago; sin sesión, se recuerda la
+  // intención y, al terminar el registro (correo o Google), la app le lleva
+  // al pago (ver lib/intencionFundadores.ts y AlEntrarConOferta).
+  const elegirFundadores = () => {
+    if (isAuthenticated) {
+      navigate(RUTA_PAGO_FUNDADORES);
+      return;
+    }
+    guardarIntencionFundadores();
+    navigate('/auth/register?oferta=fundadores');
+  };
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
 
   const PlanCard = ({
@@ -100,8 +115,8 @@ const PricingPage: React.FC = () => {
 
         {/* Plan Fundadores: contador real del servidor; se oculta solo si no hay plazas o ha cerrado. */}
         <OfertaFundadores
-          textoBoton="Crear cuenta para conseguirla"
-          onElegir={() => navigate('/auth/register')}
+          textoBoton={isAuthenticated ? 'Quiero mi plaza de fundador' : 'Crear cuenta y pagar'}
+          onElegir={elegirFundadores}
         />
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto">

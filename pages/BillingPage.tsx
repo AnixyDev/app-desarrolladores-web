@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -8,6 +8,7 @@ import Skeleton from '@/components/ui/Skeleton';
 import { CheckCircleIcon, CreditCard, Users, RefreshCwIcon, SettingsIcon } from '@/components/icons/Icon';
 import { redirectToCheckout, redirectToCheckoutFundadores, redirectToCustomerPortal, StripeItemKey } from '@/services/stripeService';
 import OfertaFundadores from '@/components/OfertaFundadores';
+import { PARAM_OFERTA, borrarIntencionFundadores, pideFundadores } from '@/lib/intencionFundadores';
 import { useToast } from '@/hooks/useToast';
 // Los precios salen del catalogo, junto al priceId con el que Stripe cobra.
 import { precioDe } from '../supabase/functions/_shared/catalogo-stripe';
@@ -78,6 +79,26 @@ const BillingPage: React.FC = () => {
 
     const isPro = profile.plan === 'Pro';
     const isTeams = profile.plan === 'Teams';
+
+    // Llegada desde la oferta (/pricing o enlace ?oferta=fundadores tras el
+    // registro): se abre el pago directamente, una sola vez. Plazas, fecha y
+    // suscripción previa las vuelve a comprobar el servidor; si dice que no,
+    // se muestra su mensaje y el usuario se queda en esta página.
+    const pagoFundadoresLanzado = useRef(false);
+    useEffect(() => {
+        if (pagoFundadoresLanzado.current || !pideFundadores(searchParams.toString())) return;
+        pagoFundadoresLanzado.current = true;
+        borrarIntencionFundadores();
+        searchParams.delete(PARAM_OFERTA);
+        setSearchParams(searchParams, { replace: true });
+        if (isPro || isTeams) {
+            addToast('Ya tienes un plan de pago: la oferta de fundadores es solo para nuevas suscripciones.', 'info');
+            return;
+        }
+        addToast('Abriendo el pago del Plan Fundadores…', 'info');
+        handleFundadores();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     // CAMBIO: profiles.plan solo guarda 'Pro' | 'Teams', sin distinguir
     // mensual de anual. Antes, si ya eras Pro (mensual) y cambiabas el

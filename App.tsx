@@ -13,6 +13,7 @@ import CookieBanner from './components/ui/CookieBanner';
 import AuthLayout from './pages/auth/AuthLayout';
 import LoginPage from './pages/LoginPage';
 import LandingPage from './pages/LandingPage';
+import AlEntrarConOferta from './components/AlEntrarConOferta';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
@@ -115,6 +116,7 @@ const MainLayout = () => {
             </div>
             <MobileBottomNav onMoreClick={() => setSidebarOpen(true)} />
             <GlobalTimerWidget />
+            <AlEntrarConOferta />
         </div>
     );
 };
