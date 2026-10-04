@@ -4,6 +4,8 @@ import { esLlamadaDelServicio } from '../_shared/llamada-servicio.ts'
 // El calculo de fechas vive aparte para que vitest pueda cubrirlo en CI.
 // Ver src/test/fechas-recurrentes.test.ts
 import { siguienteFecha } from './fechas.ts'
+// Importes (IVA e IRPF), también probados con vitest: src/test/importes-recurrentes.test.ts
+import { importesDeRecurrente } from './importes.ts'
 
 serve(async (req) => {
   // Solo permitir solicitudes autorizadas (la tarea programada de pg_cron
@@ -38,11 +40,15 @@ serve(async (req) => {
     const idsClientes = [...new Set(filas.map((r: any) => r.client_id).filter(Boolean))]
     const idsProyectos = [...new Set(filas.map((r: any) => r.project_id).filter(Boolean))]
     const dueñoDeCliente = new Map<string, string>()
+    const tipoFiscalDeCliente = new Map<string, string | null>()
     const dueñoDeProyecto = new Map<string, string>()
     if (idsClientes.length) {
-      const { data, error } = await supabase.from('clients').select('id, user_id').in('id', idsClientes)
+      const { data, error } = await supabase.from('clients').select('id, user_id, tipo_fiscal').in('id', idsClientes)
       if (error) throw error
-      for (const c of data ?? []) dueñoDeCliente.set(c.id, c.user_id)
+      for (const c of data ?? []) {
+        dueñoDeCliente.set(c.id, c.user_id)
+        tipoFiscalDeCliente.set(c.id, c.tipo_fiscal ?? null)
+      }
     }
     if (idsProyectos.length) {
       const { data, error } = await supabase.from('projects').select('id, user_id').in('id', idsProyectos)
@@ -50,8 +56,19 @@ serve(async (req) => {
       for (const p of data ?? []) dueñoDeProyecto.set(p.id, p.user_id)
     }
 
+    // Registro fiscal (huella encadenada): solo para quien lo tiene activado,
+    // igual que al crear una factura desde la app.
+    const idsUsuarios = [...new Set(filas.map((r: any) => r.user_id).filter(Boolean))]
+    const conRegistroFiscal = new Set<string>()
+    if (idsUsuarios.length) {
+      const { data, error } = await supabase.from('profiles').select('id, veri_factu_enabled').in('id', idsUsuarios)
+      if (error) throw error
+      for (const p of data ?? []) if (p.veri_factu_enabled) conRegistroFiscal.add(p.id)
+    }
+
     const results: Array<{ recurring_id: string; invoice_id: string }> = []
     const omitidas: Array<{ recurring_id: string; motivo: string }> = []
+    const avisos: Array<{ recurring_id: string; invoice_id: string; aviso: string }> = []
 
     for (const rec of filas) {
       if (!rec.client_id || dueñoDeCliente.get(rec.client_id) !== rec.user_id) {
@@ -83,22 +100,20 @@ serve(async (req) => {
         continue
       }
 
-      // 3. Importes. Se redondea el subtotal ademas del total: las columnas son
-      //    enteras y una cantidad decimal (1,5 horas) dejaba centimos sueltos,
-      //    de modo que subtotal e impuestos podian no sumar el total.
-      const subtotal = Math.round(
-        rec.items.reduce(
-          (sum: number, item: any) => sum + Number(item.price_cents) * Number(item.quantity),
-          0
-        )
+      // 3. Importes: base + IVA − IRPF de la recurrente (sin IVA ni IRPF si el
+      //    cliente es de otro país). Se redondea también el subtotal: las
+      //    columnas son enteras y una cantidad decimal dejaba céntimos sueltos.
+      const importes = importesDeRecurrente(
+        rec.items,
+        rec.tax_percent,
+        rec.irpf_percent,
+        tipoFiscalDeCliente.get(rec.client_id),
       )
-      if (!Number.isFinite(subtotal)) {
+      if (!importes) {
         console.error(`Recurrente ${rec.id}: importes no numericos — se omite`)
         omitidas.push({ recurring_id: rec.id, motivo: 'importes no numericos' })
         continue
       }
-      const taxPercent = Number(rec.tax_percent ?? 0)
-      const total = Math.round(subtotal + subtotal * (taxPercent / 100))
 
       // 4. Numero de factura correlativo (AEAT). No se usa Date.now(): dos
       //    iteraciones del bucle pueden caer en el mismo milisegundo.
@@ -121,9 +136,10 @@ serve(async (req) => {
           issue_date: today,
           due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           items: rec.items,
-          subtotal_cents: subtotal,
-          tax_percent: taxPercent,
-          total_cents: total,
+          subtotal_cents: importes.subtotal,
+          tax_percent: importes.taxPercent,
+          irpf_percent: importes.irpfPercent,
+          total_cents: importes.total,
           paid: false,
         })
         .select()
@@ -164,11 +180,26 @@ serve(async (req) => {
         continue
       }
 
+      // 6. Registro fiscal con huella, como cualquier factura emitida desde la
+      //    app. Va después de avanzar la fecha: una factura ya registrada queda
+      //    bloqueada y no se podría deshacer. Si falla, la factura queda emitida
+      //    sin registro y se informa para revisarla (no se repite mañana).
+      if (conRegistroFiscal.has(rec.user_id)) {
+        const { error: fiscalError } = await supabase.rpc('registrar_factura_fiscal', {
+          p_invoice_id: newInvoice.id,
+          p_user: rec.user_id,
+        })
+        if (fiscalError) {
+          console.error(`Recurrente ${rec.id}: factura ${newInvoice.id} emitida SIN registro fiscal:`, fiscalError)
+          avisos.push({ recurring_id: rec.id, invoice_id: newInvoice.id, aviso: 'sin registro fiscal: ' + fiscalError.message })
+        }
+      }
+
       results.push({ recurring_id: rec.id, invoice_id: newInvoice.id })
     }
 
     return new Response(
-      JSON.stringify({ processed: results.length, skipped: omitidas.length, details: results, omitidas }),
+      JSON.stringify({ processed: results.length, skipped: omitidas.length, details: results, omitidas, avisos }),
       {
         headers: { 'Content-Type': 'application/json' },
         status: 200,

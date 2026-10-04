@@ -12,6 +12,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { InvoiceItem, RecurringInvoice } from '@/types';
 import { PlusIcon, TrashIcon } from '@/components/icons/Icon';
 import { formatCurrency } from '@/lib/utils';
+import { esClienteExtranjero } from '@/lib/ivaClientes';
 
 interface CreateRecurringInvoiceModalProps {
   isOpen: boolean;
@@ -31,6 +32,9 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
   const [projectId, setProjectId] = useState('');
   const [items, setItems] = useState<InvoiceItem[]>([{ ...emptyItem }]);
   const [taxPercent, setTaxPercent] = useState(21);
+  // Retención de IRPF de cada factura emitida (antes no se podía indicar y las
+  // recurrentes salían siempre sin retención).
+  const [irpfPercent, setIrpfPercent] = useState(0);
   // FIX: solo 'monthly' y 'yearly' están soportados de verdad por el cron
   // (process-recurring-invoices) — cualquier otro valor generaría la
   // primera factura pero nunca calcularía la siguiente fecha, dejando la
@@ -46,11 +50,18 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
     setProjectId(recurrente.project_id || '');
     setItems(recurrente.items?.length ? recurrente.items.map(i => ({ ...i })) : [{ ...emptyItem }]);
     setTaxPercent(Number(recurrente.tax_percent) || 0);
+    setIrpfPercent(Number(recurrente.irpf_percent) || 0);
     setFrequency(recurrente.frequency === 'yearly' ? 'yearly' : 'monthly');
     setProximaEmision(recurrente.next_due_date.slice(0, 10));
   }, [isOpen, recurrente]);
 
   const clientProjects = useMemo(() => projects.filter(p => p.client_id === clientId), [projects, clientId]);
+
+  // Cliente de otro país (UE o fuera de la UE): sin IVA ni IRPF, igual que en
+  // la pantalla de nueva factura. El servidor lo aplica también al emitir.
+  const extranjero = esClienteExtranjero(clients.find(c => c.id === clientId)?.tipo_fiscal);
+  const ivaAplicado = extranjero ? 0 : taxPercent;
+  const irpfAplicado = extranjero ? 0 : irpfPercent;
 
   const totalCents = useMemo(
     () => items.reduce((sum, item) => sum + item.price_cents * item.quantity, 0),
@@ -63,6 +74,7 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
     setProjectId('');
     setItems([{ ...emptyItem }]);
     setTaxPercent(21);
+    setIrpfPercent(0);
     setFrequency('monthly');
     setStartDate(new Date().toISOString().slice(0, 10));
   };
@@ -101,7 +113,8 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
           client_id: clientId,
           project_id: projectId || null,
           items,
-          tax_percent: taxPercent,
+          tax_percent: ivaAplicado,
+          irpf_percent: irpfAplicado,
           frequency,
           next_due_date: proximaEmision || recurrente.next_due_date,
         });
@@ -110,7 +123,8 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
           client_id: clientId,
           project_id: projectId || null,
           items,
-          tax_percent: taxPercent,
+          tax_percent: ivaAplicado,
+          irpf_percent: irpfAplicado,
           frequency,
           start_date: startDate,
         });
@@ -225,21 +239,35 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
           </Button>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-400 mb-1">IVA (%)</label>
-          <Input
-            type="number"
-            min={0}
-            max={100}
-            value={taxPercent}
-            onChange={(e) => setTaxPercent(Number(e.target.value))}
-          />
-        </div>
+        {extranjero ? (
+          <p className="text-sm text-gray-400 bg-gray-800/60 border border-gray-700 rounded-md px-3 py-2">
+            Cliente de otro país: las facturas se emiten sin IVA ni IRPF, con la mención legal correspondiente.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="IVA (%)"
+              type="number"
+              min={0}
+              max={100}
+              value={taxPercent}
+              onChange={(e) => setTaxPercent(Number(e.target.value))}
+            />
+            <Input
+              label="Retención IRPF (%)"
+              type="number"
+              min={0}
+              max={100}
+              value={irpfPercent}
+              onChange={(e) => setIrpfPercent(Number(e.target.value))}
+            />
+          </div>
+        )}
 
         <div className="flex justify-between items-center pt-2 border-t border-gray-800 text-sm">
-          <span className="text-gray-400">Total por emisión (base + IVA)</span>
+          <span className="text-gray-400">Total por emisión (base + IVA − IRPF)</span>
           <span className="text-white font-bold">
-            {formatCurrency(Math.round(totalCents * (1 + taxPercent / 100)))}
+            {formatCurrency(Math.round(totalCents + totalCents * (ivaAplicado / 100) - totalCents * (irpfAplicado / 100)))}
           </span>
         </div>
 
