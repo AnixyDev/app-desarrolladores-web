@@ -35,6 +35,11 @@ const TermsOfService: React.FC = () => (
           No puedes usar el servicio para actividades ilegales, para enviar comunicaciones no deseadas ni para intentar
           acceder a datos de otras personas usuarias.
         </li>
+        <li>
+          Si usas Lead Hunter PRO, solo puedes enviar emails o mensajes de WhatsApp comerciales a los negocios que te
+          hayan dado su permiso, debes registrarlo con veracidad y respetar las bajas (art. 21 LSSI-CE). El primer
+          contacto debe hacerse por teléfono, por el formulario de su web o en persona.
+        </li>
       </Lista>
     </Seccion>
 
