@@ -22,9 +22,9 @@ interface Props {
 const PieLegal: React.FC<Props> = ({ variante = 'completo', className = '' }) => {
   if (variante === 'compacto') {
     return (
-      <nav aria-label="Información legal" className={`flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-gray-500 ${className}`}>
+      <nav aria-label="Información legal" className={`flex flex-wrap justify-center gap-x-4 gap-y-0 text-xs text-gray-500 ${className}`}>
         {ENLACES_LEGALES.map((e) => (
-          <Link key={e.to} to={e.to} className="hover:text-gray-300 hover:underline">
+          <Link key={e.to} to={e.to} className="inline-block py-2 hover:text-gray-300 hover:underline">
             {e.texto}
           </Link>
         ))}
@@ -36,9 +36,9 @@ const PieLegal: React.FC<Props> = ({ variante = 'completo', className = '' }) =>
     <footer className={`border-t border-gray-900 py-8 px-6 text-sm text-gray-500 ${className}`}>
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <p>© {new Date().getFullYear()} DevFreelancer</p>
-        <nav aria-label="Información legal" className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+        <nav aria-label="Información legal" className="flex flex-wrap justify-center gap-x-6 gap-y-0">
           {ENLACES_LEGALES.map((e) => (
-            <Link key={e.to} to={e.to} className="hover:text-primary-400 transition-colors">
+            <Link key={e.to} to={e.to} className="inline-block py-2 hover:text-primary-400 transition-colors">
               {e.texto}
             </Link>
           ))}
