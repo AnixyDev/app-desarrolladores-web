@@ -107,6 +107,22 @@ describe('páginas legales', () => {
   });
 });
 
+describe('datos del titular', () => {
+  it('las páginas legales piden no ser indexadas y lo retiran al salir', () => {
+    const { unmount } = montar('/aviso-legal');
+    expect(document.head.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex, follow');
+    unmount();
+    expect(document.head.querySelector('meta[name="robots"]')).toBeNull();
+  });
+
+  it('el NIF del titular es válido (letra de control)', () => {
+    const m = /^(\d{8})([A-Z])$/.exec(DATOS_LEGALES.nif);
+    if (esMarcador(DATOS_LEGALES.nif)) return;
+    expect(m, 'formato 12345678Z').not.toBeNull();
+    expect('TRWAGMYFPDXBNJZSQVHLCKE'[Number(m![1]) % 23]).toBe(m![2]);
+  });
+});
+
 describe('fuentes', () => {
   it('ya no se cargan desde Google Fonts', () => {
     expect(leer('index.html')).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
