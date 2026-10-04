@@ -78,13 +78,15 @@ describe('páginas legales', () => {
     for (const k of [
       'sb-umqsjycqypxvhbhmidma-auth-token', '__stripe_mid', '__stripe_sid', 'devfreelancer-storage-v4',
       'devfreelancer_active_timer', 'devfreelancer_oferta_fundadores', 'portal:destino', 'portal:cliente',
-      'devfreelancer_ref', 'df_cookie_consent',
     ]) expect(t, k).toContain(k);
+    // Ya no se guarda nada que no sea técnico.
+    expect(t).not.toContain('devfreelancer_ref');
+    expect(t).not.toContain('df_cookie');
   });
 
   it('cada clave de localStorage del código aparece en /cookies', () => {
     const cookies = leer('pages/legal/CookiesPage.tsx');
-    const fuentes = ['lib/afiliados.ts', 'lib/intencionFundadores.ts', 'lib/destinoPortal.ts', 'lib/portalClientes.ts', 'hooks/store/projectSlice.ts', 'hooks/useAppStore.tsx', 'components/ui/CookieBanner.tsx'];
+    const fuentes = ['lib/afiliados.ts', 'lib/intencionFundadores.ts', 'lib/destinoPortal.ts', 'lib/portalClientes.ts', 'hooks/store/projectSlice.ts', 'hooks/useAppStore.tsx'];
     for (const f of fuentes) {
       for (const [, clave] of leer(f).matchAll(/(?:CLAVE|KEY|name)\s*[:=]\s*'([^']+)'/g)) {
         expect(cookies, `${clave} (${f})`).toContain(clave);
@@ -105,5 +107,17 @@ describe('fuentes', () => {
   it('ya no se cargan desde Google Fonts', () => {
     expect(leer('index.html')).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
     expect(leer('index.css')).toMatch(/font-family: 'Inter'/);
+  });
+});
+
+describe('Stripe.js', () => {
+  it('no se descarga al importar el servicio (solo al pagar), para no poner cookies en la home', () => {
+    const f = leer('services/stripeService.ts');
+    expect(f).toMatch(/from '@stripe\/stripe-js\/pure'/);
+    expect(f).not.toMatch(/^import \{[^}]*\} from '@stripe\/stripe-js';/m);
+  });
+
+  it('ya no hay aviso de cookies', () => {
+    expect(leer('App.tsx')).not.toMatch(/CookieBanner/);
   });
 });

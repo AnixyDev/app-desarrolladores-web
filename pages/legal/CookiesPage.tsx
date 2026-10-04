@@ -47,8 +47,6 @@ const ALMACENAMIENTO: React.ReactNode[][] = [
   ['devfreelancer_oferta_fundadores', 'Recordar que elegiste el Plan Fundadores para llevarte al pago al terminar el registro.', '48 horas como máximo; se borra al usarse', 'Técnica (necesaria)'],
   ['portal:destino', 'Llevar a tu cliente al documento que abrió desde el email tras iniciar sesión en el portal.', '1 hora como máximo; se borra al usarse', 'Técnica (necesaria)'],
   ['portal:cliente', 'Recordar qué ficha estaba viendo tu cliente en el portal si trabaja con varios profesionales.', 'Hasta que borre los datos del navegador', 'Técnica (preferencia)'],
-  ['df_cookie_consent, df_cookie_prefs', 'Recordar que has visto el aviso de cookies y tu elección.', 'Hasta que borres los datos del navegador', 'Técnica (necesaria)'],
-  ['devfreelancer_ref', 'Recordar el código del afiliado que te recomendó si llegas con un enlace de afiliado (?ref=), para atribuirle la recomendación al crear tu cuenta.', 'Se borra al iniciar sesión con tu cuenta nueva; si no llegas a registrarte, hasta que borres los datos del navegador', 'Afiliación (no es estrictamente necesaria)'],
 ];
 
 const CookiesPage: React.FC = () => (
@@ -64,12 +62,13 @@ const CookiesPage: React.FC = () => (
     <Seccion titulo="2. Resumen">
       <p>
         {D.nombreComercial} <strong>no usa cookies de analítica, publicidad ni redes sociales</strong>, ni propias ni de
-        terceros. Casi todo lo que guardamos es técnico: sirve para que inicies sesión, pagues de forma segura o la app
-        recuerde lo que estabas haciendo. Estas cookies no necesitan tu consentimiento (art. 22.2 LSSI-CE).
+        terceros. Todo lo que guardamos es técnico: sirve para que inicies sesión, pagues de forma segura o la app
+        recuerde lo que estabas haciendo. Por eso no te mostramos un aviso para aceptarlas: estas cookies no necesitan
+        consentimiento (art. 22.2 LSSI-CE).
       </p>
       <p>
-        La única excepción es el código de afiliado (<code>devfreelancer_ref</code>), que solo se guarda si llegas a
-        través del enlace de un afiliado.
+        Si llegas con el enlace de un afiliado, su código viaja solo en la dirección de la página hasta que creas la
+        cuenta; no se guarda en tu navegador.
       </p>
     </Seccion>
 

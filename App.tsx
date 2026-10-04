@@ -7,13 +7,13 @@ import Header from './components/layout/Header';
 import MobileBottomNav from './components/layout/MobileBottomNav';
 import GlobalTimerWidget from './components/timer/GlobalTimerWidget';
 import ToastContainer from './components/ui/Toast';
-import CookieBanner from './components/ui/CookieBanner';
 
 // Auth & Public
 import AuthLayout from './pages/auth/AuthLayout';
 import LoginPage from './pages/LoginPage';
 import LandingPage from './pages/LandingPage';
 import AlEntrarConOferta from './components/AlEntrarConOferta';
+import VincularReferidoDeLaUrl from './components/VincularReferidoDeLaUrl';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
@@ -118,6 +118,7 @@ const MainLayout = () => {
             </div>
             <MobileBottomNav onMoreClick={() => setSidebarOpen(true)} />
             <GlobalTimerWidget />
+            <VincularReferidoDeLaUrl />
             <AlEntrarConOferta />
         </div>
     );
@@ -182,7 +183,6 @@ function App() {
     return (
             <>
                 <ToastContainer />
-                <CookieBanner />
                 <Routes>
                     {/* Rutas de autenticación (login/register) */}
                     <Route path="/auth" element={<AuthLayout />}>

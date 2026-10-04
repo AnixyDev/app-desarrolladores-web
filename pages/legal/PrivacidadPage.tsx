@@ -13,8 +13,7 @@ const PROVEEDORES: React.ReactNode[][] = [
   ['Vercel, Inc.', 'Alojamiento y entrega de la web', 'EE. UU. y red global', 'DPF y Cláusulas Contractuales Tipo'],
   ['Google Ireland Ltd. / Google LLC', 'Inicio de sesión con Google y asistente de inteligencia artificial (Gemini)', 'Irlanda y EE. UU.', 'DPF y Cláusulas Contractuales Tipo'],
   ['Cloudflare, Inc.', 'Verificación antirrobots (Turnstile) en registro e inicio de sesión', 'EE. UU. y red global', 'DPF y Cláusulas Contractuales Tipo'],
-  ['Resend, Inc.', 'Envío de correos (facturas, recordatorios, invitaciones, avisos de la cuenta)', 'EE. UU.', 'Cláusulas Contractuales Tipo'],
-  ['Amazon Web Services EMEA SARL', `Recepción de los correos enviados a ${D.email}`, 'Unión Europea (Irlanda)', 'Datos en la UE'],
+  ['Resend, Inc.', `Envío de correos (facturas, recordatorios, invitaciones, avisos de la cuenta) y recepción de los enviados a ${D.email}`, 'Unión Europea (Irlanda, sobre Amazon Web Services); empresa con sede en EE. UU.', 'Cláusulas Contractuales Tipo'],
   ['Enable Banking Oy', 'Conexión con tu banco para conciliar movimientos (solo si la activas)', 'Unión Europea (Finlandia)', 'Datos en la UE'],
 ];
 
@@ -45,7 +44,7 @@ const PrivacidadPage: React.FC = () => (
           ['Textos que escribes en el asistente de IA', 'Generar propuestas, análisis y respuestas', 'Ejecución del contrato'],
           ['Correos que nos envías', 'Atender consultas y soporte', 'Ejecución del contrato o interés legítimo en responderte (art. 6.1.f)'],
           ['IP, navegador, registros técnicos y de seguridad', 'Proteger el servicio, evitar abusos y detectar fallos', 'Interés legítimo'],
-          ['Código de afiliado con el que llegaste', 'Atribuir la recomendación al afiliado', 'Interés legítimo (ver Política de cookies)'],
+          ['Código de afiliado del enlace con el que te registraste', 'Atribuir la recomendación al afiliado y pagarle su comisión', 'Interés legítimo (art. 6.1.f)'],
         ]}
       />
       <p>
@@ -69,10 +68,18 @@ const PrivacidadPage: React.FC = () => (
         El asistente usa Gemini, de Google. Lo que escribes en él y las respuestas se envían a Google para generarlas.
       </p>
       <p>
-        Con la configuración actual del servicio, <strong>Google puede usar esos textos para mejorar sus productos y
-        algunas personas revisoras pueden leerlos</strong>. Por eso te pedimos que no introduzcas en el asistente datos
-        personales de tus clientes, datos bancarios, contraseñas ni otra información confidencial. Si usas tu propia
-        clave de Gemini (Ajustes), se aplican las condiciones de tu cuenta de Google.
+        Para responder con contexto, el asistente envía también un resumen de tu negocio: facturas, cobros, proyectos y
+        nombres de tus clientes. Las funciones de resumen de conversaciones con clientes y de análisis financiero envían
+        esos textos y datos.
+      </p>
+      <p>
+        Google trata estos datos como encargado del tratamiento y, según las condiciones de la API de Gemini para el
+        Espacio Económico Europeo, <strong>no los usa para entrenar ni mejorar sus productos</strong>; solo los registra
+        temporalmente para detectar abusos. Aun así, te recomendamos no escribir en el asistente contraseñas, datos
+        bancarios ni información especialmente sensible.
+      </p>
+      <p>
+        Si configuras tu propia clave de Gemini (Ajustes), se aplican además las condiciones de tu cuenta de Google.
       </p>
     </Seccion>
 

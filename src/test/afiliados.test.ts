@@ -18,9 +18,9 @@ vi.mock('../../lib/supabaseClient', () => ({ supabase: supabaseFalso }));
 import {
     normalizarCodigo,
     codigoDeLaUrl,
-    guardarCodigoPendiente,
-    leerCodigoPendiente,
-    vincularReferidoPendiente,
+    urlDeVueltaConReferido,
+    vincularReferido,
+    borrarClavesAntiguas,
     estadisticasDeReferidos,
 } from '../../lib/afiliados';
 import { createAuthSlice } from '../../hooks/store/authSlice';
@@ -63,32 +63,47 @@ describe('alta con correo', () => {
     });
 });
 
-describe('alta con Google: vincular después', () => {
-    it('sin código pendiente no llama al servidor', async () => {
-        await vincularReferidoPendiente();
-        expect(rpc).not.toHaveBeenCalled();
+describe('alta con Google: el código vuelve en la URL', () => {
+    it('la URL de vuelta lleva el código solo si lo hay', () => {
+        expect(urlDeVueltaConReferido('https://devfreelancer.app', '602bd2aa')).toBe('https://devfreelancer.app/?ref=602bd2aa');
+        expect(urlDeVueltaConReferido('https://devfreelancer.app', null)).toBe('https://devfreelancer.app');
     });
 
-    it('vincula el código pendiente y lo olvida', async () => {
-        guardarCodigoPendiente('602bd2aa');
+    it('vincula el código con el servidor', async () => {
         rpc.mockResolvedValue({ data: true, error: null });
-        await vincularReferidoPendiente();
+        expect(await vincularReferido('602bd2aa')).toBe(true);
         expect(rpc).toHaveBeenCalledWith('vincular_referido', { p_codigo: '602bd2aa' });
-        expect(leerCodigoPendiente()).toBeNull();
     });
 
-    it('si el servidor dice que no (ya vinculado, más de 7 días), también lo olvida', async () => {
-        guardarCodigoPendiente('602bd2aa');
+    it('si el servidor dice que no (ya vinculado, más de 7 días), da el asunto por cerrado', async () => {
         rpc.mockResolvedValue({ data: false, error: null });
-        await vincularReferidoPendiente();
-        expect(leerCodigoPendiente()).toBeNull();
+        expect(await vincularReferido('602bd2aa')).toBe(true);
     });
 
-    it('si la llamada falla, lo guarda para el siguiente inicio de sesión', async () => {
-        guardarCodigoPendiente('602bd2aa');
+    it('si la llamada falla, lo indica para reintentar', async () => {
         rpc.mockResolvedValue({ data: null, error: { message: 'sin red' } });
-        await vincularReferidoPendiente();
-        expect(leerCodigoPendiente()).toBe('602bd2aa');
+        expect(await vincularReferido('602bd2aa')).toBe(false);
+    });
+});
+
+describe('sin almacenamiento en el navegador', () => {
+    it('borra las claves que guardaban versiones anteriores', () => {
+        localStorage.setItem('devfreelancer_ref', '602bd2aa');
+        localStorage.setItem('df_cookie_consent', 'true');
+        localStorage.setItem('df_cookie_prefs', '{}');
+        localStorage.setItem('devfreelancer_active_timer', 'x');
+        borrarClavesAntiguas();
+        expect(localStorage.getItem('devfreelancer_ref')).toBeNull();
+        expect(localStorage.getItem('df_cookie_consent')).toBeNull();
+        expect(localStorage.getItem('df_cookie_prefs')).toBeNull();
+        expect(localStorage.getItem('devfreelancer_active_timer')).toBe('x');
+    });
+
+    it('el registro ya no escribe el código en localStorage', async () => {
+        const { readFileSync } = await import('node:fs');
+        const { resolve } = await import('node:path');
+        const fuente = readFileSync(resolve(__dirname, '../../lib/afiliados.ts'), 'utf8');
+        expect(fuente).not.toMatch(/localStorage\.setItem/);
     });
 });
 
