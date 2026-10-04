@@ -17,7 +17,7 @@ export const DATOS_LEGALES = {
    * Solo si el titular es una sociedad: "Inscrita en el Registro Mercantil de
    * X, tomo, folio, hoja". Si eres autónomo, déjalo como cadena vacía ('').
    */
-  datosRegistrales: 'Google',
+  datosRegistrales: '',
   /** Días de antelación con que se avisa de la renovación de un plan anual. */
   diasPreavisoRenovacion: '[DÍAS DE PREAVISO]',
   /** Si los precios de /pricing llevan el IVA incluido. Ej.: 'incluyen el IVA'. */
