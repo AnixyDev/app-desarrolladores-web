@@ -56,8 +56,8 @@ const TermsOfService: React.FC = () => (
         periodo y se cobra el precio vigente de tu plan, salvo que la canceles antes.
       </p>
       <p>
-        En los planes anuales te avisaremos por email con al menos <Dato v={D.diasPreavisoRenovacion} /> días de
-        antelación a la renovación, indicando la fecha y el importe.
+        Antes de cada renovación te enviaremos un aviso por email con la fecha y el importe del próximo cobro, para que
+        puedas cancelar a tiempo si no quieres continuar.
       </p>
       <p>
         Si cambiamos el precio de un plan, te lo comunicaremos con al menos 30 días de antelación; el nuevo precio se

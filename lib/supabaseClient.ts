@@ -2,7 +2,7 @@ import { createBrowserClient } from '@supabase/ssr';
 
 // CAMBIO: se reemplaza createClient (de @supabase/supabase-js, sesión en
 // localStorage) por createBrowserClient (de @supabase/ssr, sesión en
-// cookies). El motivo es SSO real con leadhunter.devfreelancer.app —
+// cookies). El motivo es SSO real con captacion.devfreelancer.app (Lead Hunter PRO) —
 // localStorage está aislado por origen exacto (ni compartiendo dominio
 // padre se comparte), las cookies con `domain: '.devfreelancer.app'` sí
 // se comparten entre devfreelancer.app y cualquier subdominio suyo.

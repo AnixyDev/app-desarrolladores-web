@@ -18,12 +18,15 @@ export const DATOS_LEGALES = {
    * X, tomo, folio, hoja". Si eres autónomo, déjalo como cadena vacía ('').
    */
   datosRegistrales: '',
-  /** Días de antelación con que se avisa de la renovación de un plan anual. */
-  diasPreavisoRenovacion: '[DÍAS DE PREAVISO]',
-  /** Si los precios de /pricing llevan el IVA incluido. Ej.: 'incluyen el IVA'. */
-  ivaPrecios: '[INCLUYEN EL IVA / NO INCLUYEN EL IVA]',
+  /**
+   * El pago no añade impuestos (Checkout sin automatic_tax ni tax_rates): lo
+   * que se ve en /pricing es lo que se cobra. Si algún día Stripe suma el IVA
+   * aparte, cambia esto a 'no incluyen el IVA, que se añade al pagar'.
+   */
+  ivaPrecios: 'incluyen el IVA',
   /** De dónde obtiene Lead Hunter PRO los datos de empresas y profesionales. */
-  fuentesLeadHunter: '[FUENTES DE DATOS DE LEAD HUNTER]',
+  fuentesLeadHunter:
+    'la ficha pública de cada negocio en Google Maps (a través de la API de Google Places) y de su propia página web',
   sitio: 'devfreelancer.app',
   nombreComercial: 'DevFreelancer',
 } as const;

@@ -91,6 +91,11 @@ const PrivacidadPage: React.FC = () => (
         obtenidos de <Dato v={D.fuentesLeadHunter} />.
       </p>
       <p>
+        Con esos datos, la persona usuaria de Lead Hunter PRO puede analizar el negocio con inteligencia artificial
+        (Gemini) y enviarle una propuesta comercial por email. Esos correos se envían a través de Resend, que registra si
+        se han entregado, abierto o pulsado sus enlaces, para hacer el seguimiento de la propuesta.
+      </p>
+      <p>
         La base legal es el interés legítimo en la prospección comercial entre profesionales (art. 6.1.f RGPD). Si tus
         datos aparecen en Lead Hunter PRO, puedes pedir que los borremos u oponerte a su tratamiento escribiendo a{' '}
         <Correo />. El responsable y el contacto son los mismos indicados en el apartado 1.
