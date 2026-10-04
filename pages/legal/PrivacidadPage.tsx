@@ -92,13 +92,21 @@ const PrivacidadPage: React.FC = () => (
       </p>
       <p>
         Con esos datos, la persona usuaria de Lead Hunter PRO puede analizar el negocio con inteligencia artificial
-        (Gemini) y enviarle una propuesta comercial por email. Esos correos se envían a través de Resend, que registra si
-        se han entregado, abierto o pulsado sus enlaces, para hacer el seguimiento de la propuesta.
+        (Gemini) y preparar una propuesta. El primer contacto se hace por teléfono, por el formulario de la propia web
+        del negocio o en persona: <strong>Lead Hunter PRO solo permite enviar emails o mensajes de WhatsApp a los
+        negocios que han dado su permiso</strong>, y guarda cuándo y cómo se obtuvo.
       </p>
       <p>
-        La base legal es el interés legítimo en la prospección comercial entre profesionales (art. 6.1.f RGPD). Si tus
-        datos aparecen en Lead Hunter PRO, puedes pedir que los borremos u oponerte a su tratamiento escribiendo a{' '}
-        <Correo />. El responsable y el contacto son los mismos indicados en el apartado 1.
+        Cada email identifica a quien lo envía e incluye un enlace para darse de baja. Las bajas se respetan en todas
+        las cuentas de Lead Hunter PRO: una dirección dada de baja no vuelve a recibir mensajes de nadie. Los correos se
+        envían a través de Resend, que registra si se han entregado, abierto o pulsado sus enlaces.
+      </p>
+      <p>
+        La base legal para tratar los datos de contacto profesional es el interés legítimo en la prospección comercial
+        entre profesionales (art. 6.1.f RGPD); el envío de emails y mensajes se basa en el consentimiento del negocio. Si
+        tus datos aparecen en Lead Hunter PRO, puedes darte de baja desde cualquier correo, pedir que los borremos u
+        oponerte a su tratamiento escribiendo a <Correo />. El responsable y el contacto son los mismos indicados en el
+        apartado 1.
       </p>
     </Seccion>
 

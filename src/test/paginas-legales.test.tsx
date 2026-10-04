@@ -123,6 +123,15 @@ describe('datos del titular', () => {
   });
 });
 
+describe('Lead Hunter PRO', () => {
+  it('privacidad y términos explican que solo se escribe con permiso y que hay baja', () => {
+    const t = montar('/privacidad').container.textContent ?? '';
+    expect(t).toContain('solo permite enviar emails o mensajes de WhatsApp a los negocios que han dado su permiso');
+    expect(t).toContain('enlace para darse de baja');
+    expect(montar('/terms').container.textContent).toContain('art. 21 LSSI-CE');
+  });
+});
+
 describe('fuentes', () => {
   it('ya no se cargan desde Google Fonts', () => {
     expect(leer('index.html')).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
