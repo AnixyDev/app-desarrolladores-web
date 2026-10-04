@@ -78,7 +78,17 @@ const PaginaLegal: React.FC<Props> = ({ titulo, children }) => {
     const anterior = document.title;
     document.title = `${titulo} · DevFreelancer`;
     window.scrollTo(0, 0);
-    return () => { document.title = anterior; };
+    // Las páginas legales muestran el nombre, NIF y domicilio del titular:
+    // se piden a los buscadores que no las indexen, para que no aparezcan al
+    // buscar esos datos. Quien visita la web las sigue viendo con normalidad.
+    const robots = document.createElement('meta');
+    robots.name = 'robots';
+    robots.content = 'noindex, follow';
+    document.head.appendChild(robots);
+    return () => {
+      document.title = anterior;
+      robots.remove();
+    };
   }, [titulo]);
 
   return (

@@ -6,11 +6,11 @@
 // dato: el aviso legal está obligado a mostrarlos (LSSI art. 10).
 export const DATOS_LEGALES = {
   /** Nombre y apellidos (autónomo) o razón social (sociedad). */
-  titular: 'Anixy {Dev}',
+  titular: 'Ana Fernández Rodríguez',
   /** NIF / DNI con letra, o CIF de la sociedad. */
-  nif: 'xxxxxxxxxx',
+  nif: '74870299D',
   /** Dirección postal completa: calle, número, CP, localidad y provincia. */
-  domicilio: 'Málaga, España',
+  domicilio: 'Paseo El Pedregal, 29017 Málaga',
   /** Correo de contacto y de ejercicio de derechos. */
   email: 'soporte@devfreelancer.app',
   /**
