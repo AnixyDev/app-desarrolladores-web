@@ -6,18 +6,18 @@
 // dato: el aviso legal está obligado a mostrarlos (LSSI art. 10).
 export const DATOS_LEGALES = {
   /** Nombre y apellidos (autónomo) o razón social (sociedad). */
-  titular: '[NOMBRE TITULAR]',
+  titular: 'Anixy {Dev}',
   /** NIF / DNI con letra, o CIF de la sociedad. */
-  nif: '[NIF]',
+  nif: 'xxxxxxxxxx',
   /** Dirección postal completa: calle, número, CP, localidad y provincia. */
-  domicilio: '[DOMICILIO]',
+  domicilio: 'Málaga, España',
   /** Correo de contacto y de ejercicio de derechos. */
   email: 'soporte@devfreelancer.app',
   /**
    * Solo si el titular es una sociedad: "Inscrita en el Registro Mercantil de
    * X, tomo, folio, hoja". Si eres autónomo, déjalo como cadena vacía ('').
    */
-  datosRegistrales: '[DATOS REGISTRALES O BORRAR SI ERES AUTÓNOMO]',
+  datosRegistrales: 'Google',
   /** Días de antelación con que se avisa de la renovación de un plan anual. */
   diasPreavisoRenovacion: '[DÍAS DE PREAVISO]',
   /** Si los precios de /pricing llevan el IVA incluido. Ej.: 'incluyen el IVA'. */
