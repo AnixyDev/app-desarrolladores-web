@@ -67,7 +67,7 @@ describe('páginas legales', () => {
   it('la privacidad cubre transferencias, Enable Banking y Gemini', () => {
     const { container } = montar('/privacidad');
     const t = container.textContent ?? '';
-    for (const s of ['Stripe', 'Vercel', 'Google', 'Cloudflare', 'Resend', 'Enable Banking', 'Marco de Privacidad de Datos', 'Cláusulas Contractuales Tipo', 'consentimiento', 'Gemini', 'Lead Hunter']) {
+    for (const s of ['Stripe', 'Vercel', 'Google', 'Cloudflare', 'Resend', 'ImprovMX', 'Enable Banking', 'Marco de Privacidad de Datos', 'Cláusulas Contractuales Tipo', 'consentimiento', 'Gemini', 'Lead Hunter']) {
       expect(t, s).toContain(s);
     }
   });

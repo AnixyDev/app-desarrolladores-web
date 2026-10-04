@@ -13,7 +13,8 @@ const PROVEEDORES: React.ReactNode[][] = [
   ['Vercel, Inc.', 'Alojamiento y entrega de la web', 'EE. UU. y red global', 'DPF y Cláusulas Contractuales Tipo'],
   ['Google Ireland Ltd. / Google LLC', 'Inicio de sesión con Google y asistente de inteligencia artificial (Gemini)', 'Irlanda y EE. UU.', 'DPF y Cláusulas Contractuales Tipo'],
   ['Cloudflare, Inc.', 'Verificación antirrobots (Turnstile) en registro e inicio de sesión', 'EE. UU. y red global', 'DPF y Cláusulas Contractuales Tipo'],
-  ['Resend, Inc.', `Envío de correos (facturas, recordatorios, invitaciones, avisos de la cuenta) y recepción de los enviados a ${D.email}`, 'Unión Europea (Irlanda, sobre Amazon Web Services); empresa con sede en EE. UU.', 'Cláusulas Contractuales Tipo'],
+  ['Resend, Inc.', 'Envío de correos (facturas, recordatorios, invitaciones, avisos de la cuenta)', 'Unión Europea (Irlanda, sobre Amazon Web Services); empresa con sede en EE. UU.', 'Cláusulas Contractuales Tipo'],
+  ['ImprovMX Incorporated', `Recepción y reenvío de los correos enviados a ${D.email}`, 'EE. UU.', 'Cláusulas Contractuales Tipo'],
   ['Enable Banking Oy', 'Conexión con tu banco para conciliar movimientos (solo si la activas)', 'Unión Europea (Finlandia)', 'Datos en la UE'],
 ];
 
