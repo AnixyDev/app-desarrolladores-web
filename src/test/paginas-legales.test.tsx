@@ -9,6 +9,7 @@ import AvisoLegalPage from '../../pages/legal/AvisoLegalPage';
 import PrivacidadPage from '../../pages/legal/PrivacidadPage';
 import CookiesPage from '../../pages/legal/CookiesPage';
 import TermsOfService from '../../pages/TermsOfService';
+import { DATOS_LEGALES, esMarcador } from '../../lib/datosLegales';
 
 const raiz = resolve(__dirname, '../..');
 const leer = (r: string) => readFileSync(resolve(raiz, r), 'utf8');
@@ -50,11 +51,14 @@ describe('pie legal', () => {
 });
 
 describe('páginas legales', () => {
-  it('el aviso legal muestra los marcadores sin inventar datos', () => {
-    montar('/aviso-legal');
+  it('el aviso legal muestra los datos del titular (resaltados mientras sean marcadores)', () => {
+    const { container } = montar('/aviso-legal');
     expect(screen.getByRole('heading', { level: 1, name: 'Aviso legal' })).toBeInTheDocument();
-    for (const m of ['[NOMBRE TITULAR]', '[NIF]', '[DOMICILIO]']) expect(screen.getByText(m).tagName).toBe('MARK');
-    expect(screen.getByText('soporte@devfreelancer.app')).toBeInTheDocument();
+    const texto = container.textContent ?? '';
+    for (const v of [DATOS_LEGALES.titular, DATOS_LEGALES.nif, DATOS_LEGALES.domicilio, DATOS_LEGALES.email]) {
+      expect(texto, v).toContain(v);
+      if (esMarcador(v)) expect(screen.getByText(v).tagName).toBe('MARK');
+    }
   });
 
   it('/privacy y /privacidad muestran la misma política', () => {
