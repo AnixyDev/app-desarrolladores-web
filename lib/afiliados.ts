@@ -3,14 +3,13 @@
  *
  * Quien registra las comisiones es el servidor (stripe-webhook, evento
  * invoice.paid, con registrar_comision_afiliado()). Aquí solo hay:
- *  - recordar el código del enlace ?ref= hasta que la cuenta exista;
+ *  - llevar el código del enlace ?ref= hasta el alta (sin guardarlo);
  *  - vincularlo después si el alta fue con Google (que no admite metadatos);
  *  - leer los referidos propios y calcular los totales de la página.
  */
 import { supabase } from '@/lib/supabaseClient';
 import type { Referral } from '@/types';
 
-const CLAVE = 'devfreelancer_ref';
 const CODIGO_VALIDO = /^[a-z0-9]{4,32}$/;
 
 /** Normaliza un código de afiliado; null si no tiene pinta de serlo. */
@@ -23,30 +22,34 @@ export const normalizarCodigo = (codigo: string | null | undefined): string | nu
 export const codigoDeLaUrl = (search: string): string | null =>
     normalizarCodigo(new URLSearchParams(search).get('ref'));
 
-// localStorage puede no existir o lanzar (modo privado, cookies bloqueadas):
-// el programa de afiliados nunca debe romper el registro.
-export const guardarCodigoPendiente = (codigo: string): void => {
-    try { localStorage.setItem(CLAVE, codigo); } catch { /* sin almacenamiento */ }
-};
-export const leerCodigoPendiente = (): string | null => {
-    try { return normalizarCodigo(localStorage.getItem(CLAVE)); } catch { return null; }
-};
-export const borrarCodigoPendiente = (): void => {
-    try { localStorage.removeItem(CLAVE); } catch { /* sin almacenamiento */ }
-};
+/**
+ * Sin almacenamiento en el navegador (04/10/2026): el código viaja siempre en
+ * la URL, así no hace falta pedir consentimiento de cookies.
+ *  - Alta con correo: va en los metadatos de signUp() y lo vincula
+ *    handle_new_user() en la base de datos.
+ *  - Alta con Google: Google no admite metadatos, así que el código va en la
+ *    URL de vuelta (redirectTo) y, ya con sesión, VincularReferidoDeLaUrl
+ *    llama a vincular_referido().
+ */
+
+/** URL de vuelta tras el alta con Google, con el código de afiliado si lo hay. */
+export const urlDeVueltaConReferido = (origen: string, codigo: string | null): string =>
+    codigo ? `${origen}/?ref=${encodeURIComponent(codigo)}` : origen;
 
 /**
- * Si quedó un código pendiente (alta con Google, o alta con correo que
- * confirmó en otra pestaña), lo vincula a la cuenta con sesión. El servidor
- * solo lo acepta en los 7 días siguientes al alta y si aún no hay afiliado;
- * con cualquier respuesta se olvida el código. Solo se conserva si falla la
- * llamada, para reintentarlo en el siguiente inicio de sesión.
+ * Vincula el código a la cuenta con sesión. El servidor solo lo acepta en los
+ * 7 días siguientes al alta y si aún no hay afiliado. Devuelve false solo si
+ * la llamada falla (para dejar el código en la URL y reintentar al recargar).
  */
-export const vincularReferidoPendiente = async (): Promise<void> => {
-    const codigo = leerCodigoPendiente();
-    if (!codigo) return;
+export const vincularReferido = async (codigo: string): Promise<boolean> => {
     const { error } = await supabase.rpc('vincular_referido', { p_codigo: codigo });
-    if (!error) borrarCodigoPendiente();
+    return !error;
+};
+
+/** Claves que guardaban versiones anteriores y ya no se usan: se borran. */
+export const CLAVES_ANTIGUAS = ['devfreelancer_ref', 'df_cookie_consent', 'df_cookie_prefs'] as const;
+export const borrarClavesAntiguas = (): void => {
+    try { for (const c of CLAVES_ANTIGUAS) localStorage.removeItem(c); } catch { /* sin almacenamiento */ }
 };
 
 export const cargarReferidos = async (): Promise<Referral[]> => {

@@ -7,17 +7,19 @@ import Header from './components/layout/Header';
 import MobileBottomNav from './components/layout/MobileBottomNav';
 import GlobalTimerWidget from './components/timer/GlobalTimerWidget';
 import ToastContainer from './components/ui/Toast';
-import CookieBanner from './components/ui/CookieBanner';
 
 // Auth & Public
 import AuthLayout from './pages/auth/AuthLayout';
 import LoginPage from './pages/LoginPage';
 import LandingPage from './pages/LandingPage';
 import AlEntrarConOferta from './components/AlEntrarConOferta';
+import VincularReferidoDeLaUrl from './components/VincularReferidoDeLaUrl';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import PrivacidadPage from './pages/legal/PrivacidadPage';
+import AvisoLegalPage from './pages/legal/AvisoLegalPage';
+import CookiesPage from './pages/legal/CookiesPage';
 import TermsOfService from './pages/TermsOfService';
 import PricingPage from './pages/PricingPage';
 import PublicInvoicePayPage from './pages/PublicInvoicePayPage';
@@ -116,6 +118,7 @@ const MainLayout = () => {
             </div>
             <MobileBottomNav onMoreClick={() => setSidebarOpen(true)} />
             <GlobalTimerWidget />
+            <VincularReferidoDeLaUrl />
             <AlEntrarConOferta />
         </div>
     );
@@ -180,7 +183,6 @@ function App() {
     return (
             <>
                 <ToastContainer />
-                <CookieBanner />
                 <Routes>
                     {/* Rutas de autenticación (login/register) */}
                     <Route path="/auth" element={<AuthLayout />}>
@@ -204,7 +206,11 @@ function App() {
                     </Route>
 
                     {/* Páginas públicas */}
-                    <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                    <Route path="/aviso-legal" element={<AvisoLegalPage />} />
+                    <Route path="/privacidad" element={<PrivacidadPage />} />
+                    {/* URL registrada en la pantalla de consentimiento de Google: debe seguir funcionando. */}
+                    <Route path="/privacy" element={<PrivacidadPage />} />
+                    <Route path="/cookies" element={<CookiesPage />} />
                     <Route path="/terms" element={<TermsOfService />} />
                     <Route path="/pricing" element={<PricingPage />} />
                     <Route path="/cuenta-eliminada" element={<Suspense fallback={<LoadingFallback />}><CuentaEliminadaPage /></Suspense>} />

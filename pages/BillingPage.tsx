@@ -8,6 +8,7 @@ import Skeleton from '@/components/ui/Skeleton';
 import { CheckCircleIcon, CreditCard, Users, RefreshCwIcon, SettingsIcon } from '@/components/icons/Icon';
 import { redirectToCheckout, redirectToCheckoutFundadores, redirectToCustomerPortal, StripeItemKey } from '@/services/stripeService';
 import OfertaFundadores from '@/components/OfertaFundadores';
+import { AHORRO_PRO, AHORRO_TEAM, ahorroMaximo } from '@/lib/ahorroAnual';
 import { PARAM_OFERTA, borrarIntencionFundadores, pideFundadores } from '@/lib/intencionFundadores';
 import { useToast } from '@/hooks/useToast';
 // Los precios salen del catalogo, junto al priceId con el que Stripe cobra.
@@ -109,11 +110,11 @@ const BillingPage: React.FC = () => {
     // cobro). La forma correcta de cambiar de ciclo (o cancelar) en una
     // suscripción ya activa es el Customer Portal de Stripe — así que
     // cuando la tarjeta es "isCurrent", el botón ahora abre el portal.
-    const SubscriptionCard = ({ plan, title, price, period, features, isCurrent, itemKey, icon: Icon, recommended, priceNote }: any) => (
+    const SubscriptionCard = ({ plan, title, price, period, features, isCurrent, itemKey, icon: Icon, recommended, priceNote, ahorro }: any) => (
         <div className={`relative flex flex-col p-6 sm:p-8 bg-gray-900 rounded-3xl border transition-all duration-300 ${isCurrent ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-gray-800 hover:border-gray-700 hover:shadow-2xl shadow-black'}`}>
             {recommended && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="inline-flex items-center px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-lg shadow-primary-500/20">Más Popular</span>
+                    <span className="inline-flex items-center px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-lg shadow-primary-500/20">Recomendado</span>
                 </div>
             )}
             <div className="mb-8">
@@ -124,6 +125,7 @@ const BillingPage: React.FC = () => {
                 <div className="mt-4 flex items-baseline gap-1">
                     <span className="text-4xl font-black text-white tracking-tighter">{price}</span>
                     <span className="text-sm text-gray-500 font-medium">/{period}</span>
+          {ahorro ? <span className="ml-2 self-center bg-green-500/15 text-green-400 text-[11px] font-bold px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra {ahorro} %</span> : null}
                 </div>
                 {priceNote && <p className="text-xs text-gray-500 mt-1">{priceNote}</p>}
             </div>
@@ -157,7 +159,7 @@ const BillingPage: React.FC = () => {
                 
                 <div className="inline-flex p-1 bg-gray-900 border border-gray-800 rounded-2xl shadow-inner">
                     <button onClick={() => setBillingCycle('monthly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Mensual</button>
-                    <button onClick={() => setBillingCycle('yearly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Anual <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-lg border border-green-500/30">-20%</span></button>
+                    <button onClick={() => setBillingCycle('yearly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Anual <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra hasta {ahorroMaximo()} %</span></button>
                 </div>
             </div>
 
@@ -189,7 +191,8 @@ const BillingPage: React.FC = () => {
                 ) : (
                     <>
                         <SubscriptionCard
-                            plan="Pro" title="Freelancer Pro"
+                            plan="Pro" title="Freelancer Pro" recommended={true}
+                            ahorro={billingCycle === 'yearly' ? AHORRO_PRO() : null}
                             price={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.precio ?? ''}
                             period={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.periodo ?? ''}
                             priceNote={isPro ? 'Ya tienes este plan. Cambia el ciclo de facturación desde el portal.' : undefined}
@@ -199,7 +202,8 @@ const BillingPage: React.FC = () => {
                             icon={CreditCard}
                         />
                         <SubscriptionCard
-                            plan="Teams" title="Studio Team" recommended={true}
+                            plan="Teams" title="Studio Team"
+                            ahorro={billingCycle === 'yearly' ? AHORRO_TEAM() : null}
                             price={precioDe(billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly')?.precio ?? ''}
                             period={precioDe(billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly')?.periodo ?? ''}
                             priceNote={isTeams ? 'Ya tienes este plan. Cambia el ciclo de facturación desde el portal.' : undefined}
@@ -219,7 +223,7 @@ const BillingPage: React.FC = () => {
                         <div className="space-y-2">
                             <h4 className="text-xl font-bold text-white">¿Necesitas un plan personalizado?</h4>
                             <p className="text-gray-400 text-sm">Si eres una agencia de más de 20 personas, ofrecemos despliegues en infraestructura privada (On-Premise) y soporte dedicado.</p>
-                            <a href="mailto:anixydev@gmail.com" className="text-primary-400 text-sm font-bold hover:underline mt-2 inline-block">Hablar con ventas →</a>
+                            <a href="mailto:soporte@devfreelancer.app?subject=Plan%20Enterprise" className="text-primary-400 text-sm font-bold hover:underline mt-2 inline-block">Hablar con ventas →</a>
                         </div>
                     </CardContent>
                 </Card>

@@ -18,32 +18,16 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#030712" />
 
-    <!-- Conexiones anticipadas: fuentes + API de Supabase (primera llamada de sesión) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Conexión anticipada con la API de Supabase (primera llamada de sesión) -->
     <link rel="preconnect" href="https://umqsjycqypxvhbhmidma.supabase.co" crossorigin />
 
     <!--
-      CAMBIO (rendimiento): la hoja de estilos de Google Fonts bloqueaba el
-      renderizado 750 ms (Lighthouse: "Solicitudes que bloquean el renderizado").
-      Con rel="preload" + onload el navegador la descarga en paralelo y la
-      aplica al llegar, sin retrasar el primer pintado. Las familias y pesos
-      son exactamente los mismos que antes, así que no cambia nada visual;
-      display=swap ya hacía que el texto se viera con la fuente de sistema
-      mientras tanto.
+      Fuentes servidas desde la propia web (public/fonts, @font-face en
+      index.css) en lugar de Google Fonts: quien visita la web no conecta con
+      Google. Se precargan las dos que se ven nada más entrar (texto y titular).
     -->
-    <link
-      rel="preload"
-      as="style"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap"
-      />
-    </noscript>
+    <link rel="preload" href="/fonts/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/space-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
 
     <!--
       CAMBIO (rendimiento): se elimina <script src="https://js.stripe.com/v3/">.

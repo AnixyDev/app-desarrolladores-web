@@ -19,8 +19,8 @@
  * Y UNA TERCERA: "publicas", SIN SESION
  * Las paginas a las que llega quien no ha entrado: login, registro, portal
  * del cliente, precios, pago de facturas. Cada una tiene que ENSEÑAR un texto
- * suyo concreto — no vale medir cuanto texto hay, porque el banner de cookies
- * ya pasa de 40 caracteres. Asi es como /portal/login estuvo dos meses en
+ * suyo concreto — no vale medir cuanto texto hay, porque el antiguo banner de cookies
+ * ya pasaba de 40 caracteres. Asi es como /portal/login estuvo dos meses en
  * negro sin que esta prueba lo viera: solo miraba paginas con sesion.
  *
  * LO QUE NO PRUEBA
@@ -223,8 +223,11 @@ const PUBLICAS = {
   '/portal/login':                       /Acceso al Portal/,
   '/portal/login?email=c@ejemplo.com':   /Acceso al Portal/,
   '/portal/dashboard':                   /Acceso al Portal/,   // sin sesion, al login
-  '/privacy':                            /Política de Privacidad/,
-  '/terms':                              /Términos del Servicio/,
+  '/privacy':                            /Política de privacidad/,   // misma página que /privacidad
+  '/privacidad':                         /Política de privacidad/,
+  '/aviso-legal':                        /Aviso legal/,
+  '/cookies':                            /Política de cookies/,
+  '/terms':                              /Términos y condiciones/,
   '/pricing':                            /Precios Transparentes/,
   '/cuenta-eliminada':                   /Tu cuenta se ha eliminado/,
   [`/pay/${FACTURA_PUBLICA}`]:           /Factura F-PRUEBA-1/,

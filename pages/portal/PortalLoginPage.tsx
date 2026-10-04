@@ -1,3 +1,4 @@
+import PieLegal from '@/components/PieLegal';
 import React, { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
@@ -59,7 +60,7 @@ const PortalLoginPage: React.FC = () => {
   };
 
   return (
-    <div className="flex justify-center items-center pt-16 px-4">
+    <div className="flex flex-col justify-center items-center pt-16 px-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <h2 className="text-xl font-bold text-center text-white">Acceso al Portal</h2>
@@ -98,6 +99,7 @@ const PortalLoginPage: React.FC = () => {
           )}
         </CardContent>
       </Card>
+      <PieLegal variante="compacto" className="mt-6" />
     </div>
   );
 };

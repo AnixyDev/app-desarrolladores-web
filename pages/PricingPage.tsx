@@ -21,6 +21,8 @@ import { CheckCircleIcon, CreditCard, Users, SettingsIcon } from '@/components/i
 // Los precios salen del catalogo, junto al priceId con el que Stripe cobra.
 import { precioDe } from '../supabase/functions/_shared/catalogo-stripe';
 import OfertaFundadores from '@/components/OfertaFundadores';
+import { AHORRO_PRO, AHORRO_TEAM, ahorroMaximo } from '@/lib/ahorroAnual';
+import { ENLACES_LEGALES } from '@/components/PieLegal';
 import { useAppStore } from '@/hooks/useAppStore';
 import { RUTA_PAGO_FUNDADORES, guardarIntencionFundadores } from '@/lib/intencionFundadores';
 
@@ -42,15 +44,15 @@ const PricingPage: React.FC = () => {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
 
   const PlanCard = ({
-    title, price, period, priceNote, description, features, recommended, ctaLabel, onCta, icon: Icon,
+    title, price, period, priceNote, ahorro, description, features, recommended, ctaLabel, onCta, icon: Icon,
   }: {
-    title: string; price: string; period: string; priceNote?: string; description: string;
+    title: string; price: string; period: string; priceNote?: string; ahorro?: number | null; description: string;
     features: string[]; recommended?: boolean; ctaLabel: string; onCta: () => void; icon: any;
   }) => (
     <div className={`relative flex flex-col p-6 sm:p-8 bg-gray-900 rounded-3xl border transition-all duration-300 ${recommended ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-gray-800 hover:border-gray-700'}`}>
       {recommended && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="inline-flex items-center px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-lg shadow-primary-500/20">Más Popular</span>
+          <span className="inline-flex items-center px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-lg shadow-primary-500/20">Recomendado</span>
         </div>
       )}
       <div className="mb-8">
@@ -61,6 +63,7 @@ const PricingPage: React.FC = () => {
         <div className="mt-4 flex items-baseline gap-1">
           <span className="text-4xl font-black text-white tracking-tighter">{price}</span>
           <span className="text-sm text-gray-500 font-medium">/{period}</span>
+          {ahorro ? <span className="ml-2 self-center bg-green-500/15 text-green-400 text-[11px] font-bold px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra {ahorro} %</span> : null}
         </div>
         {priceNote && <p className="text-xs text-gray-500 mt-1">{priceNote}</p>}
         <p className="text-gray-400 mt-4 text-sm">{description}</p>
@@ -109,7 +112,7 @@ const PricingPage: React.FC = () => {
 
           <div className="inline-flex p-1 bg-gray-900 border border-gray-800 rounded-2xl shadow-inner">
             <button onClick={() => setBillingCycle('monthly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Mensual</button>
-            <button onClick={() => setBillingCycle('yearly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Anual <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-lg border border-green-500/30">-20%</span></button>
+            <button onClick={() => setBillingCycle('yearly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Anual <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra hasta {ahorroMaximo()} %</span></button>
           </div>
         </div>
 
@@ -134,6 +137,8 @@ const PricingPage: React.FC = () => {
             title="Freelancer Pro"
             price={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.precio ?? ''}
             period={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.periodo ?? ''}
+            recommended
+            ahorro={billingCycle === 'yearly' ? AHORRO_PRO() : null}
             description="Todo lo que necesitas para escalar tu negocio."
             features={["Proyectos e Hitos ilimitados", "Facturación AEAT (Veri*Factu) · TicketBAI próximamente", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
             ctaLabel="Empezar con Pro"
@@ -144,7 +149,7 @@ const PricingPage: React.FC = () => {
             title="Studio Team"
             price={precioDe(billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly')?.precio ?? ''}
             period={precioDe(billingCycle === 'monthly' ? 'teamsPlan' : 'teamsPlanYearly')?.periodo ?? ''}
-            recommended
+            ahorro={billingCycle === 'yearly' ? AHORRO_TEAM() : null}
             description="Para equipos y agencias en crecimiento."
             features={["Hasta 5 miembros de equipo", "Roles y permisos avanzados", "Integraciones con Slack y Webhooks", "200 Créditos IA mensuales compartidos"]}
             ctaLabel="Empezar con Team"
@@ -162,7 +167,7 @@ const PricingPage: React.FC = () => {
               <div className="space-y-2">
                 <h4 className="text-xl font-bold text-white">¿Necesitas un plan personalizado?</h4>
                 <p className="text-gray-400 text-sm">Si eres una agencia de más de 20 personas, ofrecemos despliegues en infraestructura privada (On-Premise) y soporte dedicado.</p>
-                <a href="mailto:anixydev@gmail.com" className="text-primary-400 text-sm font-bold hover:underline mt-2 inline-block">Hablar con ventas →</a>
+                <a href="mailto:soporte@devfreelancer.app?subject=Plan%20Enterprise" className="text-primary-400 text-sm font-bold hover:underline mt-2 inline-block">Hablar con ventas →</a>
               </div>
             </div>
           </div>
@@ -178,10 +183,11 @@ const PricingPage: React.FC = () => {
           <p className="text-gray-500 text-sm">
             © {new Date().getFullYear()} DevFreelancer. Todos los derechos reservados.
           </p>
-          <div className="flex gap-6">
-            <Link to="/terms" className="text-gray-400 hover:text-white transition-colors">Términos</Link>
-            <Link to="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacidad</Link>
-          </div>
+          <nav aria-label="Información legal" className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+            {ENLACES_LEGALES.map((e) => (
+              <Link key={e.to} to={e.to} className="text-gray-400 hover:text-white transition-colors">{e.texto}</Link>
+            ))}
+          </nav>
         </div>
       </footer>
     </div>

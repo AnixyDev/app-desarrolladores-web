@@ -10,7 +10,7 @@ import { UserIcon, MailIcon, LockIcon, EyeIcon, EyeOffIcon, AlertTriangleIcon, C
 import { GoogleIcon } from '../../components/icons/GoogleIcon';
 import CaptchaTurnstile, { type CaptchaTurnstileHandle } from '../../components/auth/CaptchaTurnstile';
 import { puedeEnviarConCaptcha } from '../../lib/captcha';
-import { codigoDeLaUrl, guardarCodigoPendiente, leerCodigoPendiente } from '../../lib/afiliados';
+import { codigoDeLaUrl, urlDeVueltaConReferido } from '../../lib/afiliados';
 import { guardarIntencionFundadores, pideFundadores } from '../../lib/intencionFundadores';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -29,12 +29,9 @@ const RegisterPage: React.FC = () => {
     const captcha = useRef<CaptchaTurnstileHandle>(null);
     const location = useLocation();
 
-    // Enlace de afiliado (/register?ref=CODIGO): se guarda para usarlo en el
-    // alta, y para vincularlo después si la cuenta se crea con Google.
-    useEffect(() => {
-        const codigo = codigoDeLaUrl(location.search);
-        if (codigo) guardarCodigoPendiente(codigo);
-    }, [location.search]);
+    // Enlace de afiliado (/register?ref=CODIGO): el código se lee de la URL y
+    // se manda con el alta; no se guarda en el navegador (ver lib/afiliados.ts).
+    const codigoAfiliado = codigoDeLaUrl(location.search);
 
     // Enlace con ?oferta=fundadores (desde /pricing o compartido en redes):
     // tras crear la cuenta, la app lleva directamente al pago de fundadores.
@@ -54,7 +51,7 @@ const RegisterPage: React.FC = () => {
 
         setLoading(true);
         try {
-            const result = await register(name, email, password, captchaToken, codigoDeLaUrl(location.search) ?? leerCodigoPendiente());
+            const result = await register(name, email, password, captchaToken, codigoAfiliado);
             if (result.success) {
                 // FIX: no navegamos directo a "/" en silencio. Si el proyecto tiene
                 // confirmación de email activada (lo habitual), signUp() no crea
@@ -82,7 +79,8 @@ const RegisterPage: React.FC = () => {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin,
+                    // Con enlace de afiliado, el código vuelve en la URL para vincularlo.
+                    redirectTo: urlDeVueltaConReferido(window.location.origin, codigoAfiliado),
                 },
             });
             if (error) throw error;

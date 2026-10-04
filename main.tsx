@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import './index.css';
+import { borrarClavesAntiguas } from './lib/afiliados';
+
+// Claves que dejaron de usarse (código de afiliado y antiguo aviso de cookies).
+borrarClavesAntiguas();
 
 // IMPORTANTE: React.StrictMode se elimina intencionalmente.
 // StrictMode monta y desmonta efectos dos veces en desarrollo,

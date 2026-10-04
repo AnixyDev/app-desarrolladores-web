@@ -1,5 +1,10 @@
 import { supabase } from '@/lib/supabaseClient'; // Quita el getURL de aquí
-import { loadStripe, Stripe } from '@stripe/stripe-js';
+// '/pure': Stripe.js se descarga solo al llamar a loadStripe() (al pagar), no al
+// importar este archivo. Con la entrada normal se cargaba en todas las páginas
+// que usan este servicio (la home, por el contador de Fundadores) y ponía las
+// cookies de Stripe sin estar pagando.
+import { loadStripe } from '@stripe/stripe-js/pure';
+import type { Stripe } from '@stripe/stripe-js';
 
 // Define getURL aquí mismo para evitar el error de importación
 const getURL = () => {

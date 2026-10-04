@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import OfertaFundadores from '@/components/OfertaFundadores';
+import PieLegal from '@/components/PieLegal';
+import { guardarIntencionFundadores } from '@/lib/intencionFundadores';
 import { Logo } from '@/components/icons/Logo';
 import Button from '@/components/ui/Button';
 import {
@@ -181,6 +184,12 @@ const COMMITS = [
   { hash: '9c4a88f', msg: 'cobra online — link de pago con Stripe, sin esperar transferencias' },
 ];
 
+const CAPTURAS = [
+  { src: '/capturas/clientes.svg', alt: 'Lista de clientes en DevFreelancer', titulo: 'Clientes', texto: 'Datos fiscales, proyectos y facturas de cada cliente en una ficha.' },
+  { src: '/capturas/factura.svg', alt: 'Factura con IVA, IRPF y código QR en DevFreelancer', titulo: 'Facturas', texto: 'IVA, IRPF y QR tributario calculados al crearla.' },
+  { src: '/capturas/proyecto.svg', alt: 'Tablero de un proyecto en DevFreelancer', titulo: 'Proyectos', texto: 'Tareas, hitos y horas de cada proyecto en un tablero.' },
+];
+
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
 
@@ -236,6 +245,19 @@ const LandingPage: React.FC = () => {
           </div>
 
           <TerminalHero />
+        </section>
+
+        {/* ── Plan Fundadores: contador real del servidor; se oculta solo si no hay plazas o ha cerrado ── */}
+        <section className="px-6 pb-20">
+          <OfertaFundadores
+            textoBoton="Crear cuenta y pagar"
+            onElegir={() => {
+              // Esta página solo la ven visitantes sin sesión: se recuerda la
+              // intención y, tras registrarse, la app abre el pago.
+              guardarIntencionFundadores();
+              navigate('/auth/register?oferta=fundadores');
+            }}
+          />
         </section>
 
         {/* ── Import strip ── */}
@@ -300,6 +322,29 @@ const LandingPage: React.FC = () => {
           </div>
         </section>
 
+        {/* ── Capturas de la app ── */}
+        {/* Imágenes de EJEMPLO en public/capturas/: sustitúyelas por capturas
+            reales con el mismo nombre (relación 16:10, p. ej. 1600×1000). */}
+        <section className="py-24 px-6 max-w-6xl mx-auto">
+          <Reveal className="mb-12 text-center">
+            <h2 className="font-display text-3xl sm:text-4xl font-bold mb-3">Así se ve por dentro</h2>
+            <p className="text-gray-400">Tus clientes, tus facturas y tus proyectos, cada cosa en su sitio.</p>
+          </Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {CAPTURAS.map((c) => (
+              <Reveal key={c.src}>
+                <figure className="rounded-xl border border-gray-800 bg-gray-900/40 overflow-hidden">
+                  <img src={c.src} alt={c.alt} width={1600} height={1000} loading="lazy" decoding="async" className="w-full h-auto aspect-[16/10] object-cover bg-[#0d1117]" />
+                  <figcaption className="px-5 py-4">
+                    <p className="font-semibold text-gray-200">{c.titulo}</p>
+                    <p className="text-sm text-gray-500 mt-1">{c.texto}</p>
+                  </figcaption>
+                </figure>
+              </Reveal>
+            ))}
+          </div>
+        </section>
+
         {/* ── Franja: equipo + IA ── */}
         <section className="py-24 px-6 max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
           <Reveal className="rounded-xl border border-gray-800 bg-gray-900/40 p-8">
@@ -330,15 +375,7 @@ const LandingPage: React.FC = () => {
         </section>
       </main>
 
-      <footer className="text-center py-8 text-sm text-gray-500 border-t border-gray-900">
-        <Link to="/privacy" className="hover:text-primary-400 transition-colors">
-          Política de Privacidad
-        </Link>
-        {' · '}
-        <Link to="/terms" className="hover:text-primary-400 transition-colors">
-          Términos de Servicio
-        </Link>
-      </footer>
+      <PieLegal />
     </div>
   );
 };

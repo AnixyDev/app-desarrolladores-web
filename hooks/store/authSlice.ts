@@ -2,7 +2,6 @@ import { StateCreator } from 'zustand';
 import { AppState } from '../useAppStore';
 import { Profile, GoogleJwtPayload } from '../../types';
 import { supabase } from '../../lib/supabaseClient';
-import { vincularReferidoPendiente } from '../../lib/afiliados';
 import { logger } from '../../lib/loggerService';
 import { opcionesCaptcha, esErrorDeCaptcha, MENSAJE_CAPTCHA_FALLIDO } from '../../lib/captcha';
 import type { Session } from '@supabase/supabase-js';
@@ -235,9 +234,6 @@ export const createAuthSlice: StateCreator<AppState, [], [], AuthSlice> = (set, 
                 } else {
                     logger.info("Perfil cargado correctamente");
                     set({ profile: await conSaldoDeCreditos(profileData as Profile), isAuthenticated: true });
-                    // Alta con Google desde un enlace de afiliado: se vincula ahora.
-                    // En segundo plano: nunca debe retrasar ni romper el acceso.
-                    vincularReferidoPendiente().catch(() => {});
                 }
             } catch (error) {
                 console.error("💥 RefreshProfile Error:", error);
