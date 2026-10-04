@@ -17,7 +17,9 @@ import AlEntrarConOferta from './components/AlEntrarConOferta';
 import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import PrivacidadPage from './pages/legal/PrivacidadPage';
+import AvisoLegalPage from './pages/legal/AvisoLegalPage';
+import CookiesPage from './pages/legal/CookiesPage';
 import TermsOfService from './pages/TermsOfService';
 import PricingPage from './pages/PricingPage';
 import PublicInvoicePayPage from './pages/PublicInvoicePayPage';
@@ -204,7 +206,11 @@ function App() {
                     </Route>
 
                     {/* Páginas públicas */}
-                    <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                    <Route path="/aviso-legal" element={<AvisoLegalPage />} />
+                    <Route path="/privacidad" element={<PrivacidadPage />} />
+                    {/* URL registrada en la pantalla de consentimiento de Google: debe seguir funcionando. */}
+                    <Route path="/privacy" element={<PrivacidadPage />} />
+                    <Route path="/cookies" element={<CookiesPage />} />
                     <Route path="/terms" element={<TermsOfService />} />
                     <Route path="/pricing" element={<PricingPage />} />
                     <Route path="/cuenta-eliminada" element={<Suspense fallback={<LoadingFallback />}><CuentaEliminadaPage /></Suspense>} />

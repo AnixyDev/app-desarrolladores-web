@@ -1,3 +1,4 @@
+import PieLegal from '@/components/PieLegal';
 import React, { useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { SIDEBAR_STRUCTURE, type SidebarItem } from '@/constants';
@@ -193,6 +194,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               </span>
             </div>
           </div>
+
+          <PieLegal variante="compacto" />
         </div>
       </aside>
     </>

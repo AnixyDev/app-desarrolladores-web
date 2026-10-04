@@ -1,0 +1,30 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000' width='1600' height='1000'>
+<rect width='1600' height='1000' fill='#0d1117'/>
+<rect width='280' height='1000' fill='#111827'/>
+<rect x='280' width='1' height='1000' fill='#1f2937'/>
+<circle cx='60' cy='70' r='18' fill='#d9009f'/><text x='92' y='78' font-family='Inter, system-ui, sans-serif' font-size='24' font-weight='800' font-style='italic' fill='#fff'>DevFreelancer</text>
+<text x='56' y='200' font-family='Inter, system-ui, sans-serif' font-size='22' fill='#9ca3af'>Panel</text><text x='56' y='264' font-family='Inter, system-ui, sans-serif' font-size='22' fill='#9ca3af'>Clientes</text><text x='56' y='328' font-family='Inter, system-ui, sans-serif' font-size='22' fill='#9ca3af'>Proyectos</text><rect x='24' y='358' width='232' height='48' rx='12' fill='#d9009f' fill-opacity='.15'/><text x='56' y='392' font-family='Inter, system-ui, sans-serif' font-size='22' fill='#f472d0' font-weight='600'>Facturas</text><text x='56' y='456' font-family='Inter, system-ui, sans-serif' font-size='22' fill='#9ca3af'>Gastos</text><text x='56' y='520' font-family='Inter, system-ui, sans-serif' font-size='22' fill='#9ca3af'>Informes</text>
+<text x='340' y='90' font-family='Inter, system-ui, sans-serif' font-size='40' font-weight='700' fill='#f9fafb'>Factura FACT-2026-0042</text>
+<rect x='340' y='140' width='760' height='740' rx='16' fill='#f9fafb'/>
+<text x='384' y='210' font-family='Inter, system-ui, sans-serif' font-size='32' font-weight='800' fill='#111827'>FACTURA</text>
+<text x='384' y='248' font-family='JetBrains Mono, ui-monospace, monospace' font-size='20' fill='#6b7280'>FACT-2026-0042 · 01/10/2026</text>
+<text x='384' y='320' font-family='Inter, system-ui, sans-serif' font-size='18' fill='#6b7280'>Cliente</text><text x='384' y='350' font-family='Inter, system-ui, sans-serif' font-size='22' fill='#111827' font-weight='600'>Estudio Norte S.L.</text>
+<rect x='384' y='400' width='672' height='1' fill='#e5e7eb'/>
+<text x='384' y='450' font-family='Inter, system-ui, sans-serif' font-size='20' fill='#374151'>Desarrollo API REST</text><text x='1056' y='450' font-family='JetBrains Mono, ui-monospace, monospace' font-size='20' fill='#111827' text-anchor='end'>1.200,00 €</text>
+<text x='384' y='500' font-family='Inter, system-ui, sans-serif' font-size='20' fill='#374151'>Mantenimiento mensual</text><text x='1056' y='500' font-family='JetBrains Mono, ui-monospace, monospace' font-size='20' fill='#111827' text-anchor='end'>350,00 €</text>
+<rect x='384' y='540' width='672' height='1' fill='#e5e7eb'/>
+<text x='384' y='590' font-family='Inter, system-ui, sans-serif' font-size='20' fill='#6b7280'>Base imponible</text><text x='1056' y='590' font-family='JetBrains Mono, ui-monospace, monospace' font-size='20' fill='#111827' text-anchor='end'>1.550,00 €</text>
+<text x='384' y='630' font-family='Inter, system-ui, sans-serif' font-size='20' fill='#6b7280'>IVA 21 %</text><text x='1056' y='630' font-family='JetBrains Mono, ui-monospace, monospace' font-size='20' fill='#111827' text-anchor='end'>325,50 €</text>
+<text x='384' y='670' font-family='Inter, system-ui, sans-serif' font-size='20' fill='#6b7280'>IRPF −15 %</text><text x='1056' y='670' font-family='JetBrains Mono, ui-monospace, monospace' font-size='20' fill='#111827' text-anchor='end'>−232,50 €</text>
+<rect x='384' y='700' width='672' height='72' rx='10' fill='#fdf2fa'/>
+<text x='408' y='746' font-family='Inter, system-ui, sans-serif' font-size='24' font-weight='700' fill='#111827'>Total</text><text x='1032' y='746' font-family='JetBrains Mono, ui-monospace, monospace' font-size='26' font-weight='700' fill='#d9009f' text-anchor='end'>1.643,00 €</text>
+<rect x='1140' y='140' width='400' height='300' rx='16' fill='#111827' stroke='#1f2937'/>
+<text x='1172' y='196' font-family='Inter, system-ui, sans-serif' font-size='20' fill='#9ca3af'>Estado</text>
+<rect x='1172' y='220' width='120' height='40' rx='20' fill='#22c55e' fill-opacity='.15'/><text x='1232' y='247' font-family='Inter, system-ui, sans-serif' font-size='18' font-weight='700' fill='#4ade80' text-anchor='middle'>PAGADA</text>
+<text x='1172' y='310' font-family='Inter, system-ui, sans-serif' font-size='20' fill='#9ca3af'>Cobrada con</text><text x='1172' y='344' font-family='Inter, system-ui, sans-serif' font-size='22' fill='#e5e7eb'>Tarjeta (Stripe)</text>
+<text x='1172' y='400' font-family='JetBrains Mono, ui-monospace, monospace' font-size='18' fill='#6b7280'>03/10/2026 · 10:42</text>
+<rect x='1140' y='470' width='400' height='60' rx='12' fill='#d9009f'/><text x='1340' y='508' font-family='Inter, system-ui, sans-serif' font-size='20' font-weight='600' fill='#fff' text-anchor='middle'>Descargar PDF</text>
+<rect x='1140' y='550' width='400' height='60' rx='12' fill='#1f2937'/><text x='1340' y='588' font-family='Inter, system-ui, sans-serif' font-size='20' fill='#e5e7eb' text-anchor='middle'>Enviar por email</text>
+<rect x='1268' y='932' width='300' height='44' rx='22' fill='#000' fill-opacity='.6' stroke='#4b5563'/>
+<text x='1418' y='961' font-family='Inter, system-ui, sans-serif' font-size='20' fill='#e5e7eb' text-anchor='middle'>Captura de ejemplo</text>
+</svg>

@@ -61,9 +61,8 @@ const CookieBanner: React.FC = () => {
                             <div>
                                 <h4 className="text-sm font-bold text-white mb-1">Tu privacidad nos importa</h4>
                                 <p className="text-xs leading-relaxed text-gray-400">
-                                    Utilizamos cookies propias y de terceros para mejorar tu experiencia y analizar el uso de nuestra web. Al continuar navegando, aceptas nuestra{' '}
-                                    {/* FIX: la ruta real registrada en App.tsx es /privacy, no /politica-de-privacidad */}
-                                    <Link to="/privacy" className="text-primary-400 hover:underline">Política de Privacidad</Link>.
+                                    Usamos cookies técnicas para que la web funcione y, si llegas con un enlace de afiliado, guardamos su código. No usamos cookies de analítica ni de publicidad. Más información en la{' '}
+                                    <Link to="/cookies" className="text-primary-400 hover:underline">Política de cookies</Link>.
                                 </p>
                             </div>
                             <div className="flex items-center gap-3">

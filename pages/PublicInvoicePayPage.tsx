@@ -12,6 +12,7 @@
 // subconjunto de datos necesario para pagar) y reutiliza StripePaymentModal,
 // que ya soporta pagos sin sesión.
 
+import PieLegal from '@/components/PieLegal';
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient';
@@ -181,6 +182,7 @@ const PublicInvoicePayPage: React.FC = () => {
           Pago seguro procesado por Stripe. DevFreelancer nunca almacena los datos de tu tarjeta.
         </p>
       </main>
+      <PieLegal variante="compacto" className="pb-6" />
 
       {isPaymentModalOpen && (
         <Suspense fallback={null}>
