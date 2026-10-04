@@ -172,7 +172,7 @@ const ResetPasswordPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="text-gray-500 hover:text-gray-300 focus:outline-none focus:text-primary-400"
+                className="-m-2 p-2 text-gray-500 hover:text-gray-300 focus:outline-none focus:text-primary-400"
                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                 tabIndex={-1}
               >

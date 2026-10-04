@@ -142,7 +142,7 @@ const RegisterPage: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => setShowPassword((v) => !v)}
-                                className="text-gray-500 hover:text-gray-300 focus:outline-none focus:text-primary-400"
+                                className="-m-2 p-2 text-gray-500 hover:text-gray-300 focus:outline-none focus:text-primary-400"
                                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                                 tabIndex={-1}
                             >
@@ -185,7 +185,7 @@ const RegisterPage: React.FC = () => {
             <Button
                 type="button"
                 variant="secondary"
-                className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
+                className="w-full flex items-center justify-center gap-2 !bg-white !text-gray-900 hover:!bg-gray-200 border-none"
                 onClick={handleGoogleRegister}
             >
                 <GoogleIcon className="w-[18px] h-[18px]" />

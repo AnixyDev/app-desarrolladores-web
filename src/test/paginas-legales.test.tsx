@@ -150,3 +150,18 @@ describe('Stripe.js', () => {
     expect(leer('App.tsx')).not.toMatch(/CookieBanner/);
   });
 });
+
+describe('vista previa al compartir', () => {
+  it('index.html tiene Open Graph con imagen de 1200x630 que existe', () => {
+    const html = leer('index.html');
+    for (const p of ['og:title', 'og:description', 'og:url', 'og:image', 'twitter:card']) expect(html).toContain(p);
+    expect(html).toContain('https://devfreelancer.app/og-devfreelancer.jpg');
+    expect(readFileSync(resolve(raiz, 'public/og-devfreelancer.jpg')).length).toBeGreaterThan(10_000);
+  });
+
+  it('el botón de Google no queda con texto claro sobre fondo blanco', () => {
+    for (const f of ['pages/LoginPage.tsx', 'pages/auth/RegisterPage.tsx']) {
+      expect(leer(f), f).toMatch(/!bg-white !text-gray-900/);
+    }
+  });
+});
