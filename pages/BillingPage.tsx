@@ -8,6 +8,7 @@ import Skeleton from '@/components/ui/Skeleton';
 import { CheckCircleIcon, CreditCard, Users, RefreshCwIcon, SettingsIcon } from '@/components/icons/Icon';
 import { redirectToCheckout, redirectToCheckoutFundadores, redirectToCustomerPortal, StripeItemKey } from '@/services/stripeService';
 import OfertaFundadores from '@/components/OfertaFundadores';
+import CancelarSuscripcion from '@/components/CancelarSuscripcion';
 import { AHORRO_PRO, AHORRO_TEAM, ahorroMaximo } from '@/lib/ahorroAnual';
 import { PARAM_OFERTA, borrarIntencionFundadores, pideFundadores } from '@/lib/intencionFundadores';
 import { useToast } from '@/hooks/useToast';
@@ -213,6 +214,8 @@ const BillingPage: React.FC = () => {
                     </>
                 )}
             </div>
+
+            {(isPro || isTeams) && <CancelarSuscripcion onCambio={() => refreshProfile()} />}
 
             <div className="max-w-3xl mx-auto pt-12">
                 <Card className="bg-gradient-to-br from-gray-900 to-gray-950 border-gray-800">

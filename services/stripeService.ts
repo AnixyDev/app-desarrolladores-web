@@ -241,3 +241,22 @@ export const redirectToCheckoutFundadores = async () => {
 
   window.location.href = data.url;
 };
+
+// ─── Cancelar la suscripción eligiendo cuándo ─────────────────────────────────
+// Lo decide y lo hace el servidor (Edge Function cancelar-suscripcion); aquí
+// solo se pide la acción. Ver supabase/functions/_shared/cancelacion.ts.
+export type AccionCancelacion = 'estado' | 'al_final' | 'ahora' | 'reanudar';
+
+export interface EstadoSuscripcion {
+  tieneSuscripcion: boolean;
+  cancelacionProgramada: boolean;
+  finPeriodo: string | null;
+  esFundadores: boolean;
+  intervalo: 'month' | 'year' | null;
+}
+
+export const gestionarCancelacion = async (accion: AccionCancelacion): Promise<EstadoSuscripcion> => {
+  const { data, error } = await supabase.functions.invoke('cancelar-suscripcion', { body: { accion } });
+  if (error) throw new Error(await mensajeDelServidor(error, 'No se pudo completar la operación. Inténtalo de nuevo.'));
+  return data as EstadoSuscripcion;
+};

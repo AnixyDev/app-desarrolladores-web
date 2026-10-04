@@ -72,10 +72,19 @@ const TermsOfService: React.FC = () => (
 
     <Seccion titulo="5. Cómo cancelar">
       <p>
-        Puedes cancelar cuando quieras desde <strong>Facturación y Plan → Gestionar en el portal → Cancelar
-        suscripción</strong>, o escribiendo a <Correo />. La cancelación evita la siguiente renovación: mantienes el plan
-        hasta el final del periodo ya pagado y después tu cuenta pasa al plan gratuito, sin perder tus datos.
+        Puedes cancelar cuando quieras, sin permanencia, desde <strong>Facturación y Plan → Cancelar suscripción</strong>
+        o escribiendo a <Correo />. Al cancelar eliges cuándo termina:
       </p>
+      <Lista>
+        <li>
+          <strong>Al final del periodo pagado:</strong> mantienes tu plan hasta ese día y no se renueva. Puedes reanudar
+          la suscripción antes de esa fecha.
+        </li>
+        <li>
+          <strong>En el momento:</strong> tu cuenta pasa al plan gratuito al instante.
+        </li>
+      </Lista>
+      <p>En los dos casos conservas todos tus datos.</p>
       <p>
         Fuera del derecho de desistimiento (apartado 7), no se devuelve la parte no consumida del periodo en curso.
       </p>
