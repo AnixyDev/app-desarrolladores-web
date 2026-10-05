@@ -45,6 +45,17 @@ describe('datos de la FAQ (lib/faq.ts)', () => {
     expect(JSON.stringify(datos)).not.toMatch(/PENDIENTE/);
   });
 
+  it('no queda nada pendiente: las siete preguntas van al JSON-LD', () => {
+    for (const p of PREGUNTAS_FAQ) expect(tienePendiente(p), p.id).toBe(false);
+    expect((faqJsonLd() as any).mainEntity).toHaveLength(7);
+  });
+
+  it('no afirma que la app envíe registros a la AEAT (no lo hace todavía)', () => {
+    const verifactu = PREGUNTAS_FAQ.find((p) => p.id === 'verifactu')!.respuesta.join(' ');
+    expect(verifactu).toMatch(/todavía no está disponible/);
+    expect(verifactu).not.toMatch(/cumple(n)? (el|con)/i);
+  });
+
   it('sin preguntas publicables no genera JSON-LD', () => {
     const solo: PreguntaFaq[] = [{ id: 'x', pregunta: '¿?', respuesta: ['[PENDIENTE: algo]'] }];
     expect(faqJsonLd(solo)).toBeNull();

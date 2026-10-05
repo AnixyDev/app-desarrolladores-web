@@ -413,3 +413,72 @@ enabled = true
 # formatted with uppercase keywords, indent 2, max width 180, trailing commas,
 # and column/key alignment. Set to "null" to emit raw, unformatted SQL.
 # format_options = "{\"keywordCase\":\"upper\",\"indent\":2,\"maxWidth\":180,\"commaStyle\":\"trailing\"}"
+
+# ── Edge Functions: verificación de sesión (JWT) ─────────────────────────
+# Igual que en producción (05/10/2026). La integración de Supabase con GitHub
+# despliega las funciones al fusionar en main: sin esto usaría el valor por
+# defecto (verify_jwt = true) y rompería las que llaman servicios externos o
+# tareas programadas, como stripe-webhook (Stripe no envía sesión).
+# Al crear una función nueva, añádela aquí.
+[functions.ai-gemini]
+verify_jwt = true
+
+[functions.bank-connect]
+verify_jwt = false
+
+[functions.bank-sync]
+verify_jwt = false
+
+[functions.cancelar-suscripcion]
+verify_jwt = true
+
+[functions.certificate-expiry-alert]
+verify_jwt = true
+
+[functions.checkout-fundadores]
+verify_jwt = true
+
+[functions.create-checkout-session]
+verify_jwt = true
+
+[functions.create-connect-account]
+verify_jwt = true
+
+[functions.create-portal-session]
+verify_jwt = false
+
+[functions.eliminar-cuenta]
+verify_jwt = true
+
+[functions.get-public-invoice]
+verify_jwt = false
+
+[functions.invite-portal-client]
+verify_jwt = true
+
+[functions.invite-team-member]
+verify_jwt = true
+
+[functions.manage-secrets]
+verify_jwt = false
+
+[functions.payment-sheet]
+verify_jwt = false
+
+[functions.plazas-fundadores]
+verify_jwt = true
+
+[functions.process-recurring-invoices]
+verify_jwt = false
+
+[functions.recordatorios-cobro]
+verify_jwt = false
+
+[functions.send-document-email]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.weekly-profitability-alert]
+verify_jwt = false

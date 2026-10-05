@@ -21,7 +21,8 @@ const PROMESAS_VERIFICADAS: Record<string, string> = {
     '10 créditos IA': 'profiles.ai_credits default 10 (+ disparador de columnas de pago: una alta desde el navegador nace con 10)',
     // Pro
     'Proyectos e Hitos ilimitados': 'project_milestones + supabase/pruebas/hitos-de-proyecto.sql',
-    'Facturación AEAT (Veri*Factu) · TicketBAI próximamente': 'Veri*Factu: fiscal_records y /fiscal. TicketBAI marcado como próximamente (decisión de Ana, 26/09)',
+    // 05/10: antes decía «Facturación AEAT (Veri*Factu)», pero no hay envío a la AEAT.
+    'Facturas con huella y QR (Veri*Factu) · envío a la AEAT y TicketBAI próximamente': 'registrar_factura_fiscal() (huella SHA-256 encadenada) + QR en pdfService.ts; envío a la AEAT y TicketBAI marcados como próximamente',
     'Canal de chat privado por proyecto': 'project_messages + ProjectChat (auditoría 24/09)',
     '50 Créditos IA mensuales': 'recargar_creditos_mensuales() + supabase/pruebas/recarga-mensual-de-creditos.sql',
     // Teams
@@ -50,6 +51,12 @@ describe.each(['pages/PricingPage.tsx', 'pages/BillingPage.tsx'])('%s', (fichero
         expect(PROMESAS_VERIFICADAS, `Promesa sin verificar: «${promesa}». Compruébala y añádela a PROMESAS_VERIFICADAS.`)
             .toHaveProperty([promesa]);
     });
+});
+
+it('no se vuelve a prometer «Facturación AEAT» mientras no haya envío a la AEAT', () => {
+    for (const f of ['pages/PricingPage.tsx', 'pages/BillingPage.tsx']) {
+        expect(fs.readFileSync(path.join(RAIZ, f), 'utf8')).not.toMatch(/Facturación AEAT/);
+    }
 });
 
 it('"TicketBAI ready" no vuelve a aparecer como si existiera', () => {

@@ -38,9 +38,9 @@ export const PREGUNTAS_FAQ: PreguntaFaq[] = [
     id: 'verifactu',
     pregunta: '¿Mis facturas cumplen Verifactu?',
     respuesta: [
-      'DevFreelancer prepara tus facturas para el reglamento de sistemas de facturación (Veri*Factu): cada factura genera un registro con una huella digital (SHA-256) encadenada a la anterior, el PDF lleva el código QR de verificación de la Agencia Tributaria y, una vez emitida, la factura queda bloqueada. Para corregirla se emite una factura rectificativa.',
-      'Hoy funciona en la modalidad «No Veri*Factu», en la que los registros se conservan en el sistema. El envío automático de cada registro a la Agencia Tributaria (modalidad Veri*Factu) todavía no está disponible; puedes dejar tu certificado digital preparado en Ajustes.',
-      '[PENDIENTE: confirmar que el formato de la huella y del registro se ha contrastado con la especificación técnica oficial de la AEAT y si DevFreelancer ha presentado la declaración responsable como fabricante del software, antes de afirmar que «cumple».]',
+      'DevFreelancer ya hace la parte que se queda en tu cuenta: cada factura genera un registro con una huella digital (SHA-256) encadenada a la anterior, el PDF lleva el código QR de verificación de la Agencia Tributaria y, una vez emitida, la factura queda bloqueada. Para corregirla se emite una factura rectificativa.',
+      'Lo que todavía no está disponible es el envío automático de cada registro a la Agencia Tributaria (modalidad Veri*Factu). Mientras tanto la app funciona en la modalidad «No Veri*Factu» y puedes dejar tu certificado digital preparado en Ajustes.',
+      'Las obligaciones y los plazos dependen de tu actividad: si necesitas cumplir ya con el reglamento, consúltalo con tu gestoría.',
     ],
   },
   {
@@ -48,8 +48,8 @@ export const PREGUNTAS_FAQ: PreguntaFaq[] = [
     pregunta: '¿Puedo pasarle los datos a mi gestoría?',
     respuesta: [
       'Sí. En el Libro Fiscal (planes de pago) puedes descargar, por trimestre o por año, un archivo CSV con tus ingresos y gastos (fecha, tercero, base imponible, IVA, IRPF y total) y un borrador en PDF de los modelos 303 y 130 para que tu gestoría lo revise. El borrador no sustituye la presentación oficial ante la Agencia Tributaria.',
+      'Incluye también las facturas a clientes de otro país, que van sin IVA español, con el motivo en una columna aparte para que tu gestoría las identifique.',
       'Además, cada factura se descarga en PDF y el registro fiscal de tus facturas se puede exportar completo.',
-      '[PENDIENTE: confirmar. Hoy el Libro Fiscal y su CSV no incluyen las facturas sin IVA ni IRPF, como las de clientes extranjeros: o se corrige antes de publicar esta respuesta, o se avisa aquí.]',
     ],
   },
   {
@@ -73,9 +73,8 @@ export const PREGUNTAS_FAQ: PreguntaFaq[] = [
     id: 'cancelar',
     pregunta: '¿Puedo cancelar cuando quiera?',
     respuesta: [
-      'Sí, sin permanencia. Desde Facturación y Plan → Gestionar en el portal puedes cancelar tu suscripción en cualquier momento.',
-      '[PENDIENTE: confirmar en la configuración del portal de clientes de Stripe que la cancelación se aplica al final del periodo ya pagado, como dicen los Términos, y no en el momento.]',
-      'No se devuelve la parte no usada del periodo en curso, salvo el derecho de desistimiento de 14 días si contratas como consumidor. Lo tienes todo en los Términos y condiciones.',
+      'Sí, sin permanencia. Desde Facturación y Plan → Cancelar suscripción eliges cuándo termina: al final del periodo ya pagado (sigues con tu plan hasta ese día y puedes reanudarla antes) o en el momento (tu cuenta pasa al plan gratuito al instante).',
+      'En los dos casos conservas todos tus datos. No se devuelve la parte no usada del periodo en curso, salvo el derecho de desistimiento de 14 días si contratas como consumidor. Lo tienes todo en los Términos y condiciones.',
     ],
   },
 ];

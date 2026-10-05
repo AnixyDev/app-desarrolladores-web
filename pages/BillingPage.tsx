@@ -197,7 +197,7 @@ const BillingPage: React.FC = () => {
                             price={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.precio ?? ''}
                             period={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.periodo ?? ''}
                             priceNote={isPro ? 'Ya tienes este plan. Cambia el ciclo de facturación desde el portal.' : undefined}
-                            features={["Proyectos e Hitos ilimitados", "Facturación AEAT (Veri*Factu) · TicketBAI próximamente", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
+                            features={["Proyectos e Hitos ilimitados", "Facturas con huella y QR (Veri*Factu) · envío a la AEAT y TicketBAI próximamente", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
                             isCurrent={isPro}
                             itemKey={billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly'}
                             icon={CreditCard}
