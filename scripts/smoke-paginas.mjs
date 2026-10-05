@@ -88,7 +88,7 @@ const ESQUEMA = {
  proposals:"id=t,user_id=t,client_id=t,title=t,content=t?,amount_cents=i?,status=t?,created_at=d?,items=j?,valid_until=d?",
  receipts:"id=t,user_id=t,client_id=t?,project_id=t?,receipt_number=t,concept=t,amount_cents=i,paid_at=d,method=t?,notes=t?,created_at=d",
  recurring_expenses:"id=t,user_id=t,description=t,amount_cents=i,category=t?,frequency=t,start_date=d,next_due_date=d?,created_at=d?,next_date=d?",
- recurring_invoices:"id=t,user_id=t,client_id=t,project_id=t?,items=j,tax_percent=n?,frequency=t,start_date=d,next_due_date=d?,created_at=d?",
+ recurring_invoices:"id=t,user_id=t,client_id=t,project_id=t?,items=j,tax_percent=n?,irpf_percent=n,frequency=t,start_date=d,next_due_date=d?,created_at=d?",
  tasks:"id=t,user_id=t,project_id=t,description=t,status=t?,invoice_id=t?,created_at=d?",
  team_members:"id=t,user_id=t,name=t,email=t,role=t,status=t,invited_on=d?,hourly_rate_cents=i?,created_at=d?,accepted_user_id=t?",
  time_entries:"id=t,user_id=t,project_id=t,description=t?,start_time=d,end_time=d?,duration_seconds=i,invoice_id=t?,created_at=d?,logged_by=t?",

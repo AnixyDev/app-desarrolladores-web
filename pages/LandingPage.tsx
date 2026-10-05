@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import OfertaFundadores from '@/components/OfertaFundadores';
 import PieLegal from '@/components/PieLegal';
+import FaqHome from '@/components/FaqHome';
 import { guardarIntencionFundadores } from '@/lib/intencionFundadores';
 import { Logo } from '@/components/icons/Logo';
 import Button from '@/components/ui/Button';
@@ -373,6 +374,9 @@ const LandingPage: React.FC = () => {
             </Button>
           </Reveal>
         </section>
+
+        {/* ── Preguntas frecuentes (datos en lib/faq.ts) ── */}
+        <FaqHome />
       </main>
 
       <PieLegal />

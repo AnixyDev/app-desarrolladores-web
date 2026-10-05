@@ -123,6 +123,15 @@ describe('datos del titular', () => {
   });
 });
 
+describe('Lead Hunter PRO', () => {
+  it('privacidad y términos explican que solo se escribe con permiso y que hay baja', () => {
+    const t = montar('/privacidad').container.textContent ?? '';
+    expect(t).toContain('solo permite enviar emails o mensajes de WhatsApp a los negocios que han dado su permiso');
+    expect(t).toContain('enlace para darse de baja');
+    expect(montar('/terms').container.textContent).toContain('art. 21 LSSI-CE');
+  });
+});
+
 describe('fuentes', () => {
   it('ya no se cargan desde Google Fonts', () => {
     expect(leer('index.html')).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
@@ -139,5 +148,20 @@ describe('Stripe.js', () => {
 
   it('ya no hay aviso de cookies', () => {
     expect(leer('App.tsx')).not.toMatch(/CookieBanner/);
+  });
+});
+
+describe('vista previa al compartir', () => {
+  it('index.html tiene Open Graph con imagen de 1200x630 que existe', () => {
+    const html = leer('index.html');
+    for (const p of ['og:title', 'og:description', 'og:url', 'og:image', 'twitter:card']) expect(html).toContain(p);
+    expect(html).toContain('https://devfreelancer.app/og-devfreelancer.jpg');
+    expect(readFileSync(resolve(raiz, 'public/og-devfreelancer.jpg')).length).toBeGreaterThan(10_000);
+  });
+
+  it('el botón de Google no queda con texto claro sobre fondo blanco', () => {
+    for (const f of ['pages/LoginPage.tsx', 'pages/auth/RegisterPage.tsx']) {
+      expect(leer(f), f).toMatch(/!bg-white !text-gray-900/);
+    }
   });
 });

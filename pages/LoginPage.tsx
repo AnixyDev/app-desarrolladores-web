@@ -169,7 +169,7 @@ const LoginPage: React.FC = () => {
           type="button"
           variant="secondary"
           onClick={handleGoogleLogin}
-          className="w-full flex items-center justify-center gap-2 bg-white text-black hover:bg-gray-200 border-none"
+          className="w-full flex items-center justify-center gap-2 !bg-white !text-gray-900 hover:!bg-gray-200 border-none"
         >
           <GoogleIcon className="w-[18px] h-[18px]" />
           Continuar con Google

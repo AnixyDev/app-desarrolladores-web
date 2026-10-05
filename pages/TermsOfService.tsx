@@ -35,6 +35,11 @@ const TermsOfService: React.FC = () => (
           No puedes usar el servicio para actividades ilegales, para enviar comunicaciones no deseadas ni para intentar
           acceder a datos de otras personas usuarias.
         </li>
+        <li>
+          Si usas Lead Hunter PRO, solo puedes enviar emails o mensajes de WhatsApp comerciales a los negocios que te
+          hayan dado su permiso, debes registrarlo con veracidad y respetar las bajas (art. 21 LSSI-CE). El primer
+          contacto debe hacerse por teléfono, por el formulario de su web o en persona.
+        </li>
       </Lista>
     </Seccion>
 
@@ -67,10 +72,19 @@ const TermsOfService: React.FC = () => (
 
     <Seccion titulo="5. Cómo cancelar">
       <p>
-        Puedes cancelar cuando quieras desde <strong>Facturación y Plan → Gestionar en el portal → Cancelar
-        suscripción</strong>, o escribiendo a <Correo />. La cancelación evita la siguiente renovación: mantienes el plan
-        hasta el final del periodo ya pagado y después tu cuenta pasa al plan gratuito, sin perder tus datos.
+        Puedes cancelar cuando quieras, sin permanencia, desde <strong>Facturación y Plan → Cancelar suscripción</strong>
+        o escribiendo a <Correo />. Al cancelar eliges cuándo termina:
       </p>
+      <Lista>
+        <li>
+          <strong>Al final del periodo pagado:</strong> mantienes tu plan hasta ese día y no se renueva. Puedes reanudar
+          la suscripción antes de esa fecha.
+        </li>
+        <li>
+          <strong>En el momento:</strong> tu cuenta pasa al plan gratuito al instante.
+        </li>
+      </Lista>
+      <p>En los dos casos conservas todos tus datos.</p>
       <p>
         Fuera del derecho de desistimiento (apartado 7), no se devuelve la parte no consumida del periodo en curso.
       </p>

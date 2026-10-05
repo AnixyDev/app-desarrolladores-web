@@ -8,6 +8,7 @@ import Skeleton from '@/components/ui/Skeleton';
 import { CheckCircleIcon, CreditCard, Users, RefreshCwIcon, SettingsIcon } from '@/components/icons/Icon';
 import { redirectToCheckout, redirectToCheckoutFundadores, redirectToCustomerPortal, StripeItemKey } from '@/services/stripeService';
 import OfertaFundadores from '@/components/OfertaFundadores';
+import CancelarSuscripcion from '@/components/CancelarSuscripcion';
 import { AHORRO_PRO, AHORRO_TEAM, ahorroMaximo } from '@/lib/ahorroAnual';
 import { PARAM_OFERTA, borrarIntencionFundadores, pideFundadores } from '@/lib/intencionFundadores';
 import { useToast } from '@/hooks/useToast';
@@ -125,7 +126,7 @@ const BillingPage: React.FC = () => {
                 <div className="mt-4 flex items-baseline gap-1">
                     <span className="text-4xl font-black text-white tracking-tighter">{price}</span>
                     <span className="text-sm text-gray-500 font-medium">/{period}</span>
-          {ahorro ? <span className="ml-2 self-center bg-green-500/15 text-green-400 text-[11px] font-bold px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra {ahorro} %</span> : null}
+          {ahorro ? <span className="ml-2 self-center whitespace-nowrap bg-green-500/15 text-green-400 text-[11px] font-bold px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra {ahorro}&nbsp;%</span> : null}
                 </div>
                 {priceNote && <p className="text-xs text-gray-500 mt-1">{priceNote}</p>}
             </div>
@@ -159,7 +160,7 @@ const BillingPage: React.FC = () => {
                 
                 <div className="inline-flex p-1 bg-gray-900 border border-gray-800 rounded-2xl shadow-inner">
                     <button onClick={() => setBillingCycle('monthly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Mensual</button>
-                    <button onClick={() => setBillingCycle('yearly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Anual <span className="bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra hasta {ahorroMaximo()} %</span></button>
+                    <button onClick={() => setBillingCycle('yearly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Anual <span className="whitespace-nowrap bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra hasta {ahorroMaximo()}&nbsp;%</span></button>
                 </div>
             </div>
 
@@ -196,7 +197,7 @@ const BillingPage: React.FC = () => {
                             price={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.precio ?? ''}
                             period={precioDe(billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly')?.periodo ?? ''}
                             priceNote={isPro ? 'Ya tienes este plan. Cambia el ciclo de facturación desde el portal.' : undefined}
-                            features={["Proyectos e Hitos ilimitados", "Facturación AEAT (Veri*Factu) · TicketBAI próximamente", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
+                            features={["Proyectos e Hitos ilimitados", "Facturas con huella y QR (Veri*Factu) · envío a la AEAT y TicketBAI próximamente", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
                             isCurrent={isPro}
                             itemKey={billingCycle === 'monthly' ? 'proPlan' : 'proPlanYearly'}
                             icon={CreditCard}
@@ -213,6 +214,8 @@ const BillingPage: React.FC = () => {
                     </>
                 )}
             </div>
+
+            {(isPro || isTeams) && <CancelarSuscripcion onCambio={() => refreshProfile()} />}
 
             <div className="max-w-3xl mx-auto pt-12">
                 <Card className="bg-gradient-to-br from-gray-900 to-gray-950 border-gray-800">

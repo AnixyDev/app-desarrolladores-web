@@ -162,6 +162,7 @@ const CreateInvoicePage: React.FC = () => {
           project_id: newInvoice.project_id || null,
           items: newInvoice.items,
           tax_percent: newInvoice.tax_percent,
+          irpf_percent: newInvoice.irpf_percent,
           frequency: newInvoice.frequency,
           start_date: newInvoice.start_date,
         });

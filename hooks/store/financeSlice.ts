@@ -385,7 +385,7 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
 
     const { data, error } = await supabase
       .from('recurring_invoices')
-      .insert({ ...recurringData, user_id: user.id, next_due_date: recurringData.start_date, items: recurringData.items, tax_percent: recurringData.tax_percent })
+      .insert({ ...recurringData, user_id: user.id, next_due_date: recurringData.start_date, items: recurringData.items, tax_percent: recurringData.tax_percent, irpf_percent: recurringData.irpf_percent ?? 0 })
       .select()
       .single();
 

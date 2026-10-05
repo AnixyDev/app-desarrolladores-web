@@ -8,6 +8,7 @@ import { BookIcon, AlertTriangleIcon, DownloadIcon, ZapIcon, FileTextIcon } from
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { generateTaxReportPdf } from '@/services/pdfService';
+import { ETIQUETA_SIN_IVA, clasificarFacturas, totalesLibro } from '@/lib/libroFiscal';
 
 const TaxLedgerPage: React.FC = () => {
     const { invoices, expenses, clients, profile } = useAppStore(useShallow(s => ({ invoices: s.invoices, expenses: s.expenses, clients: s.clients, profile: s.profile })));
@@ -38,14 +39,10 @@ const TaxLedgerPage: React.FC = () => {
             return issueDate >= startDate && issueDate <= endDate;
         });
 
-        // FIX: una factura sin IVA NI IRPF aplicado no debe contarse como
-        // ingreso fiscal "normal" en el Libro Fiscal — mezclarla con las
-        // facturas correctamente tributadas falsearía el Modelo 303/130.
-        // Se separan en dos grupos: las que sí llevan fiscalidad aplicada
-        // (entran en los cálculos oficiales) y las que no (se muestran
-        // aparte, con aviso, para que se revisen y corrijan).
-        const filteredInvoices = invoicesInPeriod.filter(i => (i.tax_percent || 0) > 0 || (i.irpf_percent || 0) > 0);
-        const excludedInvoices = invoicesInPeriod.filter(i => !((i.tax_percent || 0) > 0 || (i.irpf_percent || 0) > 0));
+        // Cuentan las facturas con IVA/IRPF y las de clientes extranjeros (sin
+        // IVA español por ley, con su motivo). Solo quedan aparte, con aviso,
+        // las de IVA 0 e IRPF 0 sin motivo: ver lib/libroFiscal.ts.
+        const { incluidas: filteredInvoices, revisar: excludedInvoices } = clasificarFacturas(invoicesInPeriod);
 
         const filteredExpenses = expenses.filter(e => {
             const expenseDate = new Date(e.date);
@@ -55,43 +52,15 @@ const TaxLedgerPage: React.FC = () => {
         return { filteredInvoices, excludedInvoices, filteredExpenses };
     }, [invoices, expenses, year, quarter]);
     
-    const totals = useMemo(() => {
-        const totalIngresos = filteredData.filteredInvoices.reduce((sum, i) => sum + i.subtotal_cents, 0);
-        const totalGastos = filteredData.filteredExpenses.reduce((sum, e) => sum + e.amount_cents, 0);
-        
-        // El IVA repercutido es la base * el porcentaje, no solo (total - base) porque el total puede estar afectado por IRPF
-        const ivaRepercutido = filteredData.filteredInvoices.reduce((sum, i) => sum + (i.subtotal_cents * (i.tax_percent / 100)), 0);
-        const ivaSoportado = filteredData.filteredExpenses.reduce((sum, e) => sum + (e.amount_cents * ((e.tax_percent || 0) / 100)), 0);
-        
-        // Suma de retenciones de IRPF aplicadas en las facturas emitidas (para restar del Modelo 130)
-        const totalRetenciones = filteredData.filteredInvoices.reduce((sum, i) => {
-            return sum + (i.irpf_percent ? i.subtotal_cents * (i.irpf_percent / 100) : 0);
-        }, 0);
-
-        const beneficio = totalIngresos - totalGastos;
-        
-        // Cálculo Modelo 130 (Pago Fraccionado IRPF - Estimación Directa Simplificada)
-        // Generalmente es el 20% del rendimiento neto (Ingresos - Gastos), menos las retenciones soportadas.
-        const cuotaIntegra = beneficio > 0 ? beneficio * (irpfPercentage / 100) : 0;
-        const irpfAPagar = Math.max(0, cuotaIntegra - totalRetenciones);
-        
-        return {
-            totalIngresos,
-            totalGastos,
-            beneficio,
-            ivaRepercutido,
-            ivaSoportado,
-            ivaAPagar: ivaRepercutido - ivaSoportado,
-            totalRetenciones,
-            irpfAPagar,
-        }
-
-    }, [filteredData, irpfPercentage]);
+    const totals = useMemo(
+        () => totalesLibro(filteredData.filteredInvoices, filteredData.filteredExpenses, irpfPercentage),
+        [filteredData, irpfPercentage],
+    );
 
     const handleExportCSV = () => {
         const csvRows = [];
         // Header
-        csvRows.push(['Fecha', 'Tipo', 'Referencia', 'Tercero', 'Base Imponible', 'IVA %', 'Cuota IVA', 'IRPF %', 'Cuota IRPF', 'Total Neto'].join(','));
+        csvRows.push(['Fecha', 'Tipo', 'Referencia', 'Tercero', 'Base Imponible', 'IVA %', 'Cuota IVA', 'IRPF %', 'Cuota IRPF', 'Total Neto', 'Observaciones'].join(','));
 
         // Procesar Facturas (Ingresos)
         filteredData.filteredInvoices.forEach(inv => {
@@ -113,7 +82,8 @@ const TaxLedgerPage: React.FC = () => {
                 ivaQuota.toFixed(2),
                 `${irpfRate}%`,
                 irpfQuota.toFixed(2),
-                total.toFixed(2)
+                total.toFixed(2),
+                inv.motivo_sin_iva ? `"${ETIQUETA_SIN_IVA[inv.motivo_sin_iva]}"` : ''
             ].join(','));
         });
 
@@ -134,7 +104,8 @@ const TaxLedgerPage: React.FC = () => {
                 ivaQuota.toFixed(2),
                 '0%',
                 '0.00',
-                total.toFixed(2)
+                total.toFixed(2),
+                ''
             ].join(','));
         });
 
@@ -250,6 +221,9 @@ const TaxLedgerPage: React.FC = () => {
                 <div className='bg-gray-800/50 p-4 rounded-lg border border-gray-700'>
                     <p className='text-sm text-gray-400 mb-1'>Ingresos (Base)</p>
                     <p className='text-2xl font-bold text-green-400'>{formatCurrency(totals.totalIngresos)}</p>
+                    {totals.baseSinIva > 0 && (
+                      <p className='text-xs text-gray-500 mt-1'>De ellos {formatCurrency(totals.baseSinIva)} sin IVA español (clientes de otro país)</p>
+                    )}
                 </div>
                  <div className='bg-gray-800/50 p-4 rounded-lg border border-gray-700'>
                     <p className='text-sm text-gray-400 mb-1'>Gastos (Base)</p>
@@ -325,10 +299,10 @@ const TaxLedgerPage: React.FC = () => {
             <AlertTriangleIcon className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
             <div>
               <p className="text-orange-300 font-semibold text-sm">
-                {filteredData.excludedInvoices.length} factura{filteredData.excludedInvoices.length > 1 ? 's' : ''} sin IVA ni IRPF aplicado — excluida{filteredData.excludedInvoices.length > 1 ? 's' : ''} del Libro Fiscal
+                {filteredData.excludedInvoices.length} factura{filteredData.excludedInvoices.length > 1 ? 's' : ''} sin IVA ni IRPF y sin motivo — excluida{filteredData.excludedInvoices.length > 1 ? 's' : ''} del Libro Fiscal
               </p>
               <p className="text-orange-300/80 text-xs mt-1">
-                No se han incluido en los cálculos del Modelo 303/130 de este trimestre. Revísalas: añádeles el IVA/IRPF que corresponda si son ingresos declarables normales, o pásalas a{' '}
+                No se han incluido en los cálculos del Modelo 303/130 de este trimestre. Las facturas a clientes de otro país (UE o fuera de la UE) sí cuentan; estas van a clientes de España sin IVA. Revísalas: añádeles el IVA/IRPF que corresponda si son ingresos declarables normales, o pásalas a{' '}
                 <Link to="/receipts" className="underline">Recibos</Link> si son cobros informales que no deben facturarse formalmente.
               </p>
             </div>

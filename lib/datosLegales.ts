@@ -26,7 +26,7 @@ export const DATOS_LEGALES = {
   ivaPrecios: 'incluyen el IVA',
   /** De dónde obtiene Lead Hunter PRO los datos de empresas y profesionales. */
   fuentesLeadHunter:
-    'la ficha pública de cada negocio en Google Maps (a través de la API de Google Places) y de su propia página web',
+    'la ficha pública de cada negocio en Google Maps (API de Google Places), su propia página web, sus páginas públicas en redes sociales y los resultados públicos del buscador de Google',
   sitio: 'devfreelancer.app',
   nombreComercial: 'DevFreelancer',
 } as const;

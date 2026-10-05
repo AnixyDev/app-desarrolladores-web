@@ -447,6 +447,8 @@ export { generateBudgetPdf, generateBudgetPdfBase64, generateProposalPdf, genera
 // que es una estimación, no una declaración oficial ya presentada.
 interface TaxReportTotals {
     totalIngresos: number;
+    /** Parte de los ingresos sin IVA español (clientes UE / fuera de la UE). */
+    baseSinIva?: number;
     totalGastos: number;
     beneficio: number;
     ivaRepercutido: number;
@@ -507,6 +509,7 @@ export const generateTaxReportPdf = (
         head: [['Resumen del trimestre', '']],
         body: [
             ['Ingresos (base imponible)', formatCurrency(totals.totalIngresos)],
+            ...(totals.baseSinIva ? [['   de ellos, sin IVA español (clientes de otro país)', formatCurrency(totals.baseSinIva)]] : []),
             ['Gastos (base imponible)', formatCurrency(totals.totalGastos)],
             ['Beneficio neto', formatCurrency(totals.beneficio)],
         ],

@@ -12,6 +12,7 @@ vi.mock('@/services/stripeService', () => ({
   redirectToCustomerPortal: vi.fn(),
   redirectToCheckoutFundadores: () => redirectToCheckoutFundadores(),
   obtenerPlazasFundadores: vi.fn().mockResolvedValue(null),
+  gestionarCancelacion: vi.fn().mockResolvedValue({ tieneSuscripcion: false }),
 }));
 vi.mock('@/hooks/useToast', () => ({ useToast: () => ({ addToast }) }));
 vi.mock('@/hooks/useAppStore', () => ({
