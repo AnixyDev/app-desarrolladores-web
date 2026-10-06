@@ -1,0 +1,108 @@
+name: Copia de seguridad diaria
+
+# Volcado completo de la base de datos de Supabase, cifrado, guardado 30 días
+# como artefacto de GitHub Actions.
+#
+# Por qué existe: el plan gratuito de Supabase NO hace copias automáticas.
+# Cuando el proyecto pase a Supabase Pro (copia diaria incluida) se puede
+# mantener igualmente como segunda copia, fuera de Supabase.
+#
+# EL CIFRADO NO ES OPCIONAL. El repositorio es público y cualquier persona con
+# cuenta de GitHub puede descargar los artefactos. Sin la contraseña de
+# BACKUP_PASSPHRASE el fichero no sirve para nada; con ella, contiene los datos
+# de todos los clientes. Si se pierde la contraseña, las copias no se pueden abrir.
+#
+# Secretos del repositorio (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL     Cadena «Session pooler» del panel Connect de Supabase,
+#                       con la contraseña de la base de datos puesta. El pooler
+#                       hace falta porque la conexión directa es solo IPv6 y los
+#                       ejecutores de GitHub no tienen IPv6.
+#   BACKUP_PASSPHRASE   Contraseña larga para cifrar. Solo la conoce Ana.
+#
+# Qué NO incluye: los ficheros de Storage (logos, certificado digital, ficheros
+# del portal). Solo la base de datos.
+#
+# Restaurar: ver supabase/schema/README-copias.md
+
+on:
+  schedule:
+    - cron: '17 3 * * *'   # 03:17 UTC, cada día
+  workflow_dispatch: {}     # botón «Run workflow» para lanzarla a mano
+
+permissions:
+  contents: read
+
+concurrency:
+  group: copia-seguridad
+  cancel-in-progress: false
+
+jobs:
+  copia:
+    name: Volcar, cifrar y guardar
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Comprobar que están los secretos
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "::error::Falta el secreto SUPABASE_DB_URL"; exit 1; fi
+          if [ -z "$BACKUP_PASSPHRASE" ]; then echo "::error::Falta el secreto BACKUP_PASSPHRASE"; exit 1; fi
+          if [ ${#BACKUP_PASSPHRASE} -lt 20 ]; then echo "::error::BACKUP_PASSPHRASE debe tener al menos 20 caracteres"; exit 1; fi
+          case "$SUPABASE_DB_URL" in
+            *pooler.supabase.com*) ;;
+            *) echo "::error::SUPABASE_DB_URL tiene que ser la cadena «Session pooler» (contiene pooler.supabase.com)"; exit 1 ;;
+          esac
+
+      - name: Instalar la CLI de Supabase
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Volcar roles, esquema y datos
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p copia
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f copia/roles.sql --role-only
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f copia/esquema.sql
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f copia/datos.sql --use-copy --data-only
+
+      - name: Comprobar que el volcado no está vacío
+        run: |
+          set -euo pipefail
+          for f in roles esquema datos; do
+            test -s "copia/$f.sql" || { echo "::error::copia/$f.sql está vacío"; exit 1; }
+          done
+          # Si faltan las tablas principales, la copia no sirve: mejor fallar
+          # (GitHub avisa por correo) que guardar una copia vacía sin enterarse.
+          for t in public.profiles public.clients public.invoices public.fiscal_records auth.users; do
+            grep -q "COPY \"\?${t%%.*}\"\?\.\"\?${t#*.}\"\?" copia/datos.sql \
+              || { echo "::error::No aparece $t en los datos"; exit 1; }
+          done
+          echo "Tamaños:"; du -h copia/*
+
+      - name: Cifrar
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          nombre="devfreelancer-$(date -u +%F)"
+          tar -czf "$nombre.tar.gz" -C copia .
+          printf '%s' "$BACKUP_PASSPHRASE" > .clave
+          gpg --batch --yes --pinentry-mode loopback --passphrase-file .clave \
+              --symmetric --cipher-algo AES256 -o "$nombre.tar.gz.gpg" "$nombre.tar.gz"
+          # Nada sin cifrar debe sobrevivir a este paso.
+          shred -u .clave "$nombre.tar.gz"
+          rm -rf copia
+          echo "NOMBRE=$nombre" >> "$GITHUB_ENV"
+
+      - name: Guardar 30 días
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NOMBRE }}
+          path: ${{ env.NOMBRE }}.tar.gz.gpg
+          retention-days: 30
+          if-no-files-found: error
