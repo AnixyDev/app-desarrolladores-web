@@ -105,3 +105,18 @@ export async function descifrarTexto(b64: string, clave: CryptoKey): Promise<str
   const plano = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, clave, cifrado);
   return new TextDecoder().decode(plano);
 }
+
+/**
+ * Descifrador listo para usar con la clave de APP_ENCRYPTION_KEY, o null si
+ * no está configurada. Lo usan las funciones de envío con el remitente propio
+ * (ver remitente-propio.ts, que no importa este módulo para poder cargarse
+ * desde el navegador).
+ */
+export function descifradorConClave(rawHex: string | undefined): ((b64: string) => Promise<string>) | null {
+  if (!rawHex) return null;
+  let clave: Promise<CryptoKey> | null = null;
+  return async (b64: string) => {
+    clave ??= claveAes(rawHex);
+    return descifrarTexto(b64, await clave);
+  };
+}

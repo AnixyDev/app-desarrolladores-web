@@ -140,7 +140,7 @@ const PricingPage: React.FC = () => {
             recommended
             ahorro={billingCycle === 'yearly' ? AHORRO_PRO() : null}
             description="Todo lo que necesitas para escalar tu negocio."
-            features={["Proyectos e Hitos ilimitados", "Facturas con huella y QR (Veri*Factu) · envío a la AEAT y TicketBAI próximamente", "Canal de chat privado por proyecto", "50 Créditos IA mensuales"]}
+            features={["Proyectos e Hitos ilimitados", "Facturas con huella y QR (Veri*Factu) · envío a la AEAT y TicketBAI próximamente", "Canal de chat privado por proyecto", "Envía facturas desde tu propio dominio", "50 Créditos IA mensuales"]}
             ctaLabel="Empezar con Pro"
             onCta={() => navigate('/auth/register')}
             icon={CreditCard}

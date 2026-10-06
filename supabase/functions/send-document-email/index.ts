@@ -22,8 +22,18 @@ import {
   ENVIOS_DE_DOCUMENTOS_POR_DIA,
   type Correo,
 } from '../_shared/correo-documentos.ts';
+import {
+  cargarRemitentePropio,
+  apuntarErrorPropio,
+  enviarPorResend,
+  formatearRemitente,
+  nombreVisiblePropio,
+  motivoDelRechazo,
+  planPermiteRemitentePropio,
+  TOPES_CON_REMITENTE_PROPIO,
+} from '../_shared/remitente-propio.ts';
+import { descifradorConClave } from '../_shared/cripto.ts';
 
-const RESEND_API_URL = 'https://api.resend.com/emails';
 // CAMBIO: ya no hay remitente/reply-to fijos — se resuelven por usuario más
 // abajo, leyendo su fila de `profiles`. `from` sigue obligado a usar el
 // dominio verificado en Resend (devfreelancer.app), pero el nombre visible
@@ -84,7 +94,7 @@ Deno.serve(async (req) => {
     // se cae al email de su cuenta, que siempre existe.
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('business_name, full_name, email, invoice_reply_to_email')
+      .select('business_name, full_name, email, invoice_reply_to_email, plan')
       .eq('id', user.id)
       .single();
 
@@ -253,70 +263,68 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    // 4. Cupo diario de envíos, apuntado en el servidor con candado.
+    // 4. ¿Envía con su propio dominio (Pro/Teams) o por la plataforma?
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
+    const propio = await cargarRemitentePropio(supabaseAdmin, user.id, profile.plan, descifradorConClave(Deno.env.get('APP_ENCRYPTION_KEY')));
+    const tope = propio ? TOPES_CON_REMITENTE_PROPIO.documentosPorDia : ENVIOS_DE_DOCUMENTOS_POR_DIA;
+
+    // 5. Cupo diario de envíos, apuntado en el servidor con candado.
     const { data: hayCupo, error: errorCupo } = await supabaseAdmin.rpc('reservar_envio_documento', {
       p_user: user.id,
       p_tipo: tipo,
       p_documento: documentoId,
       p_email: destinatario,
-      p_max_dia: ENVIOS_DE_DOCUMENTOS_POR_DIA,
+      p_max_dia: tope,
     });
     if (errorCupo) {
       console.error('[send-document-email] no se pudo reservar el envío:', errorCupo.message);
       return json({ error: 'Error interno' }, 500);
     }
     if (!hayCupo) {
-      return json({ error: `Has llegado al máximo de ${ENVIOS_DE_DOCUMENTOS_POR_DIA} envíos en 24 horas. Inténtalo mañana.` }, 429);
+      const sugerencia = propio
+        ? ''
+        : planPermiteRemitentePropio(profile.plan)
+          ? ' Si conectas tu propio dominio en Ajustes → Perfil, podrás enviar sin este límite.'
+          : ' Con los planes Pro y Teams puedes enviar desde tu propio dominio sin este límite.';
+      return json({ error: `Has llegado al máximo de ${tope} envíos en 24 horas. Inténtalo mañana.${sugerencia}` }, 429);
     }
 
-    // 5. Enviar vía Resend (fetch directo a su API REST — en Deno no hace
-    //    falta el SDK de npm, y evita añadir otra dependencia al proyecto).
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    // 6. Enviar vía Resend: con SU clave y SU dirección, o con la de la plataforma.
+    const resendApiKey = propio?.apiKey ?? Deno.env.get('RESEND_API_KEY');
     if (!resendApiKey) {
       console.error('RESEND_API_KEY no configurada en los secrets de Supabase');
-      return new Response(JSON.stringify({ error: 'Configuración de email incompleta' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return json({ error: 'Configuración de email incompleta' }, 500);
     }
 
-    const resendBody: Record<string, unknown> = {
-      from: fromAddress,
+    const envio = await enviarPorResend(resendApiKey, {
+      from: propio
+        ? formatearRemitente(nombreVisiblePropio(profile.business_name || profile.full_name), propio.direccion)
+        : fromAddress,
       reply_to: replyToAddress,
       to: [destinatario],
       subject: correo.asunto,
       html: correo.html,
       attachments: [{ filename: archivo, content: attachmentBase64 }],
-    };
-
-    const resendResponse = await fetch(RESEND_API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(resendBody),
     });
 
-    const resendData = await resendResponse.json();
-
-    if (!resendResponse.ok) {
-      // El cuerpo de error de Resend va al log, no al navegador.
-      console.error('Error de Resend:', resendData);
-      return new Response(JSON.stringify({ error: 'No se pudo enviar el email. Inténtalo de nuevo.' }), {
-        status: 502,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (!envio.ok) {
+      if (propio) {
+        // Es SU cuenta: el motivo es lo que necesita para arreglarla. No se
+        // reintenta por la plataforma (ver _shared/remitente-propio.ts).
+        const motivo = motivoDelRechazo(envio.status, envio.cuerpo);
+        await apuntarErrorPropio(supabaseAdmin, user.id, motivo);
+        return json({ error: `${motivo} Revísalo en Ajustes → Perfil → Enviar desde tu dominio.` }, 502);
+      }
+      // El cuerpo de error de la cuenta de la plataforma va al log, no al navegador.
+      console.error('Error de Resend:', envio.status, envio.cuerpo);
+      return json({ error: 'No se pudo enviar el email. Inténtalo de nuevo.' }, 502);
     }
+    if (propio) await apuntarErrorPropio(supabaseAdmin, user.id, null);
 
-    return new Response(JSON.stringify({ ok: true, email: destinatario }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return json({ ok: true, email: destinatario, desde: propio ? propio.direccion : null });
   } catch (err) {
     console.error('Error inesperado en send-document-email:', err);
     return new Response(JSON.stringify({ error: 'Error interno' }), {

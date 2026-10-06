@@ -75,7 +75,7 @@ describe('la función de envío', () => {
     expect(src).toMatch(/esLlamadaDelServicio\(req\.headers\.get\('Authorization'\)/)
   })
   it('apunta el nivel ANTES de enviar y lo borra si falla', () => {
-    expect(src.indexOf(".from('recordatorios_cobro_enviados')\n          .insert(")).toBeLessThan(src.indexOf('fetch(RESEND_API_URL'))
+    expect(src.indexOf(".from('recordatorios_cobro_enviados')\n          .insert(")).toBeLessThan(src.indexOf('enviarPorResend(claveEnvio'))
     expect(src).toMatch(/delete\(\)\.eq\('invoice_id', f\.id\)\.eq\('nivel', nivel\)/)
   })
   it('respeta el interruptor general y el de cada factura, y solo escribe a clientes propios', () => {

@@ -19,8 +19,17 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { esLlamadaDelServicio } from '../_shared/llamada-servicio.ts';
 import { nombreDelRemitente } from '../_shared/correo-documentos.ts';
 import { nivelQueToca, correoDeRecordatorio, MAX_DIAS_VENCIDA } from '../_shared/recordatorios-cobro.ts';
+import {
+  cargarRemitentePropio,
+  apuntarErrorPropio,
+  enviarPorResend,
+  formatearRemitente,
+  nombreVisiblePropio,
+  motivoDelRechazo,
+  TOPES_CON_REMITENTE_PROPIO,
+} from '../_shared/remitente-propio.ts';
+import { descifradorConClave } from '../_shared/cripto.ts';
 
-const RESEND_API_URL = 'https://api.resend.com/emails';
 const FROM_DOMAIN_ADDRESS = 'facturas@devfreelancer.app';
 const SITIO = 'https://devfreelancer.app';
 // Topes bajados el 06/10/2026 mientras Resend esté en el plan gratuito
@@ -38,11 +47,10 @@ Deno.serve(async (req: Request) => {
   if (!esLlamadaDelServicio(req.headers.get('Authorization'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))) {
     return new Response('Unauthorized', { status: 401 });
   }
+  // La de la plataforma. Los usuarios Pro/Teams con dominio propio usan la suya.
   const resendApiKey = Deno.env.get('RESEND_API_KEY');
-  if (!resendApiKey) {
-    console.error('[recordatorios-cobro] RESEND_API_KEY no configurada');
-    return json({ error: 'Falta configuración de correo' }, 500);
-  }
+  if (!resendApiKey) console.error('[recordatorios-cobro] RESEND_API_KEY no configurada: solo saldrán los de dominio propio');
+  const descifrar = descifradorConClave(Deno.env.get('APP_ENCRYPTION_KEY'));
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
   // Fecha de hoy en España: el cron corre en UTC.
@@ -55,7 +63,7 @@ Deno.serve(async (req: Request) => {
   try {
     const { data: usuarios, error: errorUsuarios } = await supabase
       .from('profiles')
-      .select('id, email, business_name, full_name, invoice_reply_to_email, reminder_template_upcoming, reminder_template_overdue, stripe_account_id, stripe_onboarding_complete')
+      .select('id, email, plan, business_name, full_name, invoice_reply_to_email, reminder_template_upcoming, reminder_template_overdue, stripe_account_id, stripe_onboarding_complete')
       .eq('payment_reminders_enabled', true);
     if (errorUsuarios) throw errorUsuarios;
 
@@ -89,13 +97,19 @@ Deno.serve(async (req: Request) => {
       const niveles = new Map<string, number[]>();
       for (const r of yaEnviados ?? []) niveles.set(r.invoice_id, [...(niveles.get(r.invoice_id) ?? []), r.nivel]);
 
-      const remitente = nombreDelRemitente(u.business_name || u.full_name);
+      const propio = await cargarRemitentePropio(supabase, u.id, u.plan, descifrar);
+      const claveEnvio = propio?.apiKey ?? resendApiKey;
+      if (!claveEnvio) continue;
+      const topeHoy = propio ? TOPES_CON_REMITENTE_PROPIO.recordatoriosPorDia : MAX_POR_USUARIO_Y_DIA;
+      const remitente = propio
+        ? formatearRemitente(nombreVisiblePropio(u.business_name || u.full_name), propio.direccion)
+        : `${nombreDelRemitente(u.business_name || u.full_name)} <${FROM_DOMAIN_ADDRESS}>`;
       const firma = u.business_name || u.full_name || 'Tu proveedor';
       const replyTo = u.invoice_reply_to_email || u.email;
       const cobraConTarjeta = !!(u.stripe_account_id && u.stripe_onboarding_complete);
 
       for (const f of facturas) {
-        if (enviados >= MAX_POR_USUARIO_Y_DIA) break;
+        if (enviados >= topeHoy) break;
         const pendiente = (f.total_cents ?? 0) - (cobrado.get(f.id) ?? 0);
         if (pendiente <= 0) continue;
         const c = cliente.get(f.client_id);
@@ -123,26 +137,29 @@ Deno.serve(async (req: Request) => {
           firma,
         });
 
-        const res = await fetch(RESEND_API_URL, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: `${remitente} <${FROM_DOMAIN_ADDRESS}>`,
-            reply_to: replyTo,
-            to: destinatario,
-            subject: correo.asunto,
-            html: correo.html,
-          }),
+        const envio = await enviarPorResend(claveEnvio, {
+          from: remitente,
+          reply_to: replyTo,
+          to: destinatario,
+          subject: correo.asunto,
+          html: correo.html,
         });
 
-        if (!res.ok) {
-          console.error(`[recordatorios-cobro] Resend rechazó ${f.id} (nivel ${nivel}):`, await res.text());
+        if (!envio.ok) {
+          console.error(`[recordatorios-cobro] Resend rechazó ${f.id} (nivel ${nivel}):`, envio.status);
           await supabase.from('recordatorios_cobro_enviados').delete().eq('invoice_id', f.id).eq('nivel', nivel);
           fallidos++;
+          if (propio) {
+            // Su cuenta tiene un problema: se le enseña en Ajustes y no se
+            // insiste con el resto de sus facturas hoy. Mañana se reintenta.
+            await apuntarErrorPropio(supabase, u.id, motivoDelRechazo(envio.status, envio.cuerpo));
+            break;
+          }
           continue;
         }
         enviados++;
       }
+      if (propio && enviados && !fallidos) await apuntarErrorPropio(supabase, u.id, null);
       if (enviados || fallidos) resumen.push({ user_id: u.id, enviados, fallidos });
     }
 

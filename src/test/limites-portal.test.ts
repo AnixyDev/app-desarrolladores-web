@@ -153,7 +153,7 @@ describe('la marca de invitado solo se pone si el correo salio', () => {
   const funcion = sinComentarios(leer('supabase/functions/invite-portal-client/index.ts'));
 
   it('se comprueba la respuesta de Resend antes de marcar', () => {
-    const posicionComprobacion = funcion.indexOf('respuestaResend.ok');
+    const posicionComprobacion = funcion.indexOf('envio.ok');
     const posicionMarca = funcion.indexOf('portal_invitado_en:');
     expect(posicionComprobacion, 'no se comprueba la respuesta de Resend').toBeGreaterThan(-1);
     expect(posicionMarca, 'no se marca la invitacion').toBeGreaterThan(-1);
