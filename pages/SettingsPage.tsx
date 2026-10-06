@@ -688,9 +688,12 @@ const SettingsPage: React.FC = () => {
                         }
                       }}
                       disabled={fiscalSaving}
-                      className={`relative w-14 h-7 rounded-full transition-colors ${profile?.veri_factu_enabled ? 'bg-primary-600' : 'bg-gray-600'}`}
+                      role="switch"
+                      aria-checked={!!profile?.veri_factu_enabled}
+                      aria-label="Activar cumplimiento fiscal"
+                      className={`relative inline-flex shrink-0 items-center w-14 h-7 rounded-full transition-colors disabled:opacity-60 ${profile?.veri_factu_enabled ? 'bg-primary-600' : 'bg-gray-600'}`}
                     >
-                      <span className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${profile?.veri_factu_enabled ? 'translate-x-8' : 'translate-x-1'}`} />
+                      <span className={`absolute left-0 top-1 w-5 h-5 rounded-full bg-white shadow transition-transform ${profile?.veri_factu_enabled ? 'translate-x-8' : 'translate-x-1'}`} />
                     </button>
                   </div>
 
