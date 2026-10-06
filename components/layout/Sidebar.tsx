@@ -72,6 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           <button
             onClick={onClose}
             className="md:hidden p-2 text-gray-400 hover:text-white"
+            aria-label="Cerrar menú"
           >
             <X className="w-6 h-6" />
           </button>
@@ -186,14 +187,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             Cerrar Sesión
           </button>
 
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-primary-900/10 to-purple-900/10 border border-primary-500/10">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-[10px] font-bold uppercase text-gray-400">
-                Sistema Operativo V1.0
-              </span>
-            </div>
-          </div>
 
           <PieLegal variante="compacto" />
         </div>

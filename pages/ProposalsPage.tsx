@@ -277,6 +277,7 @@ const ProposalsPage: React.FC = () => {
         </div>
 
         <select
+          aria-label="Filtrar por estado"
           value={filterStatus}
           onChange={e => setFilterStatus(e.target.value as FilterStatus)}
           className="bg-gray-900/50 border border-gray-800 rounded-xl px-4 py-2 text-sm text-white focus:border-primary-500 outline-none cursor-pointer"
@@ -427,7 +428,7 @@ const SummaryCard = ({ label, value, accent }: any) => {
   const colors: any = { blue: 'text-blue-400', green: 'text-green-400', purple: 'text-purple-400', default: 'text-white' };
   return (
     <div className="bg-gray-900/50 border border-gray-800 rounded-2xl p-4">
-      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">{label}</p>
+      <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">{label}</p>
       <p className={`text-xl font-bold truncate ${colors[accent || 'default']}`}>{value}</p>
     </div>
   );

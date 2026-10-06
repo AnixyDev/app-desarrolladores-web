@@ -112,6 +112,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         <div className="relative" ref={notificationsRef}>
           <button
             onClick={() => setIsNotificationsOpen(p => !p)}
+            aria-label={unreadCount > 0 ? `Notificaciones (${unreadCount} sin leer)` : 'Notificaciones'}
+            aria-expanded={isNotificationsOpen}
             className="p-2 rounded-full text-gray-400 hover:text-white hover:bg-gray-800 relative"
           >
             <Bell className="w-5 h-5" />
@@ -198,6 +200,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => setIsUserMenuOpen(p => !p)}
+            aria-label="Menú de usuario"
+            aria-expanded={isUserMenuOpen}
             className="flex items-center gap-3 p-1.5 rounded-full hover:bg-gray-800"
           >
             {profile?.avatar_url ? (

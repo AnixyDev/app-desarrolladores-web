@@ -181,7 +181,7 @@ const AIAssistantPage: React.FC = () => {
           >
             <div className="min-w-0 flex-1">
               <p className="truncate">{c.titulo}</p>
-              <p className="text-[11px] text-gray-500">{formatearFecha(c.updated_at)}</p>
+              <p className="text-xs text-gray-500">{formatearFecha(c.updated_at)}</p>
             </div>
             <button
               type="button"
@@ -324,7 +324,7 @@ const AIAssistantPage: React.FC = () => {
               <SendIcon className="h-4 w-4" />
             </Button>
           </div>
-          <p className="mt-1.5 px-1 text-[11px] text-gray-500">
+          <p className="mt-1.5 px-1 text-xs text-gray-500">
             Intro para enviar · Mayús+Intro para nueva línea · Cada mensaje cuesta {AI_CREDIT_COSTS.chatMessage} {AI_CREDIT_COSTS.chatMessage === 1 ? 'crédito' : 'créditos'} (si falla, no se cobra). La IA puede equivocarse: revisa cifras y temas fiscales.
           </p>
         </form>

@@ -683,12 +683,12 @@ const handleSelectBudget = (budgetId: string) => {
                           <td className="px-3 py-3 font-mono text-white">
                         {inv.invoice_number}
                         {inv.fiscal_locked && (
-                          <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/30" title="Registro fiscal Veri*Factu generado — esta factura está bloqueada frente a ediciones">
+                          <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/30" title="Registro fiscal Veri*Factu generado — esta factura está bloqueada frente a ediciones">
                             🔒 Veri*Factu
                           </span>
                         )}
                         {inv.rectifies_invoice_id && (
-                          <div className="text-[11px] font-sans text-gray-500">Rectifica a {numeroDe(inv.rectifies_invoice_id) ?? 'otra factura'}</div>
+                          <div className="text-xs font-sans text-gray-500">Rectifica a {numeroDe(inv.rectifies_invoice_id) ?? 'otra factura'}</div>
                         )}
                       </td>
                           <td className="px-3 py-3">{getClientName(inv.client_id)}</td>
@@ -696,10 +696,10 @@ const handleSelectBudget = (budgetId: string) => {
                           <td className="px-3 py-3 text-right font-bold text-white">{formatCurrency(inv.total_cents)}</td>
 
                           <td className="px-3 py-3 min-w-[140px]">
-                            <span className={`inline-block mb-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ${status.className}`}>
+                            <span className={`inline-block mb-1.5 px-2 py-0.5 rounded-full text-xs font-bold border ${status.className}`}>
                               {status.label}
                             </span>
-                            <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                            <div className="flex justify-between text-xs text-gray-500 mb-1">
                               <span>{formatCurrency(status.paidCents)}</span>
                               {remainingCents > 0 && <span>Restan {formatCurrency(remainingCents)}</span>}
                             </div>
@@ -710,7 +710,7 @@ const handleSelectBudget = (budgetId: string) => {
                               />
                             </div>
                             {recordatorios[inv.id] && status.label !== 'PAGADA' && (
-                              <div className="mt-1 text-[10px] text-gray-500" title={`Último recordatorio enviado el ${formatearFecha(recordatorios[inv.id].enviado_en)}`}>
+                              <div className="mt-1 text-xs text-gray-500" title={`Último recordatorio enviado el ${formatearFecha(recordatorios[inv.id].enviado_en)}`}>
                                 Recordada · {recordatorios[inv.id].nivel < 0 ? 'antes' : `${recordatorios[inv.id].nivel} d`}
                               </div>
                             )}
@@ -743,17 +743,17 @@ const handleSelectBudget = (budgetId: string) => {
                             <p className="font-mono text-white font-bold">
                               {inv.invoice_number}
                               {inv.fiscal_locked && (
-                                <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/30">
+                                <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/30">
                                   🔒
                                 </span>
                               )}
                             </p>
                             {inv.rectifies_invoice_id && (
-                              <p className="text-[11px] text-gray-500">Rectifica a {numeroDe(inv.rectifies_invoice_id) ?? 'otra factura'}</p>
+                              <p className="text-xs text-gray-500">Rectifica a {numeroDe(inv.rectifies_invoice_id) ?? 'otra factura'}</p>
                             )}
                             <p className="text-sm text-gray-400">{getClientName(inv.client_id)}</p>
                           </div>
-                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold border whitespace-nowrap ${status.className}`}>
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${status.className}`}>
                             {status.label}
                           </span>
                         </div>
@@ -764,7 +764,7 @@ const handleSelectBudget = (budgetId: string) => {
                         </div>
 
                         <div>
-                          <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                          <div className="flex justify-between text-xs text-gray-500 mb-1">
                             <span>{formatCurrency(status.paidCents)} cobrado</span>
                             {remainingCents > 0 && <span>Restan {formatCurrency(remainingCents)}</span>}
                           </div>

@@ -205,3 +205,22 @@ input, textarea, select {
 .markdown-ia table { border-collapse: collapse; margin: 0.4rem 0 0.6rem; font-size: 0.85em; display: block; overflow-x: auto; }
 .markdown-ia th, .markdown-ia td { border: 1px solid rgba(255,255,255,0.15); padding: 0.3rem 0.5rem; text-align: left; }
 .markdown-ia blockquote { border-left: 3px solid rgba(244,114,182,0.6); padding-left: 0.75rem; color: #d1d5db; margin: 0.4rem 0; }
+
+/* ── Auditoría UX 06/10/2026 ─────────────────────────────────────────────
+   Botones de solo icono (editar, descargar, enviar, borrar…) en pantallas
+   táctiles o estrechas: medían 20–28 px y lo cómodo para el dedo son ~44 px.
+   Solo se agranda el área pulsable mínima; un <button> centra su contenido,
+   así que el icono sigue en su sitio. Se excluyen los de ancho completo. */
+@media (pointer: coarse), (max-width: 767px) {
+  button:has(> svg:only-child):not([class*="w-full"]) {
+    min-width: 40px;
+    min-height: 40px;
+  }
+}
+
+/* Enlaces dentro de un párrafo: el rosa sobre texto gris claro no se
+   distinguía por color (1,8:1). Subrayados se reconocen sin depender de él. */
+:where(p, li, dd) > a:not([class*="bg-"]):not([class*="rounded"]) {
+  text-decoration-line: underline;
+  text-underline-offset: 2px;
+}

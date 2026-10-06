@@ -19,8 +19,8 @@ interface StatCardProps {
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, trend, color }) => (
-  <div className="bg-gray-900/50 border border-gray-800 p-5 rounded-3xl hover:border-gray-700 transition-colors">
-    <div className="flex justify-between items-start mb-4">
+  <div className="min-w-0 bg-gray-900/50 border border-gray-800 p-4 sm:p-5 rounded-3xl hover:border-gray-700 transition-colors">
+    <div className="flex justify-between items-start mb-3 sm:mb-4">
       <div className={`p-2 rounded-xl bg-gray-800 ${color}`}>
         <Icon className="w-5 h-5" />
       </div>
@@ -31,7 +31,7 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, trend, co
       )}
     </div>
     <p className="text-gray-400 text-xs font-medium uppercase tracking-wider">{title}</p>
-    <p className="text-2xl font-bold text-white mt-1">{value}</p>
+    <p className="text-xl sm:text-2xl font-bold text-white mt-1 break-words">{value}</p>
   </div>
 );
 
@@ -114,7 +114,7 @@ const DashboardPage: React.FC = () => {
       </div>
 
       {/* Stats rápidas — valores calculados desde Supabase */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           title="Ingresos Mes"
           value={formattedIncome}

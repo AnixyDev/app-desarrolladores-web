@@ -216,7 +216,27 @@ const ExpensesPage: React.FC = () => {
                         <h2 className="text-lg font-semibold text-white">Gastos Únicos</h2>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="overflow-x-auto">
+                        {/* Móvil: tarjetas; la tabla, desde tableta. */}
+                        <ul className="md:hidden divide-y divide-gray-800">
+                            {expenses.map(expense => (
+                                <li key={expense.id} className="flex items-start justify-between gap-3 p-4">
+                                    <div className="min-w-0">
+                                        <p className="text-white break-words">{(expense as any).description} {expense.cuota_autonomo_mes && <span className="ml-2 inline-block rounded bg-primary-600/20 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary-300 align-middle">Autónomo</span>}</p>
+                                        <p className="text-sm text-gray-400">{formatearFecha(expense.date)}</p>
+                                        <p className="text-white font-semibold">{formatCurrency(expense.amount_cents)}</p>
+                                    </div>
+                                    <div className="flex shrink-0 gap-2">
+                                        <Button size="sm" variant="secondary" onClick={() => abrirEdicionGasto(expense)} title="Editar" aria-label="Editar">
+                                            <EditIcon className="w-4 h-4" />
+                                        </Button>
+                                        <Button size="sm" variant="danger" onClick={() => handleDeleteClick(expense.id, 'single')} title="Eliminar" aria-label="Eliminar">
+                                            <TrashIcon className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                        <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="border-b border-gray-800">
                                 <tr>
@@ -231,7 +251,7 @@ const ExpensesPage: React.FC = () => {
                                     <tr key={expense.id} className="border-b border-gray-800 hover:bg-gray-800/50">
                                         <td className="p-4 text-white">
                                             {(expense as any).description}
-                                            {expense.cuota_autonomo_mes && <span className="ml-2 inline-block rounded bg-primary-600/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-300 align-middle">Autónomo</span>}
+                                            {expense.cuota_autonomo_mes && <span className="ml-2 inline-block rounded bg-primary-600/20 px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary-300 align-middle">Autónomo</span>}
                                         </td>
                                         <td className="p-4 text-gray-300">{formatearFecha(expense.date)}</td>
                                         <td className="p-4 text-white font-semibold">{formatCurrency(expense.amount_cents)}</td>
@@ -258,7 +278,27 @@ const ExpensesPage: React.FC = () => {
                         <h2 className="text-lg font-semibold text-white">Gastos Recurrentes</h2>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="overflow-x-auto">
+                        {/* Móvil: tarjetas; la tabla, desde tableta. */}
+                        <ul className="md:hidden divide-y divide-gray-800">
+                            {recurringExpenses.map(expense => (
+                                <li key={expense.id} className="flex items-start justify-between gap-3 p-4">
+                                    <div className="min-w-0">
+                                        <p className="text-white break-words">{(expense as any).description}</p>
+                                        <p className="text-sm text-gray-400">Próximo: {formatearFecha(expense.next_date)}</p>
+                                        <p className="text-white font-semibold">{formatCurrency(expense.amount_cents)}</p>
+                                    </div>
+                                    <div className="flex shrink-0 gap-2">
+                                        <Button size="sm" variant="secondary" onClick={() => abrirEdicionRecurrente(expense)} title="Editar" aria-label="Editar">
+                                            <EditIcon className="w-4 h-4" />
+                                        </Button>
+                                        <Button size="sm" variant="danger" onClick={() => handleDeleteClick(expense.id, 'recurring')} title="Eliminar" aria-label="Eliminar">
+                                            <TrashIcon className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                        <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="border-b border-gray-800">
                                 <tr>

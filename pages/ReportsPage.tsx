@@ -204,12 +204,14 @@ const ReportsPage: React.FC = () => {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-2">
         <input
           type="date"
+          aria-label="Desde"
           value={startDate}
           onChange={e => setStartDate(e.target.value)}
           className="w-full sm:w-auto px-3 py-2 bg-gray-800 border border-gray-700 rounded"
         />
         <input
           type="date"
+          aria-label="Hasta"
           value={endDate}
           onChange={e => setEndDate(e.target.value)}
           className="w-full sm:w-auto px-3 py-2 bg-gray-800 border border-gray-700 rounded"

@@ -54,14 +54,17 @@ export const TablaLegal: React.FC<{ columnas: string[]; filas: React.ReactNode[]
 
     <div className="sm:hidden space-y-3" role="list" aria-label={titulo}>
       {filas.map((f, i) => (
-        <dl key={i} role="listitem" className="rounded-lg border border-gray-800 bg-gray-900/60 p-3 space-y-1.5">
-          {f.map((celda, j) => (
-            <div key={j}>
-              <dt className="text-[11px] uppercase tracking-wide text-gray-500">{columnas[j]}</dt>
-              <dd className={j === 0 ? primera : ''}>{celda}</dd>
-            </div>
-          ))}
-        </dl>
+        <div key={i} role="listitem" className="rounded-lg border border-gray-800 bg-gray-900/60 p-3">
+          {/* role="listitem" va en un envoltorio: puesto en el <dl> le quitaba su significado de lista de definiciones. */}
+          <dl className="space-y-1.5">
+            {f.map((celda, j) => (
+              <div key={j}>
+                <dt className="text-xs uppercase tracking-wide text-gray-500">{columnas[j]}</dt>
+                <dd className={j === 0 ? primera : ''}>{celda}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       ))}
     </div>
   </div>

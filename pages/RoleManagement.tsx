@@ -66,16 +66,16 @@ const UserRow: React.FC<UserRowProps> = ({ user, onUpdateRole, onUpdateStatus, o
     const isCurrentUser = user.id === currentUserId;
 
     return (
-        <div className="grid grid-cols-12 gap-4 items-center p-4 border-b border-gray-700 hover:bg-gray-800 transition">
-            <div className="col-span-4 text-white"><p className="font-semibold">{user.name.split('(')[0].trim()}</p><p className="text-xs text-gray-400">{user.email}</p></div>
-            <div className="col-span-2">
+        <div className="grid grid-cols-2 md:grid-cols-12 gap-x-4 gap-y-3 items-center p-4 border-b border-gray-700 hover:bg-gray-800 transition">
+            <div className="col-span-2 md:col-span-4 text-white min-w-0"><p className="font-semibold">{user.name.split('(')[0].trim()}</p><p className="text-xs text-gray-400">{user.email}</p></div>
+            <div className="col-span-1 md:col-span-2">
                 {isEditing && !isCurrentUser ? (
                     <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value as Role['id'])} className="w-full p-2 bg-gray-700 text-white rounded-lg border border-gray-600 focus:border-fuchsia-500 outline-none text-sm">
                         {availableRoles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
                     </select>
                 ) : <RoleBadge role={user.role} />}
             </div>
-            <div className="col-span-2 text-sm text-white">
+            <div className="col-span-1 md:col-span-2 text-sm text-white text-right md:text-left">
                 {isEditing && !isCurrentUser ? (
                     <div className="relative">
                          <input 
@@ -91,10 +91,12 @@ const UserRow: React.FC<UserRowProps> = ({ user, onUpdateRole, onUpdateStatus, o
                     <span>{formatCurrency(user.hourly_rate_cents)}/h</span>
                 )}
             </div>
-            <div className="col-span-1">
+            <div className="col-span-1 flex items-center gap-2"><span className="md:hidden text-xs text-gray-400">{user.status === 'Activo' ? 'Activo' : 'Inactivo'}</span>
                  <button
                     onClick={handleStatusToggle}
                     title={user.status === 'Activo' ? 'Desactivar usuario' : 'Activar usuario'}
+                    aria-label={user.status === 'Activo' ? `Desactivar a ${user.name}` : `Activar a ${user.name}`}
+                    aria-pressed={user.status === 'Activo'}
                     disabled={isCurrentUser}
                     className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-fuchsia-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${
                         user.status === 'Activo' ? 'bg-green-500' : 'bg-gray-600'
@@ -107,13 +109,13 @@ const UserRow: React.FC<UserRowProps> = ({ user, onUpdateRole, onUpdateStatus, o
                     />
                 </button>
             </div>
-            <div className="col-span-3 flex justify-end space-x-2">
+            <div className="col-span-1 md:col-span-3 flex justify-end space-x-2">
                 {isEditing ? (
-                    <button onClick={handleSave} className={`${buttonStyle} bg-green-600 text-white hover:bg-green-700`}><SaveIcon className="w-4 h-4" /></button>
+                    <button onClick={handleSave} aria-label={`Guardar cambios de ${user.name}`} className={`${buttonStyle} bg-green-600 text-white hover:bg-green-700`}><SaveIcon className="w-4 h-4" /></button>
                 ) : (
-                    <button onClick={() => setIsEditing(true)} disabled={isCurrentUser} className={`${buttonStyle} bg-fuchsia-600 text-black hover:bg-fuchsia-700 disabled:opacity-50 disabled:cursor-not-allowed`}><EditIcon className="w-4 h-4" /></button>
+                    <button onClick={() => setIsEditing(true)} disabled={isCurrentUser} aria-label={`Editar a ${user.name}`} className={`${buttonStyle} bg-fuchsia-600 text-black hover:bg-fuchsia-700 disabled:opacity-50 disabled:cursor-not-allowed`}><EditIcon className="w-4 h-4" /></button>
                 )}
-                <button onClick={() => onDeleteUser(user)} disabled={isCurrentUser} className={`${buttonStyle} bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed`}><TrashIcon className="w-4 h-4" /></button>
+                <button onClick={() => onDeleteUser(user)} disabled={isCurrentUser} aria-label={`Eliminar a ${user.name}`} className={`${buttonStyle} bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed`}><TrashIcon className="w-4 h-4" /></button>
             </div>
         </div>
     );
@@ -159,7 +161,7 @@ const RoleManagement: React.FC = () => {
             </div>
         ) : (
             <div className="bg-gray-900 rounded-xl overflow-hidden border border-gray-700">
-                 <div className="grid grid-cols-12 gap-4 items-center p-4 bg-gray-800 text-xs font-semibold uppercase text-gray-400">
+                 <div className="hidden md:grid grid-cols-12 gap-4 items-center p-4 bg-gray-800 text-xs font-semibold uppercase text-gray-400">
                     <div className="col-span-4">Usuario</div>
                     <div className="col-span-2">Rol</div>
                     <div className="col-span-2">Tarifa/Hora</div>

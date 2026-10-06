@@ -114,7 +114,7 @@ const ComisionesAfiliados: React.FC = () => {
                     </p>
                 ) : (
                     <table className="w-full text-left">
-                        <thead className="bg-gray-950/50 text-[10px] uppercase font-black text-gray-500 tracking-widest">
+                        <thead className="bg-gray-950/50 text-xs uppercase font-black text-gray-500 tracking-widest">
                             <tr>
                                 <th className="p-4">Afiliado</th>
                                 <th className="p-4">Referidos</th>

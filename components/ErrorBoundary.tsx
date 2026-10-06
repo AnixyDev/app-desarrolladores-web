@@ -48,7 +48,7 @@ class ErrorBoundary extends Component<Props, State> {
             {import.meta.env.DEV && (
               <details className="mt-6 text-left bg-black/40 p-4 rounded-xl overflow-auto max-h-40">
                 <summary className="text-xs text-red-400 cursor-pointer">Detalles del error (Solo Dev)</summary>
-                <pre className="text-[10px] text-gray-500 mt-2 whitespace-pre-wrap">
+                <pre className="text-xs text-gray-500 mt-2 whitespace-pre-wrap">
                   {this.state.error?.toString()}
                 </pre>
               </details>

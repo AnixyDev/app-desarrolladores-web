@@ -57,7 +57,7 @@ const GlobalTimerWidget: React.FC = () => {
       >
         <PulsingDot />
         <div className="text-left">
-          <p className="max-w-[160px] truncate text-[11px] text-gray-400">{label}</p>
+          <p className="max-w-[160px] truncate text-xs text-gray-400">{label}</p>
           <p className="font-mono text-sm font-bold tabular-nums text-white">{formatDuration(elapsed)}</p>
         </div>
         <button

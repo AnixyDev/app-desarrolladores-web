@@ -210,6 +210,7 @@ const BankReconciliationPage: React.FC = () => {
               <label className="block text-sm text-gray-400 mb-1">Archivo de clave privada (.pem)</label>
               <input
                 type="file"
+                aria-label="Archivo de clave privada (.pem)"
                 accept=".pem"
                 onChange={(e) => setPrivateKeyFile(e.target.files?.[0] || null)}
                 className="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-gray-800 file:text-white hover:file:bg-gray-700"

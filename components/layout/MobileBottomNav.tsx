@@ -18,7 +18,7 @@ const TABS = [
 
 const MobileBottomNav: React.FC<MobileBottomNavProps> = ({ onMoreClick }) => {
   const tabBase =
-    'flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-[10px] font-semibold transition-colors';
+    'flex flex-col items-center justify-center gap-0.5 flex-1 h-full text-xs font-semibold transition-colors';
 
   return (
     <nav

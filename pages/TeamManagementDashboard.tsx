@@ -136,14 +136,14 @@ const TeamManagementDashboard: React.FC = () => {
       </Modal>
 
       <div className="max-w-7xl mx-auto">
-        <header className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
-          <h1 className="text-3xl font-bold text-white flex items-center">
+        <header className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-8 border-b border-gray-800 pb-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center">
             <Users className="w-7 h-7 text-fuchsia-500 mr-3" />
-            DevFreelancer Teams
+            Equipo
           </h1>
           <button
             onClick={() => setShowInviteModal(true)}
-            className="px-6 py-2 font-semibold rounded-lg transition duration-200 bg-fuchsia-600 text-black hover:bg-fuchsia-700 shadow-md shadow-fuchsia-500/30 flex items-center"
+            className="w-full sm:w-auto justify-center whitespace-nowrap px-6 py-2.5 font-semibold rounded-lg transition duration-200 bg-fuchsia-600 text-black hover:bg-fuchsia-700 shadow-md shadow-fuchsia-500/30 flex items-center"
           >
             <UserPlus className="w-5 h-5 mr-2" />
             Invitar Miembro
@@ -203,7 +203,7 @@ const TeamManagementDashboard: React.FC = () => {
                     </td>
                     <td className="p-4 text-gray-300">{formatearFecha(member.invitedOn)}</td>
                     <td className="p-4 text-right sticky right-0 bg-gray-900/95 backdrop-blur-sm">
-                      <button onClick={() => handleDelete(member)} className="text-gray-400 hover:text-red-500 p-2 rounded-full transition duration-200">
+                      <button onClick={() => handleDelete(member)} aria-label={`Quitar a ${member.name || member.email}`} title="Quitar del equipo" className="text-gray-400 hover:text-red-500 p-2 rounded-full transition duration-200">
                         <Trash2 className="w-5 h-5" />
                       </button>
                     </td>

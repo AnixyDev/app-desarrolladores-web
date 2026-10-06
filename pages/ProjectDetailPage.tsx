@@ -1,6 +1,7 @@
 // pages/ProjectDetailPage.tsx
 import React, { useState, useMemo, lazy, Suspense } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import { MoreVertical } from 'lucide-react';
 // FIX: Remove .tsx and .ts extensions from imports to resolve module resolution errors.
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -26,6 +27,7 @@ const ProjectDetailPage: React.FC = () => {
 
     const { datosDeTrabajoCargados, getProjectById, getClientById, getTasksByProjectId, timeEntries, expenses, profile, addTask, toggleTask, deleteTask, deleteProject, updateProjectStatus, teamMembership, updateProject, updateTask } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getProjectById: s.getProjectById, getClientById: s.getClientById, getTasksByProjectId: s.getTasksByProjectId, timeEntries: s.timeEntries, expenses: s.expenses, profile: s.profile, addTask: s.addTask, toggleTask: s.toggleTask, deleteTask: s.deleteTask, deleteProject: s.deleteProject, updateProjectStatus: s.updateProjectStatus, teamMembership: s.teamMembership, updateProject: s.updateProject, updateTask: s.updateTask })));
     const [editandoProyecto, setEditandoProyecto] = useState(false);
+    const [menuAbierto, setMenuAbierto] = useState(false);
     const [tareaEnEdicion, setTareaEnEdicion] = useState<{ id: string; texto: string } | null>(null);
 
     const [newTaskDescription, setNewTaskDescription] = useState('');
@@ -179,14 +181,18 @@ const ProjectDetailPage: React.FC = () => {
         }
     };
 
+    const puedeEditar = puede('editarProyecto', project.user_id, profile?.id, teamMembership);
+    const puedeBorrar = puede('borrarProyecto', project.user_id, profile?.id, teamMembership);
+
     return (
         <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-white">{project.name}</h1>
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
+                <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-white break-words">{project.name}</h1>
                     <Link to={`/clients/${client.id}`} className="text-lg text-primary-400 hover:underline">{client.name}</Link>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
+                {/* Escritorio: todos los botones. Móvil: la acción principal y el resto en «Más acciones». */}
+                <div className="hidden sm:flex items-center gap-2 flex-wrap">
                     <Button variant="secondary" onClick={handleCreateInvoice}>
                         <FileTextIcon className="w-4 h-4 mr-2"/> Crear Factura
                     </Button>
@@ -195,12 +201,12 @@ const ProjectDetailPage: React.FC = () => {
                             <DollarSignIcon className="w-4 h-4 mr-2"/> Facturar Presupuesto
                         </Button>
                     )}
-                    {puede('editarProyecto', project.user_id, profile?.id, teamMembership) && (
+                    {puedeEditar && (
                     <Button variant="secondary" onClick={() => setEditandoProyecto(true)} aria-label="Editar proyecto" title="Editar proyecto">
                         <EditIcon className="w-4 h-4 mr-2" /> Editar
                     </Button>
                     )}
-                    {puede('borrarProyecto', project.user_id, profile?.id, teamMembership) && (
+                    {puedeBorrar && (
                     <Button
                         variant="secondary"
                         onClick={() => setIsDeleteProjectModalOpen(true)}
@@ -211,6 +217,52 @@ const ProjectDetailPage: React.FC = () => {
                     </Button>
                     )}
                 </div>
+                <div className="sm:hidden flex w-full items-center gap-2">
+                    {project.budget_cents > 0 ? (
+                        <Button className="flex-1 justify-center" onClick={handleCreateInvoiceFromBudget}>
+                            <DollarSignIcon className="w-4 h-4 mr-2"/> Facturar presupuesto
+                        </Button>
+                    ) : (
+                        <Button className="flex-1 justify-center" onClick={handleCreateInvoice}>
+                            <FileTextIcon className="w-4 h-4 mr-2"/> Crear factura
+                        </Button>
+                    )}
+                    {(project.budget_cents > 0 || puedeEditar || puedeBorrar) && (
+                    <div className="relative">
+                        <Button
+                            variant="secondary"
+                            onClick={() => setMenuAbierto((v) => !v)}
+                            aria-label="Más acciones"
+                            aria-haspopup="menu"
+                            aria-expanded={menuAbierto}
+                        >
+                            <MoreVertical className="w-5 h-5" />
+                        </Button>
+                        {menuAbierto && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setMenuAbierto(false)} aria-hidden="true" />
+                                <div role="menu" className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl border border-gray-700 bg-gray-900 shadow-xl">
+                                    {project.budget_cents > 0 && (
+                                        <button role="menuitem" className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-200 hover:bg-gray-800" onClick={() => { setMenuAbierto(false); handleCreateInvoice(); }}>
+                                            <FileTextIcon className="w-4 h-4" /> Crear factura
+                                        </button>
+                                    )}
+                                    {puedeEditar && (
+                                        <button role="menuitem" className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-gray-200 hover:bg-gray-800" onClick={() => { setMenuAbierto(false); setEditandoProyecto(true); }}>
+                                            <EditIcon className="w-4 h-4" /> Editar proyecto
+                                        </button>
+                                    )}
+                                    {puedeBorrar && (
+                                        <button role="menuitem" className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-400 hover:bg-red-500/10" onClick={() => { setMenuAbierto(false); setIsDeleteProjectModalOpen(true); }}>
+                                            <TrashIcon className="w-4 h-4" /> Eliminar proyecto
+                                        </button>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    )}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -218,19 +270,12 @@ const ProjectDetailPage: React.FC = () => {
                     <Card>
                         <CardHeader className="flex items-center justify-between">
                             <h2 className="text-lg font-semibold text-white">Detalles del Proyecto</h2>
-                            {puede('editarProyecto', project.user_id, profile?.id, teamMembership) && (
-                                <button
-                                    onClick={() => setEditandoProyecto(true)}
-                                    className="flex items-center gap-1 text-sm text-primary-400 hover:text-primary-300"
-                                >
-                                    <EditIcon className="w-4 h-4" /> Editar
-                                </button>
-                            )}
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div>
                                 <label className="text-sm font-medium text-gray-400 block">Estado</label>
                                 <select 
+                                    aria-label="Estado"
                                     value={project.status} 
                                     disabled={!puede('editarProyecto', project.user_id, profile?.id, teamMembership)}
                                     onChange={(e) => updateProjectStatus(project.id, e.target.value as Project['status']).catch(() => addToast('No se pudo cambiar el estado.', 'error'))}

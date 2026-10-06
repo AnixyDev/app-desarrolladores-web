@@ -10,7 +10,7 @@ import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import { ShieldCheckIcon, RefreshCwIcon, DownloadIcon } from '@/components/icons/Icon';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, formatearFecha } from '@/lib/utils';
 
 const FiscalCompliancePage: React.FC = () => {
   const { fiscalRecords, profile, verifyFiscalChain } = useAppStore(useShallow(s => ({ fiscalRecords: s.fiscalRecords, profile: s.profile, verifyFiscalChain: s.verifyFiscalChain })));
@@ -116,7 +116,7 @@ const FiscalCompliancePage: React.FC = () => {
                           {r.record_type === 'alta' ? 'Alta' : 'Anulación'}
                         </span>
                       </td>
-                      <td className="p-3 text-gray-400">{r.fecha_expedicion}</td>
+                      <td className="p-3 text-gray-400 whitespace-nowrap">{formatearFecha(r.fecha_expedicion)}</td>
                       <td className="p-3 text-right text-white">{formatCurrency(r.importe_total_cents)}</td>
                       <td className="p-3 text-gray-400 capitalize">{r.modalidad.replace('_', ' ')}</td>
                       <td className="p-3 text-gray-400 capitalize">{r.estado_envio.replace(/_/g, ' ')}</td>

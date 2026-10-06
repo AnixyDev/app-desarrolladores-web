@@ -52,7 +52,7 @@ const PricingPage: React.FC = () => {
     <div className={`relative flex flex-col p-6 sm:p-8 bg-gray-900 rounded-3xl border transition-all duration-300 ${recommended ? 'border-primary-500 ring-4 ring-primary-500/10' : 'border-gray-800 hover:border-gray-700'}`}>
       {recommended && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="inline-flex items-center px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-lg shadow-primary-500/20">Recomendado</span>
+          <span className="inline-flex items-center px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest bg-gradient-to-r from-primary-600 to-purple-600 text-white shadow-lg shadow-primary-500/20">Recomendado</span>
         </div>
       )}
       <div className="mb-8">
@@ -63,7 +63,7 @@ const PricingPage: React.FC = () => {
         <div className="mt-4 flex items-baseline gap-1">
           <span className="text-4xl font-black text-white tracking-tighter">{price}</span>
           <span className="text-sm text-gray-500 font-medium">/{period}</span>
-          {ahorro ? <span className="ml-2 self-center whitespace-nowrap bg-green-500/15 text-green-400 text-[11px] font-bold px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra {ahorro}&nbsp;%</span> : null}
+          {ahorro ? <span className="ml-2 self-center whitespace-nowrap bg-green-500/15 text-green-400 text-xs font-bold px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra {ahorro}&nbsp;%</span> : null}
         </div>
         {priceNote && <p className="text-xs text-gray-500 mt-1">{priceNote}</p>}
         <p className="text-gray-400 mt-4 text-sm">{description}</p>
@@ -112,7 +112,7 @@ const PricingPage: React.FC = () => {
 
           <div className="inline-flex p-1 bg-gray-900 border border-gray-800 rounded-2xl shadow-inner">
             <button onClick={() => setBillingCycle('monthly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Mensual</button>
-            <button onClick={() => setBillingCycle('yearly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Anual <span className="whitespace-nowrap bg-green-500/20 text-green-400 text-[10px] px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra hasta {ahorroMaximo()}&nbsp;%</span></button>
+            <button onClick={() => setBillingCycle('yearly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Anual <span className="whitespace-nowrap bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra hasta {ahorroMaximo()}&nbsp;%</span></button>
           </div>
         </div>
 
@@ -166,8 +166,8 @@ const PricingPage: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <h4 className="text-xl font-bold text-white">¿Necesitas un plan personalizado?</h4>
-                <p className="text-gray-400 text-sm">Si eres una agencia de más de 20 personas, ofrecemos despliegues en infraestructura privada (On-Premise) y soporte dedicado.</p>
-                <a href="mailto:soporte@devfreelancer.app?subject=Plan%20Enterprise" className="text-primary-400 text-sm font-bold hover:underline mt-2 inline-block">Hablar con ventas →</a>
+                <p className="text-gray-400 text-sm">Si eres una agencia de más de 20 personas, escríbenos y lo estudiamos.</p>
+                <a href="mailto:soporte@devfreelancer.app?subject=Plan%20personalizado" className="text-primary-400 text-sm font-bold hover:underline mt-2 inline-block">Escríbenos →</a>
               </div>
             </div>
           </div>
