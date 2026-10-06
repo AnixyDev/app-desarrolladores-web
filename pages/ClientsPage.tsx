@@ -13,9 +13,9 @@ import { EditIcon, TrashIcon, PhoneIcon, MailIcon, Users as UsersIcon } from '@/
 import { useToast } from '@/hooks/useToast';
 import EmptyState from '@/components/ui/EmptyState';
 import { TIPOS_FISCALES, normalizarNifIva, nifIvaValido } from '@/lib/ivaClientes';
+import { borrarClienteConConfirmacion } from '@/lib/borrarCliente';
 
 const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
-const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
 
 
 const initialClientState: NewClient = {
@@ -30,12 +30,10 @@ const initialClientState: NewClient = {
 };
 
 const ClientsPage: React.FC = () => {
-    const { clients, addClient, updateClient, deleteClient, profile } = useAppStore(useShallow(s => ({ clients: s.clients, addClient: s.addClient, updateClient: s.updateClient, deleteClient: s.deleteClient, profile: s.profile })));
+    const { clients, addClient, updateClient, deleteClient, profile, invoices, projects, fiscalRecords, getClientById } = useAppStore(useShallow(s => ({ clients: s.clients, addClient: s.addClient, updateClient: s.updateClient, deleteClient: s.deleteClient, profile: s.profile, invoices: s.invoices, projects: s.projects, fiscalRecords: s.fiscalRecords, getClientById: s.getClientById })));
     const { addToast } = useToast();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-    const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
     const [formData, setFormData] = useState<NewClient | Client>(initialClientState);
     const [editingClient, setEditingClient] = useState<Client | null>(null);
     // FIX: estado de guardado para bloquear el botón y evitar doble submit
@@ -118,25 +116,17 @@ const ClientsPage: React.FC = () => {
         }
     };
 
-    const handleDelete = (client: Client) => {
-        setClientToDelete(client);
-        setIsConfirmModalOpen(true);
-    };
-
-    const confirmDelete = async () => {
-        if (clientToDelete) {
-            try {
-                await deleteClient(clientToDelete.id);
-                addToast(`Cliente "${clientToDelete.name}" eliminado`, 'info');
-            } catch (error) {
-                console.error('Error eliminando cliente:', error);
-                addToast('No se pudo eliminar el cliente.', 'error');
-            } finally {
-                setIsConfirmModalOpen(false);
-                setClientToDelete(null);
-            }
-        }
-    };
+    // Con facturas no se borra (hay que conservarlas): ver lib/borrarCliente.ts.
+    const handleDelete = (client: Client) => borrarClienteConConfirmacion({
+        cliente: client,
+        facturas: invoices.filter(i => i.client_id === client.id),
+        proyectos: projects.filter(p => p.client_id === client.id).length,
+        borrar: deleteClient,
+        avisar: addToast,
+        perfil: profile,
+        registrosFiscales: fiscalRecords ?? [],
+        clientePorId: getClientById,
+    });
 
     return (
         <div>
@@ -233,15 +223,6 @@ const ClientsPage: React.FC = () => {
                         isOpen={isUpgradeModalOpen}
                         onClose={() => setIsUpgradeModalOpen(false)}
                         featureName="clientes"
-                    />
-                )}
-                {isConfirmModalOpen && (
-                    <ConfirmationModal
-                        isOpen={isConfirmModalOpen}
-                        onClose={() => setIsConfirmModalOpen(false)}
-                        onConfirm={confirmDelete}
-                        title="¿Eliminar Cliente?"
-                        message={`¿Estás seguro? Se eliminarán permanentemente todos los datos asociados a "${clientToDelete?.name}", incluyendo proyectos, facturas y gastos. Esta acción no se puede deshacer.`}
                     />
                 )}
             </Suspense>

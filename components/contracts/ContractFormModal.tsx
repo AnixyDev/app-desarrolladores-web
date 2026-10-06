@@ -4,6 +4,7 @@ import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import { Contract, Client, Project, Profile } from '@/types';
 import { generarContrato, huecosPendientes } from '@/lib/plantillaContrato';
+import { confirmar } from '@/hooks/useConfirmar';
 
 
 interface ContractFormModalProps {
@@ -161,8 +162,12 @@ const ContractFormModal: React.FC<ContractFormModalProps> = ({
             <button
               type="button"
               disabled={!selectedProjectId}
-              onClick={() => {
-                if (contractContent.trim() && !window.confirm('Se sustituirá el texto actual por la plantilla legal con los datos del cliente y del proyecto. ¿Continuar?')) return;
+              onClick={async () => {
+                if (contractContent.trim() && !(await confirmar({
+                  titulo: '¿Usar la plantilla legal?',
+                  mensaje: 'Se sustituirá el texto actual por la plantilla con los datos del cliente y del proyecto.',
+                  textoConfirmar: 'Sustituir texto',
+                }))) return;
                 setContractContent(generateTemplate(selectedClientId, selectedProjectId));
               }}
               className="text-xs text-primary-400 hover:text-primary-300 disabled:opacity-40"

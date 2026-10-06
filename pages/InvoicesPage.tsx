@@ -17,6 +17,7 @@ import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal';
 import CreateRecurringInvoiceModal from '@/components/modals/CreateRecurringInvoiceModal';
 import { generateInvoicePdf, generateInvoicePdfBase64 } from '@/services/pdfService';
 import { sendEmail, sendDocumentEmail } from '@/services/emailService';
+import { confirmar } from '@/hooks/useConfirmar';
 
 interface PaymentSummary {
   paidCents: number;
@@ -520,9 +521,9 @@ const handleSelectBudget = (budgetId: string) => {
 
   const handleDeleteInvoice = async (inv: Invoice) => {
     const aviso = inv.rectifies_invoice_id
-      ? `¿Borrar la factura rectificativa ${inv.invoice_number}? La factura que rectificaba volverá a poder rectificarse.`
-      : `¿Borrar la factura ${inv.invoice_number}? No se puede deshacer.`;
-    if (!window.confirm(aviso)) return;
+      ? { titulo: `¿Borrar la rectificativa ${inv.invoice_number}?`, mensaje: 'La factura que rectificaba volverá a poder rectificarse.' }
+      : { titulo: `¿Borrar la factura ${inv.invoice_number}?`, mensaje: 'No se puede deshacer.' };
+    if (!(await confirmar({ ...aviso, peligro: true }))) return;
     try {
       await deleteInvoice(inv.id);
       addToast(`Factura ${inv.invoice_number} borrada.`, 'info');
@@ -532,7 +533,7 @@ const handleSelectBudget = (budgetId: string) => {
   };
 
   const handleDeleteRecurringInvoice = async (id: string) => {
-    if (!window.confirm('¿Borrar esta factura recurrente? Las facturas ya emitidas no se tocan.')) return;
+    if (!(await confirmar({ titulo: '¿Borrar esta factura recurrente?', mensaje: 'Dejarán de emitirse. Las facturas ya emitidas no se tocan.', peligro: true }))) return;
     try {
       await deleteRecurringInvoice(id);
     } catch (err) {

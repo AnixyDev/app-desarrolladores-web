@@ -13,13 +13,14 @@ import Input from '@/components/ui/Input';
 import { Client, NewClient } from '@/types';
 import { supabase } from '@/lib/supabaseClient';
 import { useToast } from '@/hooks/useToast';
+import { borrarClienteConConfirmacion } from '@/lib/borrarCliente';
 
 const ClientIncomeChart = lazy(() => import('@/components/charts/ClientIncomeChart'));
 
 const ClientDetailPage: React.FC = () => {
     const { clientId } = useParams<{ clientId: string }>();
     const navigate = useNavigate();
-    const { datosDeTrabajoCargados, getClientById, projects, invoices, receipts, updateClient, deleteClient, invitarAlPortal } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getClientById: s.getClientById, projects: s.projects, invoices: s.invoices, receipts: s.receipts, updateClient: s.updateClient, deleteClient: s.deleteClient, invitarAlPortal: s.invitarAlPortal })));
+    const { datosDeTrabajoCargados, getClientById, projects, invoices, receipts, updateClient, deleteClient, invitarAlPortal, profile, fiscalRecords } = useAppStore(useShallow(s => ({ datosDeTrabajoCargados: s.datosDeTrabajoCargados, getClientById: s.getClientById, projects: s.projects, invoices: s.invoices, receipts: s.receipts, updateClient: s.updateClient, deleteClient: s.deleteClient, invitarAlPortal: s.invitarAlPortal, profile: s.profile, fiscalRecords: s.fiscalRecords })));
     const { addToast } = useToast();
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -96,11 +97,20 @@ const ClientDetailPage: React.FC = () => {
         }
     };
     
-    const handleDelete = () => {
-        if (window.confirm('¿Estás seguro? Se eliminarán todos los datos asociados a este cliente (proyectos, facturas, etc.).')) {
-            deleteClient(client.id);
-            navigate('/clients');
-        }
+    // Con facturas no se borra (hay que conservarlas): ver lib/borrarCliente.ts.
+    // Solo se vuelve a la lista si el servidor ha confirmado el borrado.
+    const handleDelete = async () => {
+        const borrado = await borrarClienteConConfirmacion({
+            cliente: client,
+            facturas: clientInvoices,
+            proyectos: clientProjects.length,
+            borrar: deleteClient,
+            avisar: addToast,
+            perfil: profile,
+            registrosFiscales: fiscalRecords ?? [],
+            clientePorId: getClientById,
+        });
+        if (borrado) navigate('/clients');
     }
 
     const handleInvitarAlPortal = async () => {

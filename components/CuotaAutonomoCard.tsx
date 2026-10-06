@@ -12,6 +12,7 @@ import { formatCurrency, formatearFecha } from '@/lib/utils';
 import type { CuotaAutonomo } from '@/types';
 import { importeDelMes, proximoCargo, pagadoEnElAnio, primeroDeMes } from '@/lib/cuotaAutonomo';
 import { cargarCuotasAutonomo, guardarCuotaAutonomo, borrarCuotaAutonomo, registrarMisCuotas } from '@/services/cuotaAutonomoService';
+import { confirmar } from '@/hooks/useConfirmar';
 
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const nombreMes = (desde: string) => `${MESES[Number(desde.slice(5, 7)) - 1]} ${desde.slice(0, 4)}`;
@@ -84,7 +85,7 @@ const CuotaAutonomoCard: React.FC = () => {
   };
 
   const borrarTramo = async (t: CuotaAutonomo) => {
-    if (!window.confirm(`¿Borrar el tramo que empieza en ${nombreMes(t.desde)}? Los gastos de meses ya apuntados no se tocan.`)) return;
+    if (!(await confirmar({ titulo: `¿Borrar el tramo de ${nombreMes(t.desde)}?`, mensaje: 'Los gastos de los meses ya apuntados no se tocan.', peligro: true }))) return;
     try {
       await borrarCuotaAutonomo(t.id);
       await sincronizar();

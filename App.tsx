@@ -7,6 +7,7 @@ import Header from './components/layout/Header';
 import MobileBottomNav from './components/layout/MobileBottomNav';
 import GlobalTimerWidget from './components/timer/GlobalTimerWidget';
 import ToastContainer from './components/ui/Toast';
+import ConfirmDialog from './components/ui/ConfirmDialog';
 
 // Auth & Public
 import AuthLayout from './pages/auth/AuthLayout';
@@ -183,6 +184,7 @@ function App() {
     return (
             <>
                 <ToastContainer />
+                <ConfirmDialog />
                 <Routes>
                     {/* Rutas de autenticación (login/register) */}
                     <Route path="/auth" element={<AuthLayout />}>

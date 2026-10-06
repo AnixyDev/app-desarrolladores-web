@@ -19,6 +19,7 @@ import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useToast } from '@/hooks/useToast';
 import { formatearFecha } from '@/lib/utils';
+import { confirmar } from '@/hooks/useConfirmar';
 
 const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
 
@@ -93,7 +94,7 @@ const AIAssistantPage: React.FC = () => {
   };
 
   const borrar = async (c: ConversacionIA) => {
-    if (!window.confirm(`¿Borrar la conversación «${c.titulo}»?`)) return;
+    if (!(await confirmar({ titulo: '¿Borrar esta conversación?', mensaje: `«${c.titulo}» y todos sus mensajes se borrarán.`, peligro: true }))) return;
     try {
       await borrarConversacion(c.id);
       setConversaciones(prev => prev.filter(x => x.id !== c.id));

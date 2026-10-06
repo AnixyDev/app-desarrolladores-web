@@ -13,6 +13,7 @@ import { correoDeRecordatorio, PLANTILLA_PROXIMA_POR_DEFECTO, PLANTILLA_VENCIDA_
 
 import { formatearFecha } from '@/lib/utils';
 import CorreoPropioCard from '@/components/settings/CorreoPropioCard';
+import { confirmar } from '@/hooks/useConfirmar';
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal' | 'connect';
 
 /**
@@ -139,12 +140,12 @@ const SettingsPage: React.FC = () => {
   };
 
   const handleDeleteGeminiKey = async () => {
-    const seguro = window.confirm(
-      'Vas a eliminar tu API key de Gemini.\n\n' +
-      'Se borra cifrada de la base de datos y no se puede recuperar desde aquí. ' +
-      'Podrás generar una nueva en Google AI Studio.\n\n' +
-      '¿Seguro que quieres eliminarla?'
-    );
+    const seguro = await confirmar({
+      titulo: '¿Eliminar tu clave de Gemini?',
+      mensaje: 'Se borra de la base de datos y no se puede recuperar desde aquí. Podrás generar una nueva en Google AI Studio. Mientras tanto, la IA usará la clave compartida de la plataforma.',
+      textoConfirmar: 'Eliminar clave',
+      peligro: true,
+    });
     if (!seguro) return;
 
     try {
@@ -191,12 +192,12 @@ const SettingsPage: React.FC = () => {
     // Supabase Storage no tiene papelera ni versiones. Los backups de base de
     // datos tampoco incluyen los objetos de Storage. Antes este boton borraba
     // el certificado de un solo clic, sin preguntar nada.
-    const seguro = window.confirm(
-      'Vas a eliminar tu certificado digital.\n\n' +
-      'Esto es IRREVERSIBLE: no se puede recuperar desde aquí ni desde los backups. ' +
-      'Para volver a tenerlo necesitarás el fichero .p12 original y su contraseña.\n\n' +
-      '¿Seguro que quieres eliminarlo?'
-    );
+    const seguro = await confirmar({
+      titulo: '¿Eliminar tu certificado digital?',
+      mensaje: 'Es irreversible: no se puede recuperar desde aquí ni desde las copias de seguridad. Para volver a tenerlo necesitarás el fichero .p12 original y su contraseña.',
+      textoConfirmar: 'Eliminar certificado',
+      peligro: true,
+    });
     if (!seguro) return;
 
     try {
