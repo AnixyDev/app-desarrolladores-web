@@ -28,10 +28,10 @@ const montar = (url: string) =>
   );
 
 describe('pie legal', () => {
-  it('enlaza las cuatro páginas legales', () => {
+  it('enlaza Garantías y las cuatro páginas legales', () => {
     render(<MemoryRouter><PieLegal /></MemoryRouter>);
     const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(hrefs).toEqual(['/aviso-legal', '/privacidad', '/cookies', '/terms']);
+    expect(hrefs).toEqual(['/garantias', '/aviso-legal', '/privacidad', '/cookies', '/terms']);
   });
 
   it('está en la home, precios, acceso, portal, pago de factura, cuenta eliminada y menú de la app', () => {

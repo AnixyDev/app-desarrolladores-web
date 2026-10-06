@@ -21,13 +21,21 @@ export function csvDeFacturas(facturas: Invoice[], cliente: (id: string) => Clie
   return '﻿' + [cabecera, ...filas].map(f => f.map(celda).join(';')).join('\r\n');
 }
 
-export async function zipDeFacturas(p: {
+export interface DatosZipFacturas {
   facturas: Invoice[];
   cliente: (id: string) => Client | undefined;
   perfil: Profile;
   registrosFiscales: FiscalRecord[];
   alAvanzar?: (hechas: number, total: number) => void;
-}): Promise<{ blob: Blob; sinCliente: string[] }> {
+}
+
+export async function zipDeFacturas(p: DatosZipFacturas): Promise<{ blob: Blob; sinCliente: string[] }> {
+  const { archivos, sinCliente } = await archivosDeFacturas(p);
+  return { blob: new Blob([crearZip(archivos).buffer as ArrayBuffer], { type: 'application/zip' }), sinCliente };
+}
+
+/** PDFs (carpeta facturas/) y facturas.csv, listos para meter en un ZIP. */
+export async function archivosDeFacturas(p: DatosZipFacturas): Promise<{ archivos: ArchivoZip[]; sinCliente: string[] }> {
   const archivos: ArchivoZip[] = [];
   const sinCliente: string[] = [];
   const usados = new Set<string>();
@@ -47,5 +55,5 @@ export async function zipDeFacturas(p: {
   }
   archivos.push({ nombre: 'facturas.csv', datos: new TextEncoder().encode(csvDeFacturas(p.facturas, p.cliente)) });
   p.alAvanzar?.(p.facturas.length, p.facturas.length);
-  return { blob: new Blob([crearZip(archivos).buffer as ArrayBuffer], { type: 'application/zip' }), sinCliente };
+  return { archivos, sinCliente };
 }

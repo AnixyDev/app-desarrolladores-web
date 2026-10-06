@@ -225,6 +225,7 @@ const PUBLICAS = {
   '/portal/dashboard':                   /Acceso al Portal/,   // sin sesion, al login
   '/privacy':                            /Política de privacidad/,   // misma página que /privacidad
   '/privacidad':                         /Política de privacidad/,
+  '/garantias':                          /Tus datos son tuyos/,
   '/aviso-legal':                        /Aviso legal/,
   '/cookies':                            /Política de cookies/,
   '/terms':                              /Términos y condiciones/,

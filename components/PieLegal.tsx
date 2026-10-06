@@ -37,6 +37,9 @@ const PieLegal: React.FC<Props> = ({ variante = 'completo', className = '' }) =>
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         <p>© {new Date().getFullYear()} DevFreelancer</p>
         <nav aria-label="Información legal" className="flex flex-wrap justify-center gap-x-6 gap-y-0">
+          <Link to="/garantias" className="inline-block py-2 text-gray-300 hover:text-primary-400 transition-colors">
+            Garantías
+          </Link>
           {ENLACES_LEGALES.map((e) => (
             <Link key={e.to} to={e.to} className="inline-block py-2 hover:text-primary-400 transition-colors">
               {e.texto}
