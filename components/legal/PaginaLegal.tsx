@@ -74,9 +74,13 @@ export const TablaLegal: React.FC<{ columnas: string[]; filas: React.ReactNode[]
 interface Props {
   titulo: string;
   children: React.ReactNode;
+  /** Fecha de «Última actualización» si no es la de los textos legales. */
+  fecha?: string;
+  /** Páginas sin datos del titular (Garantías) sí se dejan indexar. */
+  indexable?: boolean;
 }
 
-const PaginaLegal: React.FC<Props> = ({ titulo, children }) => {
+const PaginaLegal: React.FC<Props> = ({ titulo, children, fecha = FECHA_TEXTOS_LEGALES, indexable = false }) => {
   useEffect(() => {
     const anterior = document.title;
     document.title = `${titulo} · DevFreelancer`;
@@ -87,12 +91,12 @@ const PaginaLegal: React.FC<Props> = ({ titulo, children }) => {
     const robots = document.createElement('meta');
     robots.name = 'robots';
     robots.content = 'noindex, follow';
-    document.head.appendChild(robots);
+    if (!indexable) document.head.appendChild(robots);
     return () => {
       document.title = anterior;
       robots.remove();
     };
-  }, [titulo]);
+  }, [titulo, indexable]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-300 flex flex-col">
@@ -109,7 +113,7 @@ const PaginaLegal: React.FC<Props> = ({ titulo, children }) => {
       <main className="flex-1 px-4 sm:px-6 py-10">
         <article className="max-w-3xl mx-auto">
           <h1 className="text-3xl sm:text-4xl font-black text-white mb-2">{titulo}</h1>
-          <p className="text-xs text-gray-500 mb-10">Última actualización: {FECHA_TEXTOS_LEGALES}</p>
+          <p className="text-xs text-gray-500 mb-10">Última actualización: {fecha}</p>
           <div className="space-y-10 text-[15px] leading-relaxed [&_a]:text-primary-400 [&_a:hover]:underline [&_strong]:text-gray-100">
             {children}
           </div>

@@ -111,8 +111,8 @@ const PricingPage: React.FC = () => {
           <p className="text-gray-400 max-w-2xl mx-auto text-lg leading-relaxed">Invierte en las herramientas que hacen crecer tu negocio. Cancela cuando quieras.</p>
 
           <div className="inline-flex p-1 bg-gray-900 border border-gray-800 rounded-2xl shadow-inner">
-            <button onClick={() => setBillingCycle('monthly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Mensual</button>
-            <button onClick={() => setBillingCycle('yearly')} className={`px-8 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Anual <span className="whitespace-nowrap bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra hasta {ahorroMaximo()}&nbsp;%</span></button>
+            <button onClick={() => setBillingCycle('monthly')} className={`px-5 sm:px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${billingCycle === 'monthly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Mensual</button>
+            <button onClick={() => setBillingCycle('yearly')} className={`px-4 sm:px-8 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${billingCycle === 'yearly' ? 'bg-gray-800 text-white shadow-lg' : 'text-gray-500 hover:text-gray-300'}`}>Anual <span className="whitespace-nowrap bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-lg border border-green-500/30">Ahorra hasta {ahorroMaximo()}&nbsp;%</span></button>
           </div>
         </div>
 
@@ -158,6 +158,11 @@ const PricingPage: React.FC = () => {
           />
         </div>
 
+        <p className="text-center text-sm text-gray-400 -mt-4">
+          Tus datos son tuyos: expórtalos cuando quieras, sin darte de baja.{' '}
+          <Link to="/garantias" className="text-primary-400 font-semibold hover:underline">Ver garantías →</Link>
+        </p>
+
         <div className="max-w-3xl mx-auto pt-4">
           <div className="bg-gradient-to-br from-gray-900 to-gray-950 border border-gray-800 rounded-2xl">
             <div className="p-8 text-center sm:text-left flex flex-col sm:flex-row items-center gap-8">
@@ -184,6 +189,7 @@ const PricingPage: React.FC = () => {
             © {new Date().getFullYear()} DevFreelancer. Todos los derechos reservados.
           </p>
           <nav aria-label="Información legal" className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+            <Link to="/garantias" className="inline-block py-2 text-gray-300 hover:text-white transition-colors">Garantías</Link>
             {ENLACES_LEGALES.map((e) => (
               <Link key={e.to} to={e.to} className="inline-block py-2 text-gray-400 hover:text-white transition-colors">{e.texto}</Link>
             ))}

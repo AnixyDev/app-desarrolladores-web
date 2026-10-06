@@ -13,6 +13,7 @@ import { correoDeRecordatorio, PLANTILLA_PROXIMA_POR_DEFECTO, PLANTILLA_VENCIDA_
 
 import { formatearFecha } from '@/lib/utils';
 import CorreoPropioCard from '@/components/settings/CorreoPropioCard';
+import ExportarDatosCard from '@/components/settings/ExportarDatosCard';
 import { confirmar } from '@/hooks/useConfirmar';
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal' | 'connect';
 
@@ -547,6 +548,7 @@ const SettingsPage: React.FC = () => {
                     Cerrar sesión
                   </Button>
                 </div>
+                <ExportarDatosCard />
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-red-800/60 bg-red-950/20 p-4">
                   <div>
                     <p className="text-white font-medium">Eliminar mi cuenta</p>

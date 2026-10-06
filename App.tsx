@@ -20,6 +20,7 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import PrivacidadPage from './pages/legal/PrivacidadPage';
 import AvisoLegalPage from './pages/legal/AvisoLegalPage';
+import GarantiasPage from './pages/legal/GarantiasPage';
 import CookiesPage from './pages/legal/CookiesPage';
 import TermsOfService from './pages/TermsOfService';
 import PricingPage from './pages/PricingPage';
@@ -208,6 +209,7 @@ function App() {
                     </Route>
 
                     {/* Páginas públicas */}
+                    <Route path="/garantias" element={<GarantiasPage />} />
                     <Route path="/aviso-legal" element={<AvisoLegalPage />} />
                     <Route path="/privacidad" element={<PrivacidadPage />} />
                     {/* URL registrada en la pantalla de consentimiento de Google: debe seguir funcionando. */}

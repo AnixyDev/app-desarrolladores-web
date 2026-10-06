@@ -4,6 +4,10 @@ import OfertaFundadores from '@/components/OfertaFundadores';
 import PieLegal from '@/components/PieLegal';
 import FaqHome from '@/components/FaqHome';
 import { guardarIntencionFundadores } from '@/lib/intencionFundadores';
+import { precioDe } from '../supabase/functions/_shared/catalogo-stripe';
+
+// Precio del héroe: sale del catálogo, el mismo con el que cobra Stripe.
+const PRECIO_PRO = precioDe('proPlan')?.precio.replace('€', ' €') ?? '';
 import { Logo } from '@/components/icons/Logo';
 import Button from '@/components/ui/Button';
 import {
@@ -225,14 +229,20 @@ const LandingPage: React.FC = () => {
           <div className="inline-flex items-center gap-2 mb-6 px-3 py-1 rounded-full border border-gray-800 bg-gray-900/60 font-mono text-xs text-gray-400">
             <span className="text-primary-400">$</span> whoami
           </div>
+          {/* Una sola promesa (06/10/2026). Sin «con Verifactu»: el envío a la AEAT
+              y la firma de registros aún no están (ver /garantias). */}
           <h1 className="font-display text-4xl sm:text-5xl md:text-6xl font-bold mb-6 tracking-tight leading-[1.1]">
-            La gestión de tu negocio,<br className="hidden sm:block" /> con la lógica de un desarrollador
+            Factura, controla tus horas<br className="hidden sm:block" /> y la rentabilidad de cada proyecto
           </h1>
-          <p className="text-gray-400 text-lg sm:text-xl mb-10 max-w-2xl mx-auto">
-            Clientes, proyectos, facturas con IVA/IRPF automático y cobro online. Sin plantillas de Excel, sin PDFs perdidos en el correo.
+          <p className="text-gray-300 text-lg sm:text-xl mb-3 max-w-2xl mx-auto">
+            Para desarrolladores freelance en España: IVA e IRPF automáticos, facturas con QR tributario y cobro online.{' '}
+            <span className="text-white font-semibold">Pro, {PRECIO_PRO} al mes.</span> Gratis para empezar.
+          </p>
+          <p className="text-gray-500 text-base mb-10 max-w-2xl mx-auto">
+            Y además: presupuestos, contratos, portal del cliente y asistente con IA.
           </p>
 
-          <div className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
+          <div className="flex flex-col sm:flex-row justify-center gap-4 mb-6">
             <Button onClick={() => navigate('/auth/register')} className="px-8 py-3.5 text-base">
               Empezar gratis
             </Button>
@@ -244,6 +254,10 @@ const LandingPage: React.FC = () => {
               Ver precios
             </Button>
           </div>
+          <p className="mb-16 text-sm text-gray-400">
+            Tus datos son tuyos: expórtalos cuando quieras.{' '}
+            <Link to="/garantias" className="text-primary-400 font-semibold hover:underline">Ver garantías →</Link>
+          </p>
 
           <TerminalHero />
         </section>
