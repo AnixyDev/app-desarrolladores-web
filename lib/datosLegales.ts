@@ -32,6 +32,6 @@ export const DATOS_LEGALES = {
 } as const;
 
 /** Fecha de la última revisión de los textos legales. */
-export const FECHA_TEXTOS_LEGALES = '4 de octubre de 2026';
+export const FECHA_TEXTOS_LEGALES = '6 de octubre de 2026';
 
 export const esMarcador = (valor: string): boolean => /^\[.*\]$/.test(valor.trim());
