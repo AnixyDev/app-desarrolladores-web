@@ -101,9 +101,10 @@ describe('puedeInvitar — tope diario de envios', () => {
     expect(puedeInvitar('Teams', 0).permitida).toBe(true);
   });
 
-  it('el tope es holgado para montar un equipo entero', () => {
-    // 5 plazas, con erratas y reenvios, no deberia acercarse al tope.
-    expect(INVITACIONES_POR_DIA).toBeGreaterThan(MIEMBROS_POR_PLAN.Teams * 3);
+  it('el tope deja invitar al equipo entero en un dia', () => {
+    // Bajado a 5 mientras Resend este en el plan gratuito: alcanza justo
+    // para las 5 plazas de Teams.
+    expect(INVITACIONES_POR_DIA).toBeGreaterThanOrEqual(MIEMBROS_POR_PLAN.Teams);
   });
 });
 

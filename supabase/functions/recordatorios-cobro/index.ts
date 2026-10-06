@@ -23,7 +23,12 @@ import { nivelQueToca, correoDeRecordatorio, MAX_DIAS_VENCIDA } from '../_shared
 const RESEND_API_URL = 'https://api.resend.com/emails';
 const FROM_DOMAIN_ADDRESS = 'facturas@devfreelancer.app';
 const SITIO = 'https://devfreelancer.app';
-const MAX_POR_USUARIO_Y_DIA = 40;
+// Topes bajados el 06/10/2026 mientras Resend esté en el plan gratuito
+// (100 correos al día para TODA la plataforma, también los de acceso).
+// Sin ellos, un solo usuario podría agotar el cupo de todos. Al pasar a
+// Resend Pro (≈10 suscriptores o >2.000 correos/mes) se vuelven a subir.
+// Lo que no sale hoy por el tope sale en los días siguientes. Antes 40.
+const MAX_POR_USUARIO_Y_DIA = 5;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 const json = (cuerpo: unknown, status = 200) =>

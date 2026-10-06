@@ -11,8 +11,12 @@
 // correo, y quien lo hiciera quemaría la reputación de devfreelancer.app para
 // todos los demás.
 
-/** Invitaciones al portal que puede enviar una cuenta cada 24 horas. */
-export const INVITACIONES_PORTAL_POR_DIA = 20;
+// Topes bajados el 06/10/2026 mientras Resend esté en el plan gratuito
+// (100 correos al día para TODA la plataforma, también los de acceso).
+// Sin ellos, un solo usuario podría agotar el cupo de todos. Al pasar a
+// Resend Pro (≈10 suscriptores o >2.000 correos/mes) se vuelven a subir.
+/** Invitaciones al portal que puede enviar una cuenta cada 24 horas. Antes 20. */
+export const INVITACIONES_PORTAL_POR_DIA = 5;
 
 /**
  * Espera mínima antes de volver a invitar al MISMO cliente.
