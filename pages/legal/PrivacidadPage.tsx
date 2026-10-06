@@ -15,6 +15,7 @@ const PROVEEDORES: React.ReactNode[][] = [
   ['Cloudflare, Inc.', 'Verificación antirrobots (Turnstile) en registro e inicio de sesión', 'EE. UU. y red global', 'DPF y Cláusulas Contractuales Tipo'],
   ['Resend, Inc.', 'Envío de correos (facturas, recordatorios, invitaciones, avisos de la cuenta)', 'Unión Europea (Irlanda, sobre Amazon Web Services); empresa con sede en EE. UU.', 'Cláusulas Contractuales Tipo'],
   ['ImprovMX Incorporated', `Recepción y reenvío de los correos enviados a ${D.email}`, 'EE. UU.', 'Cláusulas Contractuales Tipo'],
+  ['GitHub, Inc.', 'Custodia de la copia de seguridad diaria de la base de datos, cifrada con AES-256 antes de guardarse (GitHub no tiene la clave y no puede leerla); se borra a los 30 días', 'EE. UU.', 'DPF y Cláusulas Contractuales Tipo'],
   ['Enable Banking Oy', 'Conexión con tu banco para conciliar movimientos (solo si la activas)', 'Unión Europea (Finlandia)', 'Datos en la UE'],
 ];
 
