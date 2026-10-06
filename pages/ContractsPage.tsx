@@ -17,6 +17,7 @@ import BuySignatureCreditsModal from '@/components/modals/BuySignatureCreditsMod
 import { FileSignatureIcon } from '@/components/icons/Icon';
 
 import { formatearFecha } from '@/lib/utils';
+import { confirmar } from '@/hooks/useConfirmar';
 const ContractsPage: React.FC = () => {
   const { profile, contracts, clients, projects, addContract, updateContract, deleteContract, sendContract, getClientById, getProjectById, subscribeToContractsRealtime } = useAppStore(useShallow(s => ({ profile: s.profile, contracts: s.contracts, clients: s.clients, projects: s.projects, addContract: s.addContract, updateContract: s.updateContract, deleteContract: s.deleteContract, sendContract: s.sendContract, getClientById: s.getClientById, getProjectById: s.getProjectById, subscribeToContractsRealtime: s.subscribeToContractsRealtime })));
   // CAMBIO: NUEVO. Activa la suscripción de Realtime al montar la página,
@@ -37,10 +38,13 @@ const ContractsPage: React.FC = () => {
   // ── Handlers del formulario ────────────────────────────────────────────────
 
   const handleOpenCreate = () => { setEditingContract(null); setIsFormOpen(true); };
-  const handleOpenEdit = (contract: Contract) => {
-    if (contract.status === 'signed' && !window.confirm(
-      'Este contrato ya está firmado. Si lo editas, se quita la firma y habrá que volver a enviarlo para firmar. ¿Continuar?'
-    )) return;
+  const handleOpenEdit = async (contract: Contract) => {
+    if (contract.status === 'signed' && !(await confirmar({
+      titulo: 'Este contrato ya está firmado',
+      mensaje: 'Si lo editas, se quita la firma y habrá que volver a enviarlo para firmar.',
+      textoConfirmar: 'Editar igualmente',
+      peligro: true,
+    }))) return;
     setEditingContract(contract);
     setIsFormOpen(true);
   };
@@ -92,9 +96,9 @@ const ContractsPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     const firmado = contracts.find(c => c.id === id)?.status === 'signed';
-    if (window.confirm(firmado
-      ? 'Este contrato está FIRMADO. Si lo borras, perderás la prueba de la firma. ¿Borrarlo de todas formas?'
-      : '¿Estás seguro de eliminar este contrato?')) {
+    if (await confirmar(firmado
+      ? { titulo: 'Este contrato está firmado', mensaje: 'Si lo borras, perderás la prueba de la firma.', textoConfirmar: 'Borrar de todas formas', peligro: true }
+      : { titulo: '¿Borrar este contrato?', mensaje: 'Se borrará y no se puede deshacer.', peligro: true })) {
       try {
         await deleteContract(id);
         addToast('Contrato eliminado.', 'info');

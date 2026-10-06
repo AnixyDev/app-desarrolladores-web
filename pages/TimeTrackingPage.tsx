@@ -12,6 +12,7 @@ import { generateTimeEntryDescription, AI_CREDIT_COSTS } from '@/services/gemini
 import { TimeEntry } from '@/types';
 import { requestTimerNotificationPermission, isTimerNotificationSupported } from '@/services/timerNotifications';
 import { formatDuration, formatearFecha } from '@/lib/utils';
+import { confirmar } from '@/hooks/useConfirmar';
 
 const TimeDistributionChart = lazy(() => import('@/components/charts/TimeDistributionChart'));
 const WeeklyHoursChart = lazy(() => import('@/components/charts/WeeklyHoursChart'));
@@ -264,7 +265,7 @@ const TimeTrackingPage: React.FC = () => {
 
     // FIX: nuevo — antes no existía forma de borrar un registro de tiempo.
     const handleDeleteEntry = async (entry: TimeEntry) => {
-        if (window.confirm(`¿Eliminar este registro de tiempo (${formatHoursMinutes(entry.duration_seconds)})? Esta acción no se puede deshacer.`)) {
+        if (await confirmar({ titulo: '¿Borrar este registro de tiempo?', mensaje: `${formatHoursMinutes(entry.duration_seconds)} registradas. No se puede deshacer.`, peligro: true })) {
             try {
                 await deleteTimeEntry(entry.id);
                 addToast('Registro de tiempo eliminado.', 'success');

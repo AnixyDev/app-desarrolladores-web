@@ -22,6 +22,7 @@ import { sendDocumentEmail } from '../services/emailService';
 import { generateProposalPdf, generateProposalPdfBase64 } from '../services/pdfService';
 import { useToast } from '../hooks/useToast';
 import { Proposal } from '@/types';
+import { confirmar } from '@/hooks/useConfirmar';
 
 // ─── Tipos locales ────────────────────────────────────────────────────────────
 type FilterStatus = 'all' | Proposal['status'];
@@ -212,7 +213,7 @@ const ProposalsPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar esta propuesta?')) {
+    if (await confirmar({ titulo: '¿Borrar esta propuesta?', mensaje: 'Se borrará y no se puede deshacer.', peligro: true })) {
       try {
         await deleteProposal(id);
         addToast('Propuesta eliminada.', 'success');

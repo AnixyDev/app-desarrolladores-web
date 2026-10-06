@@ -21,6 +21,7 @@ import { sendDocumentEmail } from '../services/emailService';
 import { generateBudgetPdf, generateBudgetPdfBase64 } from '../services/pdfService';
 import { useToast } from '../hooks/useToast';
 import CreateBudgetModal from '../components/modals/CreateBudgetModal';
+import { confirmar } from '@/hooks/useConfirmar';
 
 const BudgetsPage: React.FC = () => {
   const { budgets, profile, getClientById, updateBudgetStatus, deleteBudget } = useAppStore(useShallow(s => ({ budgets: s.budgets, profile: s.profile, getClientById: s.getClientById, updateBudgetStatus: s.updateBudgetStatus, deleteBudget: s.deleteBudget })));
@@ -81,7 +82,7 @@ const BudgetsPage: React.FC = () => {
   };
 
   const handleDelete = async (budget: Budget) => {
-    if (!window.confirm(`¿Borrar el presupuesto "${budget.description}"? No se puede deshacer.`)) return;
+    if (!(await confirmar({ titulo: '¿Borrar este presupuesto?', mensaje: `«${budget.description}» se borrará y no se puede deshacer.`, peligro: true }))) return;
     try {
       await deleteBudget(budget.id);
       addToast('Presupuesto borrado.', 'info');
