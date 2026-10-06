@@ -39,6 +39,6 @@ describe('Libro Fiscal: qué facturas cuentan', () => {
   });
 
   it('hay una etiqueta para cada motivo sin IVA (columna Observaciones del CSV)', () => {
-    expect(Object.keys(ETIQUETA_SIN_IVA).sort()).toEqual(['inversion_sujeto_pasivo_ue', 'no_sujeta_fuera_ue']);
+    expect(Object.keys(ETIQUETA_SIN_IVA).sort()).toEqual(['inversion_sujeto_pasivo_ue', 'no_sujeta_fuera_ue', 'no_sujeta_fuera_ue_particular']);
   });
 });

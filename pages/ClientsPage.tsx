@@ -13,6 +13,7 @@ import { EditIcon, TrashIcon, PhoneIcon, MailIcon, Users as UsersIcon } from '@/
 import { useToast } from '@/hooks/useToast';
 import EmptyState from '@/components/ui/EmptyState';
 import { TIPOS_FISCALES, normalizarNifIva, nifIvaValido } from '@/lib/ivaClientes';
+import { PAISES } from '@/lib/paises';
 import { borrarClienteConConfirmacion } from '@/lib/borrarCliente';
 
 const UpgradePromptModal = lazy(() => import('@/components/modals/UpgradePromptModal'));
@@ -27,6 +28,8 @@ const initialClientState: NewClient = {
     address: '',
     tipo_fiscal: 'nacional',
     nif_iva: '',
+    pais: null,
+    es_particular: false,
 };
 
 const ClientsPage: React.FC = () => {
@@ -90,7 +93,16 @@ const ClientsPage: React.FC = () => {
             addToast('El NIF-IVA debe empezar por el código del país (por ejemplo, FR12345678901).', 'error');
             return;
         }
-        const datos = { ...formData, tipo_fiscal: tipoFiscal, nif_iva: nifIva };
+        // País y particular (registro fiscal Verifactu): fuera de la UE el país es
+        // obligatorio; en «España» solo se indica para un particular de otro país
+        // de la UE, que paga IVA español pero no tiene NIF español.
+        const pais = tipoFiscal === 'empresa_ue' || formData.pais === 'ES' ? null : (formData.pais || null);
+        if (tipoFiscal === 'fuera_ue' && !pais) {
+            addToast('Indica el país del cliente.', 'error');
+            return;
+        }
+        const esParticular = tipoFiscal === 'fuera_ue' ? !!formData.es_particular : tipoFiscal === 'nacional' && !!pais;
+        const datos = { ...formData, tipo_fiscal: tipoFiscal, nif_iva: nifIva, pais, es_particular: esParticular };
 
         setIsSaving(true);
         try {
@@ -178,7 +190,20 @@ const ClientsPage: React.FC = () => {
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <Input name="name" label="Nombre Completo" value={formData.name} onChange={handleInputChange} required />
                     <Input name="company" label="Empresa (Opcional)" value={formData.company} onChange={handleInputChange} />
-                    <Input name="tax_id" label="NIF/CIF (Opcional)" value={formData.tax_id || ''} onChange={handleInputChange} placeholder="Ej: B12345678" />
+                    <Input
+                        name="tax_id"
+                        label={formData.tipo_fiscal === 'fuera_ue' || (formData.tipo_fiscal !== 'empresa_ue' && formData.pais && formData.pais !== 'ES')
+                            ? 'Documento fiscal o de identidad'
+                            : 'NIF/CIF'}
+                        value={formData.tax_id || ''}
+                        onChange={handleInputChange}
+                        placeholder={formData.tipo_fiscal === 'fuera_ue' ? 'Ej: EIN, pasaporte…' : 'Ej: B12345678'}
+                    />
+                    {formData.tipo_fiscal !== 'empresa_ue' && (
+                        <p className="-mt-2 text-xs text-gray-500">
+                            Hacienda lo exige para identificar al cliente en las facturas de más de 400 €.
+                        </p>
+                    )}
                     <Input name="email" label="Email" type="email" value={formData.email} onChange={handleInputChange} required />
                     <Input name="phone" label="Teléfono (Opcional)" value={formData.phone} onChange={handleInputChange} />
                     <Input name="address" label="Dirección (Opcional)" value={formData.address || ''} onChange={handleInputChange} />
@@ -199,6 +224,35 @@ const ClientsPage: React.FC = () => {
                             {TIPOS_FISCALES.find(t => t.valor === (formData.tipo_fiscal ?? 'nacional'))?.ayuda}
                         </p>
                     </div>
+                    {formData.tipo_fiscal !== 'empresa_ue' && (
+                        <div>
+                            <label htmlFor="pais" className="block text-sm text-gray-400 mb-1">
+                                {formData.tipo_fiscal === 'fuera_ue' ? 'País' : 'País (solo si es un particular de otro país de la UE)'}
+                            </label>
+                            <select
+                                id="pais"
+                                name="pais"
+                                value={formData.pais ?? (formData.tipo_fiscal === 'fuera_ue' ? '' : 'ES')}
+                                onChange={handleInputChange}
+                                required={formData.tipo_fiscal === 'fuera_ue'}
+                                className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-primary-500"
+                            >
+                                {formData.tipo_fiscal === 'fuera_ue' && <option value="" disabled>Elige el país…</option>}
+                                {PAISES.map(p => <option key={p.codigo} value={p.codigo}>{p.nombre}</option>)}
+                            </select>
+                        </div>
+                    )}
+                    {formData.tipo_fiscal === 'fuera_ue' && (
+                        <label className="flex items-start gap-3 text-sm text-gray-300">
+                            <input
+                                type="checkbox"
+                                checked={!!formData.es_particular}
+                                onChange={(e) => setFormData(prev => ({ ...prev, es_particular: e.target.checked }))}
+                                className="mt-0.5 h-4 w-4 rounded border-gray-600 bg-gray-800"
+                            />
+                            <span>Es un particular, no una empresa ni un autónomo</span>
+                        </label>
+                    )}
                     {formData.tipo_fiscal === 'empresa_ue' && (
                         <Input
                             name="nif_iva"

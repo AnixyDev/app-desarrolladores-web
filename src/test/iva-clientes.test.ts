@@ -19,7 +19,7 @@ describe('facturas sin IVA a clientes extranjeros', () => {
     expect(mencionSinIva('inversion_sujeto_pasivo_ue')).toContain('Inversión del sujeto pasivo');
     expect(mencionSinIva('no_sujeta_fuera_ue')).toContain('no sujeta');
     expect(mencionSinIva(null)).toBeNull();
-    expect(Object.keys(MENCIONES_SIN_IVA)).toHaveLength(2);
+    expect(Object.keys(MENCIONES_SIN_IVA)).toHaveLength(3);
   });
 
   it('normaliza el NIF-IVA como lo espera la base de datos', () => {

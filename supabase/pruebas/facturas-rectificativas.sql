@@ -29,7 +29,7 @@ begin
   perform set_config('request.jwt.claims', json_build_object('sub', v_yo, 'role', 'authenticated', 'email', 'yo-' || v_yo || '@ejemplo.com')::text, true);
   execute 'set local role authenticated';
 
-  insert into public.clients (user_id, name, email) values (v_yo, 'Cliente', 'c@ejemplo.com') returning id into v_cli;
+  insert into public.clients (user_id, name, email, tax_id) values (v_yo, 'Cliente', 'c@ejemplo.com', 'B12345678') returning id into v_cli;
   -- 2 x 100 € + 21 % IVA = 242 €
   insert into public.invoices (user_id, client_id, invoice_number, issue_date, due_date, items, subtotal_cents, tax_percent, total_cents)
   values (v_yo, v_cli, public.generate_invoice_number(v_yo), current_date, current_date + 15,

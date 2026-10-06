@@ -15,6 +15,7 @@ import type { Expense, Invoice, MotivoSinIva } from '@/types';
 export const ETIQUETA_SIN_IVA: Record<MotivoSinIva, string> = {
   inversion_sujeto_pasivo_ue: 'Sin IVA español: inversión del sujeto pasivo (cliente UE)',
   no_sujeta_fuera_ue: 'Sin IVA español: no sujeta (cliente fuera de la UE)',
+  no_sujeta_fuera_ue_particular: 'Sin IVA español: no sujeta (particular fuera de la UE)',
 };
 
 type FacturaLibro = Pick<Invoice, 'subtotal_cents' | 'tax_percent' | 'irpf_percent' | 'motivo_sin_iva'>;

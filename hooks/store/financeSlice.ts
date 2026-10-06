@@ -1,3 +1,4 @@
+import { useToast } from '@/hooks/useToast';
 import { StateCreator } from 'zustand';
 import {
   Invoice,
@@ -271,8 +272,9 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
     });
     if (fiscalError) {
       console.error('Error generando el registro fiscal Veri*Factu:', fiscalError);
-      // La factura ya se creó — no se revierte, pero se avisa. El usuario
-      // puede reintentar el registro fiscal desde /fiscal.
+      // La factura ya se creó — no se revierte, pero se avisa (antes solo
+      // quedaba en la consola). El usuario puede reintentarlo desde /fiscal.
+      useToast.getState().addToast(`La factura se ha guardado, pero no se ha podido registrar en el registro fiscal: ${fiscalError.message}`, 'error');
     } else {
       finalInvoice = { ...data, fiscal_locked: true };
       set(state => ({ fiscalRecords: [fiscalRecord as FiscalRecord, ...state.fiscalRecords] }));
@@ -323,6 +325,7 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
       const { data: registro, error: errorFiscal } = await supabase.rpc('generate_fiscal_record', { p_invoice_id: nueva.id });
       if (errorFiscal) {
         console.error('Error generando el registro fiscal de la rectificativa:', errorFiscal);
+        useToast.getState().addToast(`La rectificativa se ha guardado, pero no se ha podido registrar en el registro fiscal: ${errorFiscal.message}`, 'error');
       } else {
         nueva = { ...nueva, fiscal_locked: true };
         set(state => ({ fiscalRecords: [registro as FiscalRecord, ...state.fiscalRecords] }));
