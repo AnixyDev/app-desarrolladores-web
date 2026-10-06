@@ -25,6 +25,8 @@ const PROMESAS_VERIFICADAS: Record<string, string> = {
     'Facturas con huella y QR (Veri*Factu) · envío a la AEAT y TicketBAI próximamente': 'registrar_factura_fiscal() (huella SHA-256 encadenada) + QR en pdfService.ts; envío a la AEAT y TicketBAI marcados como próximamente',
     'Canal de chat privado por proyecto': 'project_messages + ProjectChat (auditoría 24/09)',
     '50 Créditos IA mensuales': 'recargar_creditos_mensuales() + supabase/pruebas/recarga-mensual-de-creditos.sql',
+    // 06/10: Pro y Teams conectan su propia cuenta de Resend con su dominio verificado.
+    'Envía facturas desde tu propio dominio': '_shared/remitente-propio.ts + manage-secrets save_resend (correo de prueba antes de guardar) + src/test/remitente-propio.test.ts',
     // Teams
     'Hasta 5 miembros de equipo': '_shared/limites-equipo.ts (auditoría 24/09)',
     'Roles y permisos avanzados': 'rol_en_equipo() + supabase/pruebas/roles-del-equipo.sql + lib/permisosEquipo.ts',

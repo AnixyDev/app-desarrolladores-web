@@ -23,6 +23,16 @@ import {
   INVITACIONES_PORTAL_POR_DIA,
   ESPERA_ENTRE_REENVIOS_MINUTOS,
 } from '../_shared/limites-portal.ts';
+import {
+  cargarRemitentePropio,
+  apuntarErrorPropio,
+  enviarPorResend,
+  formatearRemitente,
+  nombreVisiblePropio,
+  motivoDelRechazo,
+  TOPES_CON_REMITENTE_PROPIO,
+} from '../_shared/remitente-propio.ts';
+import { descifradorConClave } from '../_shared/cripto.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,7 +40,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const RESEND_API_URL = 'https://api.resend.com/emails';
 const FROM_ADDRESS = 'DevFreelancer <alertas@devfreelancer.app>';
 
 const ORIGEN_POR_DEFECTO = 'https://devfreelancer.app';
@@ -161,11 +170,6 @@ Deno.serve(async (req) => {
     return json({ error: 'Fallo al autenticar al usuario' }, 401);
   }
 
-  const resendKey = Deno.env.get('RESEND_API_KEY');
-  if (!resendKey) {
-    console.error('Falta RESEND_API_KEY: no se puede enviar la invitación.');
-    return json({ error: 'Error interno' }, 500);
-  }
 
   try {
     const { clientId } = await req.json();
@@ -210,6 +214,19 @@ Deno.serve(async (req) => {
       return rechazo('El email de ese cliente no es una dirección válida. Corrígelo en su ficha.');
     }
 
+    // ── ¿Su propio dominio (Pro/Teams) o la plataforma? ──────────────────
+    const { data: perfil } = await supabaseAdmin
+      .from('profiles')
+      .select('business_name, full_name, plan')
+      .eq('id', freelancer.id)
+      .maybeSingle();
+    const propio = await cargarRemitentePropio(supabaseAdmin, freelancer.id, perfil?.plan, descifradorConClave(Deno.env.get('APP_ENCRYPTION_KEY')));
+    const resendKey = propio?.apiKey ?? Deno.env.get('RESEND_API_KEY');
+    if (!resendKey) {
+      console.error('Falta RESEND_API_KEY: no se puede enviar la invitación.');
+      return json({ error: 'Error interno' }, 500);
+    }
+
     // ── CONTROL 2: tope diario y espera entre reenvíos ────────────────────
     //
     // CAMBIO (27/09): antes se contaba con clients.portal_invitado_en, que el
@@ -222,7 +239,7 @@ Deno.serve(async (req) => {
       p_user: freelancer.id,
       p_client: cliente.id,
       p_email: destinatario,
-      p_max_dia: INVITACIONES_PORTAL_POR_DIA,
+      p_max_dia: propio ? TOPES_CON_REMITENTE_PROPIO.invitacionesPortalPorDia : INVITACIONES_PORTAL_POR_DIA,
       p_espera_min: ESPERA_ENTRE_REENVIOS_MINUTOS,
     });
 
@@ -235,39 +252,32 @@ Deno.serve(async (req) => {
     }
 
     // ── El correo ─────────────────────────────────────────────────────────
-    const { data: perfil } = await supabaseAdmin
-      .from('profiles')
-      .select('business_name, full_name')
-      .eq('id', freelancer.id)
-      .maybeSingle();
-
     const nombreFreelancer = perfil?.business_name || perfil?.full_name || 'Tu freelancer';
 
     // Sin token. El cliente pide su propio enlace desde el portal; aquí solo
     // se le lleva al formulario con su dirección ya puesta.
     const enlace = `${origin}/portal/login?email=${encodeURIComponent(destinatario)}`;
 
-    const respuestaResend = await fetch(RESEND_API_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: FROM_ADDRESS,
-        to: [destinatario],
-        subject: `${nombreFreelancer} te ha dado acceso a tu portal de cliente`,
-        html: cuerpoDelCorreo(cliente.name ?? 'Hola', nombreFreelancer, enlace),
-      }),
+    const envio = await enviarPorResend(resendKey, {
+      from: propio
+        ? formatearRemitente(nombreVisiblePropio(nombreFreelancer), propio.direccion)
+        : FROM_ADDRESS,
+      to: [destinatario],
+      subject: `${nombreFreelancer} te ha dado acceso a tu portal de cliente`,
+      html: cuerpoDelCorreo(cliente.name ?? 'Hola', nombreFreelancer, enlace),
     });
 
-    if (!respuestaResend.ok) {
-      // El error crudo de Resend no se le devuelve al navegador: puede llevar
-      // detalles de la cuenta de correo.
-      const detalle = await respuestaResend.text();
-      console.error('Resend rechazó la invitación al portal:', respuestaResend.status, detalle);
+    if (!envio.ok) {
+      if (propio) {
+        const motivo = motivoDelRechazo(envio.status, envio.cuerpo);
+        await apuntarErrorPropio(supabaseAdmin, freelancer.id, motivo);
+        return rechazo(`${motivo} Revísalo en Ajustes → Perfil → Enviar desde tu dominio.`);
+      }
+      // El error crudo de la cuenta de la plataforma no se le devuelve al navegador.
+      console.error('Resend rechazó la invitación al portal:', envio.status, envio.cuerpo);
       return rechazo('No se pudo enviar la invitación. Inténtalo de nuevo en unos minutos.');
     }
+    if (propio) await apuntarErrorPropio(supabaseAdmin, freelancer.id, null);
 
     // Se marca para que la ficha del cliente enseñe cuándo se le invitó. El
     // cupo ya no depende de esta columna (ver CONTROL 2).

@@ -29,10 +29,14 @@ export type PlanConocido = keyof typeof MIEMBROS_POR_PLAN;
  * borrar: sin este tope, bastaria con anadir, invitar, borrar y repetir para
  * mandar correos sin fin. Por eso cada envio se registra aparte.
  *
- * 20 es holgado para el uso normal (montar un equipo de 5, con erratas y
- * reenvios, no llega ni de lejos) y corta el abuso en seco.
+ * 5 alcanza para invitar al equipo entero (5 plazas) en un dia; con erratas
+ * o reenvios, se termina al dia siguiente.
  */
-export const INVITACIONES_POR_DIA = 20;
+// Topes bajados el 06/10/2026 mientras Resend esté en el plan gratuito
+// (100 correos al día para TODA la plataforma, también los de acceso).
+// Sin ellos, un solo usuario podría agotar el cupo de todos. Al pasar a
+// Resend Pro (≈10 suscriptores o >2.000 correos/mes) se vuelven a subir.
+export const INVITACIONES_POR_DIA = 5; // antes 20
 
 const PROPIA = Object.prototype.hasOwnProperty;
 

@@ -12,6 +12,7 @@ import { nivelDeCaducidad } from '../supabase/functions/_shared/caducidad-certif
 import { correoDeRecordatorio, PLANTILLA_PROXIMA_POR_DEFECTO, PLANTILLA_VENCIDA_POR_DEFECTO, MAX_LONGITUD_PLANTILLA } from '../supabase/functions/_shared/recordatorios-cobro';
 
 import { formatearFecha } from '@/lib/utils';
+import CorreoPropioCard from '@/components/settings/CorreoPropioCard';
 type SettingsTab = 'profile' | 'notifications' | 'security' | 'billing' | 'fiscal' | 'connect';
 
 /**
@@ -416,6 +417,8 @@ const SettingsPage: React.FC = () => {
                   </form>
                 </CardContent>
               </Card>
+
+              <CorreoPropioCard plan={profile?.plan} onVerPlanes={() => setActiveTab('billing')} />
 
               <Card className="border-primary-500/20 bg-primary-500/5">
                 <CardHeader>

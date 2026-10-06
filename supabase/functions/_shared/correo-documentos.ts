@@ -156,5 +156,9 @@ export function correoDeRecibo(d: {
 export const TIPOS_DE_DOCUMENTO = ['factura', 'contrato', 'presupuesto', 'propuesta', 'recibo'] as const;
 export type TipoDeDocumento = typeof TIPOS_DE_DOCUMENTO[number];
 
-/** Envíos por usuario y día. Holgado para el uso normal; corta el abuso. */
-export const ENVIOS_DE_DOCUMENTOS_POR_DIA = 50;
+// Topes bajados el 06/10/2026 mientras Resend esté en el plan gratuito
+// (100 correos al día para TODA la plataforma, también los de acceso).
+// Sin ellos, un solo usuario podría agotar el cupo de todos. Al pasar a
+// Resend Pro (≈10 suscriptores o >2.000 correos/mes) se vuelven a subir.
+/** Envíos por usuario y día. Antes 50. */
+export const ENVIOS_DE_DOCUMENTOS_POR_DIA = 10;

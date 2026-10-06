@@ -62,6 +62,11 @@ const PrivacidadPage: React.FC = () => (
         se recogen en los <Link to="/terms#encargo">Términos y condiciones</Link>. Si tus clientes acceden al portal de
         clientes o pagan una factura online, sus datos de acceso y de pago se tratan para ese fin.
       </p>
+      <p>
+        Los correos a tus clientes (facturas, presupuestos, recordatorios, invitaciones al portal) salen por Resend. Si
+        tienes el plan Pro o Teams y conectas tu propia cuenta de Resend con tu dominio, esos correos salen por tu cuenta:
+        guardamos tu clave cifrada y solo la usamos para enviar lo que tú mandes desde {D.nombreComercial}.
+      </p>
     </Seccion>
 
     <Seccion id="ia" titulo="4. Asistente de inteligencia artificial (Gemini)">

@@ -1,6 +1,16 @@
 // supabase/functions/manage-secrets/index.ts
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import forge from 'https://esm.sh/node-forge@1.3.1';
+import {
+  planPermiteRemitentePropio,
+  normalizarDireccion,
+  normalizarClaveResend,
+  esDominioDeCorreoGratuito,
+  nombreVisiblePropio,
+  formatearRemitente,
+  motivoDelRechazo,
+  enviarPorResend,
+} from '../_shared/remitente-propio.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -159,7 +169,7 @@ Deno.serve(async (req) => {
         case 'status': {
           const { data } = await supabaseAdmin
             .from('user_secrets')
-            .select('gemini_api_key_encrypted, gemini_api_key_updated_at, veri_factu_cert_storage_path, veri_factu_cert_uploaded_at, veri_factu_cert_expires_at, veri_factu_cert_subject, enablebanking_app_id, enablebanking_configured_at')
+            .select('gemini_api_key_encrypted, gemini_api_key_updated_at, veri_factu_cert_storage_path, veri_factu_cert_uploaded_at, veri_factu_cert_expires_at, veri_factu_cert_subject, enablebanking_app_id, enablebanking_configured_at, resend_from_email, resend_configurado_en, resend_ultimo_error, resend_error_en')
             .eq('user_id', user.id)
             .maybeSingle();
 
@@ -172,6 +182,11 @@ Deno.serve(async (req) => {
             certificate_subject: data?.veri_factu_cert_subject ?? null,
             enablebanking_configured: !!data?.enablebanking_app_id,
             enablebanking_configured_at: data?.enablebanking_configured_at ?? null,
+            resend_configured: !!data?.resend_from_email,
+            resend_from_email: data?.resend_from_email ?? null,
+            resend_configurado_en: data?.resend_configurado_en ?? null,
+            resend_ultimo_error: data?.resend_ultimo_error ?? null,
+            resend_error_en: data?.resend_error_en ?? null,
           });
         }
 
@@ -196,6 +211,74 @@ Deno.serve(async (req) => {
           const { error } = await supabaseAdmin
             .from('user_secrets')
             .update({ enablebanking_app_id: null, enablebanking_private_key_encrypted: null, enablebanking_configured_at: null, updated_at: new Date().toISOString() })
+            .eq('user_id', user.id);
+          if (error) throw error;
+          return jsonResponse({ success: true });
+        }
+
+        case 'save_resend': {
+          // Correo desde el dominio propio. Ver _shared/remitente-propio.ts.
+          const { data: perfil } = await supabaseAdmin
+            .from('profiles').select('plan, business_name, full_name').eq('id', user.id).maybeSingle();
+          if (!planPermiteRemitentePropio(perfil?.plan)) {
+            return jsonResponse({ error: 'Enviar desde tu propio dominio está incluido en los planes Pro y Teams.' }, 403);
+          }
+
+          const apiKey = normalizarClaveResend(payload?.api_key);
+          if (!apiKey) {
+            return jsonResponse({ error: 'Eso no parece una clave de Resend: empiezan por «re_». Cópiala entera desde resend.com → API Keys.' }, 400);
+          }
+          const direccion = normalizarDireccion(payload?.from_email);
+          if (!direccion) {
+            return jsonResponse({ error: 'Escribe una dirección de correo válida, por ejemplo facturas@tudominio.com.' }, 400);
+          }
+          if (esDominioDeCorreoGratuito(direccion)) {
+            return jsonResponse({ error: 'Tiene que ser una dirección de tu propio dominio (no Gmail, Outlook, Hotmail…): Resend solo envía desde dominios verificados.' }, 400);
+          }
+          if (!user.email) {
+            return jsonResponse({ error: 'Tu cuenta no tiene email al que mandar la prueba.' }, 400);
+          }
+
+          // Se guarda SOLO si un correo de prueba sale de verdad: comprueba a
+          // la vez que la clave vale y que el dominio está verificado.
+          const prueba = await enviarPorResend(apiKey, {
+            from: formatearRemitente(nombreVisiblePropio(perfil?.business_name || perfil?.full_name), direccion),
+            to: [user.email],
+            subject: 'Prueba de envío desde tu dominio — DevFreelancer',
+            html:
+              '<p>Si lees esto, tu dominio está bien conectado.</p>' +
+              '<p>A partir de ahora tus facturas, presupuestos, recordatorios de cobro e invitaciones al portal ' +
+              `saldrán desde <strong>${direccion}</strong>.</p>`,
+          });
+          if (!prueba.ok) {
+            console.error('[manage-secrets] prueba de Resend propio rechazada:', prueba.status);
+            return jsonResponse({ error: motivoDelRechazo(prueba.status, prueba.cuerpo) }, 400);
+          }
+
+          const { error } = await supabaseAdmin.from('user_secrets').upsert({
+            user_id: user.id,
+            resend_api_key_encrypted: await encryptString(apiKey, key),
+            resend_from_email: direccion,
+            resend_configurado_en: new Date().toISOString(),
+            resend_ultimo_error: null,
+            resend_error_en: null,
+            updated_at: new Date().toISOString(),
+          });
+          if (error) throw error;
+          return jsonResponse({ success: true, from_email: direccion, prueba_enviada_a: user.email });
+        }
+
+        case 'delete_resend': {
+          const { error } = await supabaseAdmin
+            .from('user_secrets')
+            .update({
+              resend_api_key_encrypted: null,
+              resend_from_email: null,
+              resend_configurado_en: null,
+              resend_ultimo_error: null,
+              resend_error_en: null,
+              updated_at: new Date().toISOString(),
+            })
             .eq('user_id', user.id);
           if (error) throw error;
           return jsonResponse({ success: true });
