@@ -178,7 +178,7 @@ const PublicInvoicePayPage: React.FC = () => {
           )}
         </div>
 
-        <p className="text-center text-xs text-gray-600 mt-6">
+        <p className="text-center text-xs text-gray-500 mt-6">
           Pago seguro procesado por Stripe. DevFreelancer nunca almacena los datos de tu tarjeta.
         </p>
       </main>

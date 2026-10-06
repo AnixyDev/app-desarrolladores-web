@@ -22,13 +22,13 @@ import { formatearFecha } from '@/lib/utils';
 const statusBadge = (status: JobApplicationStatus) => {
   switch (status) {
     case 'accepted':
-      return <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/30 uppercase">Aceptado</span>;
+      return <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-500/10 text-green-400 border border-green-500/30 uppercase">Aceptado</span>;
     case 'rejected':
-      return <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/30 uppercase">Rechazado</span>;
+      return <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/30 uppercase">Rechazado</span>;
     case 'viewed':
-      return <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/30 uppercase">En revisión</span>;
+      return <span className="px-2 py-1 rounded-full text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/30 uppercase">En revisión</span>;
     default:
-      return <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-orange-500/10 text-orange-400 border border-orange-500/30 uppercase">Pendiente</span>;
+      return <span className="px-2 py-1 rounded-full text-xs font-bold bg-orange-500/10 text-orange-400 border border-orange-500/30 uppercase">Pendiente</span>;
   }
 };
 

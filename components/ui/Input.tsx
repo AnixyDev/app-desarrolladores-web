@@ -10,10 +10,13 @@ type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
 };
 
 const Input: React.FC<InputProps> = ({ label, id, wrapperClassName = '', icon, rightElement, className = '', ...props }) => {
+  // Sin id, la etiqueta no quedaba asociada al campo (lectores de pantalla y clic en la etiqueta).
+  const idAuto = React.useId();
+  const idCampo = id ?? (label ? idAuto : undefined);
   return (
     <div className={wrapperClassName}>
       {label && (
-        <label htmlFor={id} className="block text-sm font-medium text-gray-300 mb-1">
+        <label htmlFor={idCampo} className="block text-sm font-medium text-gray-300 mb-1">
           {label}
         </label>
       )}
@@ -24,7 +27,7 @@ const Input: React.FC<InputProps> = ({ label, id, wrapperClassName = '', icon, r
           </span>
         )}
         <input
-          id={id}
+          id={idCampo}
           className={`block w-full px-3 py-2 ${icon ? 'pl-10' : ''} ${rightElement ? 'pr-10' : ''} border border-gray-600 rounded-md shadow-sm placeholder-gray-500 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white disabled:bg-gray-700 disabled:opacity-70 disabled:cursor-not-allowed ${className}`}
           {...props}
         />

@@ -9,6 +9,7 @@ import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { AI_CREDIT_COSTS, rankArticlesByRelevance, generarDocumento, generarQuiz } from '@/services/geminiService';
 import { useToast } from '@/hooks/useToast';
+import { formatearFechaHora } from '@/lib/utils';
 
 const BuyCreditsModal = lazy(() => import('@/components/modals/BuyCreditsModal'));
 const ConfirmationModal = lazy(() => import('@/components/modals/ConfirmationModal'));
@@ -232,7 +233,7 @@ const KnowledgeBase: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-semibold text-white flex items-center gap-2"><BookIcon/> Knowledge Base del Equipo</h1>
+                    <h1 className="text-2xl font-semibold text-white flex items-center gap-2"><BookIcon/> Base de conocimiento del equipo</h1>
                     {teamMembership && (
                         <p className="text-xs text-gray-500 mt-1">
                             Viendo el knowledge base de {teamMembership.ownerBusinessName || teamMembership.ownerFullName || 'tu equipo'}.
@@ -264,10 +265,10 @@ const KnowledgeBase: React.FC = () => {
                             </div>
                         </CardContent>
                         <div className="p-4 border-t border-gray-800 flex justify-between items-center text-xs text-gray-500">
-                            <span>Actualizado: {article.updated_at}</span>
+                            <span>Actualizado: {formatearFechaHora(article.updated_at)}</span>
                             <div className="flex gap-2">
-                                <Button size="sm" variant="secondary" onClick={() => openModal(article)}><EditIcon className="w-4 h-4"/></Button>
-                                <Button size="sm" variant="danger" onClick={() => handleDelete(article)}><TrashIcon className="w-4 h-4"/></Button>
+                                <Button size="sm" variant="secondary" onClick={() => openModal(article)} aria-label="Editar artículo" title="Editar artículo"><EditIcon className="w-4 h-4"/></Button>
+                                <Button size="sm" variant="danger" onClick={() => handleDelete(article)} aria-label="Borrar artículo" title="Borrar artículo"><TrashIcon className="w-4 h-4"/></Button>
                             </div>
                         </div>
                     </Card>

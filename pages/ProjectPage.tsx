@@ -231,12 +231,14 @@ const ProjectPage: React.FC = () => {
                     <div className="bg-gray-900 p-1 rounded-xl flex border border-gray-800">
                         <button
                             onClick={() => setViewMode('kanban')}
+                            aria-label="Vista tablero" aria-pressed={viewMode === 'kanban'}
                             className={`p-2 rounded-lg ${viewMode === 'kanban' ? 'bg-gray-800 text-primary-400' : 'text-gray-500'}`}
                         >
                             <LayoutGrid size={18} />
                         </button>
                         <button
                             onClick={() => setViewMode('grid')}
+                            aria-label="Vista lista" aria-pressed={viewMode === 'grid'}
                             className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-gray-800 text-primary-400' : 'text-gray-500'}`}
                         >
                             <List size={18} />

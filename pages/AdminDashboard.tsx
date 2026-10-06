@@ -94,7 +94,7 @@ const PanelAdmin = () => {
             </p>
             <p className="text-2xl font-black text-white">{value}</p>
             {subvalue && (
-              <p className="text-[10px] text-gray-400 mt-1">
+              <p className="text-xs text-gray-400 mt-1">
                 {subvalue}
               </p>
             )}
@@ -135,6 +135,8 @@ const PanelAdmin = () => {
         </div>
         <button
           onClick={fetchData}
+          aria-label="Actualizar datos"
+          title="Actualizar datos"
           className="p-3 bg-gray-900 border border-gray-800 rounded-xl hover:bg-gray-800 transition-colors"
         >
           <RefreshCwIcon
@@ -200,7 +202,7 @@ const PanelAdmin = () => {
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full text-left">
-            <thead className="bg-gray-950/50 text-[10px] uppercase font-black text-gray-500 tracking-widest">
+            <thead className="bg-gray-950/50 text-xs uppercase font-black text-gray-500 tracking-widest">
               <tr>
                 <th className="p-4">Usuario</th>
                 <th className="p-4">Producto</th>
@@ -231,7 +233,7 @@ const PanelAdmin = () => {
                       {t.user_email}
                     </td>
                     <td className="p-4">
-                      <span className="px-2 py-1 bg-gray-800 rounded-md text-[10px] font-bold text-gray-300 uppercase">
+                      <span className="px-2 py-1 bg-gray-800 rounded-md text-xs font-bold text-gray-300 uppercase">
                         {t.plan_name}
                       </span>
                     </td>
@@ -241,7 +243,7 @@ const PanelAdmin = () => {
                     <td className="p-4 text-xs text-gray-500">
                       {formatearFecha(t.created_at)}
                     </td>
-                    <td className="p-4 text-right text-[10px] font-black uppercase text-green-400">
+                    <td className="p-4 text-right text-xs font-black uppercase text-green-400">
                       <div className="flex items-center justify-end gap-1">
                         <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
                         Completado

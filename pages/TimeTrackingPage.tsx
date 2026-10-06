@@ -311,10 +311,12 @@ const TimeTrackingPage: React.FC = () => {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            {/* En el móvil, título arriba y acciones debajo: en una sola fila el
+                botón «Añadir entrada manual» salía cortado por la derecha. */}
+            <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
                 <div>
                     <h1 className="text-2xl font-semibold text-white flex items-center gap-2">
-                        <ClockIcon className="w-6 h-6" /> Time Tracking
+                        <ClockIcon className="w-6 h-6" /> Registro de horas
                     </h1>
                     {scopedEntries.length > 0 && (
                         <p className="text-sm text-gray-500 mt-1">
@@ -322,9 +324,9 @@ const TimeTrackingPage: React.FC = () => {
                         </p>
                     )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     {users.length > 0 && (
-                        <div className="flex items-center bg-gray-800 border border-gray-700 rounded-lg p-1 text-sm">
+                        <div className="grid grid-cols-2 sm:flex sm:items-center bg-gray-800 border border-gray-700 rounded-lg p-1 text-sm">
                             <button
                                 onClick={() => setScope('all')}
                                 className={`px-3 py-1.5 rounded-md transition-colors ${scope === 'all' ? 'bg-primary-600 text-white' : 'text-gray-400 hover:text-white'}`}
@@ -339,7 +341,7 @@ const TimeTrackingPage: React.FC = () => {
                             </button>
                         </div>
                     )}
-                    <Button onClick={openModal}><PlusIcon className="w-4 h-4 mr-2" />Añadir Entrada Manual</Button>
+                    <Button onClick={openModal} className="w-full sm:w-auto whitespace-nowrap"><PlusIcon className="w-4 h-4 mr-2" />Añadir entrada manual</Button>
                 </div>
             </div>
 
@@ -365,6 +367,7 @@ const TimeTrackingPage: React.FC = () => {
                     ) : (
                         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                             <select
+                                aria-label="Tarea"
                                 value={selectedTaskId}
                                 onChange={(e) => setSelectedTaskId(e.target.value)}
                                 className="flex-1 px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white"

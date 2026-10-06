@@ -149,7 +149,7 @@ const PortalBrandingPage: React.FC = () => {
                             )}
                             <div>
                                 <p className="text-white font-bold leading-tight">{brandName}</p>
-                                <p className="text-[11px] text-gray-500 leading-tight">Portal de Cliente</p>
+                                <p className="text-xs text-gray-500 leading-tight">Portal de Cliente</p>
                             </div>
                         </div>
                     </div>
@@ -164,7 +164,7 @@ const PortalBrandingPage: React.FC = () => {
                     {profile?.portal_logo_url ? (
                         <img src={profile.portal_logo_url} alt="Logo actual" className="h-16 w-16 rounded-xl object-cover border border-gray-700" />
                     ) : (
-                        <div className="h-16 w-16 rounded-xl bg-gray-800 border border-gray-700 flex items-center justify-center text-gray-600 text-xs text-center">
+                        <div className="h-16 w-16 rounded-xl bg-gray-800 border border-gray-700 flex items-center justify-center text-gray-400 text-xs text-center">
                             Sin logo
                         </div>
                     )}
@@ -185,6 +185,7 @@ const PortalBrandingPage: React.FC = () => {
                 <CardContent className="flex items-center gap-4">
                     <input
                         type="color"
+                        aria-label="Color de marca"
                         value={brandColor}
                         onChange={(e) => setBrandColor(e.target.value)}
                         className="h-12 w-16 rounded-lg border border-gray-700 bg-transparent cursor-pointer"
@@ -208,7 +209,7 @@ const PortalBrandingPage: React.FC = () => {
                     </p>
                     <div className="flex items-center gap-2">
                         <code className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-300 truncate">{portalUrl}</code>
-                        <Button onClick={handleCopyLink} variant="secondary" size="sm">
+                        <Button onClick={handleCopyLink} variant="secondary" size="sm" aria-label={copied ? "Enlace copiado" : "Copiar enlace"} title="Copiar enlace">
                             {copied ? <CheckCircleIcon className="w-4 h-4 text-green-400" /> : <CopyIcon className="w-4 h-4" />}
                         </Button>
                     </div>

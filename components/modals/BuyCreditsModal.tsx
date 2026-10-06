@@ -50,7 +50,7 @@ const BuyCreditsModal: React.FC<BuyCreditsModalProps> = ({ isOpen, onClose, cred
     }`}>
         {popular && (
             <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 w-full text-center">
-                <span className="inline-flex items-center px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white shadow-lg">
+                <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-purple-500 to-fuchsia-500 text-white shadow-lg">
                     <StarIcon className="w-3 h-3 mr-1 fill-current" /> Mejor Valor
                 </span>
             </div>

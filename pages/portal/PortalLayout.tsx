@@ -198,7 +198,7 @@ const PortalLayout: React.FC = () => {
             )}
             <div>
               <h1 className="text-lg font-bold text-white leading-tight">{brandName}</h1>
-              <p className="text-[11px] text-gray-500 leading-tight">Portal de Cliente</p>
+              <p className="text-xs text-gray-500 leading-tight">Portal de Cliente</p>
             </div>
           </div>
           <div className="flex items-center gap-4">

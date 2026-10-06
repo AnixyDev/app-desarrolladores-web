@@ -22,7 +22,7 @@ const InvoicePreviewCard: React.FC = () => (
                 </div>
                 <span className="font-mono text-xs text-gray-400">FACT-0042</span>
             </div>
-            <span className="rounded-full bg-green-500/10 px-2 py-0.5 font-mono text-[10px] text-green-400">
+            <span className="rounded-full bg-green-500/10 px-2 py-0.5 font-mono text-xs text-green-400">
                 PAGADA
             </span>
         </div>

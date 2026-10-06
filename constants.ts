@@ -21,11 +21,11 @@ export type SidebarGroup = {
 export type SidebarItem = SidebarLink | SidebarGroup;
 
 export const SIDEBAR_STRUCTURE: SidebarItem[] = [
-  { type: 'link', href: '/', label: 'Dashboard', icon: 'LayoutDashboard' },
+  { type: 'link', href: '/', label: 'Inicio', icon: 'LayoutDashboard' },
   { type: 'link', href: '/clients', label: 'Clientes', icon: 'Users' },
   { type: 'link', href: '/projects', label: 'Proyectos', icon: 'Briefcase' },
   { type: 'link', href: 'https://captacion.devfreelancer.app/dashboard', label: 'Lead Hunter PRO', icon: 'Radar' },
-  { type: 'link', href: '/time-tracking', label: 'Time Tracking', icon: 'Clock' },
+  { type: 'link', href: '/time-tracking', label: 'Horas', icon: 'Clock' },
 
   {
     type: 'group',
@@ -86,7 +86,7 @@ export const SIDEBAR_STRUCTURE: SidebarItem[] = [
     items: [
       { href: '/team', label: 'Gestionar Equipo', icon: 'Users' },
       { href: '/roles', label: 'Roles y Permisos', icon: 'Shield' },
-      { href: '/knowledge-base', label: 'Knowledge Base', icon: 'BrainCircuit' },
+      { href: '/knowledge-base', label: 'Base de conocimiento', icon: 'BrainCircuit' },
       // CAMBIO: /my-timesheet se eliminó (era una ruta duplicada — el
       // cronómetro en vivo se movió a /time-tracking, ver
       // TimeTrackingPage.tsx). Este enlace apuntaba ahí y se habría

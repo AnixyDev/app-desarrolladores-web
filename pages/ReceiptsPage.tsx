@@ -189,7 +189,36 @@ const ReceiptsPage: React.FC = () => {
       ) : (
         <Card>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            {/* Móvil: tarjetas; la tabla, desde tableta. */}
+            <ul className="md:hidden divide-y divide-gray-800">
+              {receipts.map(receipt => (
+                <li key={receipt.id} className="p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-white font-medium break-words">{getClientName(receipt.client_id)}</p>
+                      <p className="text-sm text-gray-300 break-words">{receipt.concept}</p>
+                      <p className="text-sm text-gray-400"><span className="font-mono">{receipt.receipt_number}</span> · {formatearFecha(receipt.paid_at)}</p>
+                    </div>
+                    <p className="shrink-0 font-semibold text-white">{formatCurrency(receipt.amount_cents)}</p>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="secondary" onClick={() => openEdit(receipt)} title="Editar" aria-label="Editar">
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => handleDownload(receipt)} title="Descargar PDF" aria-label="Descargar PDF">
+                      <Download className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => handleSendEmail(receipt)} title="Enviar por email" aria-label="Enviar por email" disabled={enviando === receipt.id}>
+                      <Send className="w-4 h-4" />
+                    </Button>
+                    <Button size="sm" variant="danger" onClick={() => setReceiptToDelete(receipt)} title="Eliminar" aria-label="Eliminar">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left">
                 <thead className="border-b border-gray-800">
                   <tr>

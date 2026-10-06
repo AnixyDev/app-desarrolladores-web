@@ -213,13 +213,14 @@ const CreateInvoicePage: React.FC = () => {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto pb-20">
+    <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto pb-36 sm:pb-20">
       <AvisoNifFactura nif={profile?.tax_id} />
 
       {/* Cabecera */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-white">Nueva Factura</h1>
-        <div className="flex flex-wrap gap-2">
+        {/* En el móvil van en la barra fija de abajo. */}
+        <div className="hidden sm:flex flex-wrap gap-2">
           <Button type="button" variant="secondary" onClick={() => navigate('/invoices')}>
             Descartar
           </Button>
@@ -236,6 +237,7 @@ const CreateInvoicePage: React.FC = () => {
           <div>
             <label className="block text-sm text-gray-400 mb-1">Cliente</label>
             <select
+              aria-label="Cliente"
               name="client_id"
               value={newInvoice.client_id}
               onChange={handleInputChange}
@@ -251,6 +253,7 @@ const CreateInvoicePage: React.FC = () => {
           <div>
             <label className="block text-sm text-gray-400 mb-1">Proyecto (opcional)</label>
             <select
+              aria-label="Proyecto (opcional)"
               name="project_id"
               value={newInvoice.project_id ?? ''}
               onChange={handleInputChange}
@@ -364,7 +367,7 @@ const CreateInvoicePage: React.FC = () => {
                 />
               </div>
               <div className="pt-7">
-                <Button type="button" variant="danger" size="sm" onClick={() => removeItem(index)}>
+                <Button type="button" variant="danger" size="sm" onClick={() => removeItem(index)} aria-label="Quitar línea" title="Quitar línea">
                   <TrashIcon className="w-4 h-4" />
                 </Button>
               </div>
@@ -403,6 +406,14 @@ const CreateInvoicePage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Móvil: Descartar / Guardar siempre a mano, encima de la barra de navegación. */}
+      <div className="sm:hidden fixed inset-x-0 bottom-16 z-30 flex gap-3 border-t border-gray-800 bg-gray-950/95 px-4 py-3 backdrop-blur-md">
+        <Button type="button" variant="secondary" className="flex-1 justify-center" onClick={() => navigate('/invoices')}>
+          Descartar
+        </Button>
+        <Button type="submit" className="flex-1 justify-center">Guardar factura</Button>
+      </div>
 
       {/* Modal generador IA */}
       <Modal isOpen={isAIGeneratorOpen} onClose={() => setIsAIGeneratorOpen(false)} title="Generar conceptos con IA">

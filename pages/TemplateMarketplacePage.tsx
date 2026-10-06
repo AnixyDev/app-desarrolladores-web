@@ -255,7 +255,7 @@ const TemplateMarketplacePage: React.FC = () => {
                   <p className="text-white text-sm font-medium truncate flex items-center gap-2">
                     {t.name}
                     {t.is_public && (
-                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-900/30 text-green-400 border border-green-800 flex items-center gap-1">
+                      <span className="px-1.5 py-0.5 rounded text-xs bg-green-900/30 text-green-400 border border-green-800 flex items-center gap-1">
                         <TagIcon className="w-2.5 h-2.5" /> {t.price_cents > 0 ? `${(t.price_cents / 100).toFixed(2)}€` : 'Gratis'} · Publicada
                       </span>
                     )}

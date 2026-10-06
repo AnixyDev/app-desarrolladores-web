@@ -77,7 +77,7 @@ const TerminalHero: React.FC = () => {
         <span className="h-2.5 w-2.5 rounded-full bg-gray-700" />
         <span className="h-2.5 w-2.5 rounded-full bg-gray-700" />
         <span className="h-2.5 w-2.5 rounded-full bg-gray-700" />
-        <span className="ml-3 text-[11px] font-mono text-gray-500">bash — devfreelancer</span>
+        <span className="ml-3 text-xs font-mono text-gray-500">bash — devfreelancer</span>
       </div>
       <div className="p-5 sm:p-6 font-mono text-[13px] sm:text-sm leading-relaxed min-h-[220px]">
         {completedLines.map((line, i) => (

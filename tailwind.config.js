@@ -29,6 +29,10 @@ export default {
         gray: {
           950: '#030712',
           900: '#111827',
+          // Texto secundario. El de Tailwind (#6b7280) daba 4,16:1 sobre el
+          // fondo de la app y 3,67:1 sobre las tarjetas: por debajo del 4,5:1
+          // que pide WCAG AA. Este da 5,87:1 y 5,17:1 (auditoría UX 06/10/2026).
+          500: '#838b99',
           800: '#1f2937',
           700: '#374151',
         }

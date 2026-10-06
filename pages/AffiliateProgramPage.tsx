@@ -166,7 +166,7 @@ const AffiliateProgramPage = () => {
                       <td className="px-6 py-4">{r.referred_user_name || 'Invitado'}</td>
                       <td className="px-6 py-4">{formatearFecha(r.created_at || r.join_date)}</td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold border ${statusClasses[r.status]}`}>
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold border ${statusClasses[r.status]}`}>
                           {statusLabels[r.status]}
                         </span>
                       </td>

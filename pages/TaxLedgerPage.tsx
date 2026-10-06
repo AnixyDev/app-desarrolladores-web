@@ -187,6 +187,7 @@ const TaxLedgerPage: React.FC = () => {
                     <DownloadIcon className="w-4 h-4 mr-2" /> Exportar CSV
                 </Button>
                 <select
+                    aria-label="Trimestre"
                     value={quarter}
                     onChange={e => setQuarter(e.target.value === 'annual' ? 'annual' : Number(e.target.value))}
                     className="px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white"
@@ -197,7 +198,7 @@ const TaxLedgerPage: React.FC = () => {
                     <option value={4}>4º Trimestre (4T)</option>
                     <option value="annual">Año Completo</option>
                 </select>
-                 <select value={year} onChange={e => setYear(Number(e.target.value))} className="px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white">
+                 <select aria-label="Año" value={year} onChange={e => setYear(Number(e.target.value))} className="px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white">
                     {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
                 <div className="w-32">
@@ -367,7 +368,7 @@ const TaxLedgerPage: React.FC = () => {
                         <tbody className="divide-y divide-gray-800">
                         {filteredData.filteredExpenses.length > 0 ? filteredData.filteredExpenses.map(exp => (
                             <tr key={exp.id} className='hover:bg-gray-800/30'>
-                                <td className='p-3 text-gray-300 whitespace-nowrap'>{exp.date}</td>
+                                <td className='p-3 text-gray-300 whitespace-nowrap'>{formatearFecha(exp.date)}</td>
                                 <td className='p-3 text-white'>{exp.description}</td>
                                 <td className='p-3 text-right font-medium text-red-400'>{formatCurrency(exp.amount_cents)}</td>
                                 <td className='p-3 text-right text-gray-400 text-sm'>{formatCurrency(exp.amount_cents * ((exp.tax_percent || 0)/100))}</td>
