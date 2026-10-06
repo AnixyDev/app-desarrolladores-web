@@ -373,7 +373,7 @@ const TimeTrackingPage: React.FC = () => {
                                 className="flex-1 px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white"
                             >
                                 <option value="">
-                                    {pendingTasks.length > 0 ? 'Selecciona una tarea para fichar...' : 'No tienes tareas pendientes — crea una desde un proyecto'}
+                                    {pendingTasks.length > 0 ? 'Selecciona una tarea para fichar...' : 'Sin tareas pendientes: créalas en un proyecto'}
                                 </option>
                                 {pendingTasks.map(t => (
                                     <option key={t.id} value={t.id}>{t.description}</option>
