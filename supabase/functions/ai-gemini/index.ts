@@ -458,7 +458,11 @@ serve(async (req) => {
     }
 
     let effectiveApiKey = GEMINI_API_KEY;
-    const { data: userSecret } = await supabase
+    // Con la clave de servicio (07/10/2026): las claves cifradas ya no se
+    // pueden leer con la sesión del usuario, ni siquiera las suyas. Se filtra
+    // por el usuario verificado arriba con auth.getUser().
+    const servicio = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const { data: userSecret } = await servicio
       .from("user_secrets")
       .select("gemini_api_key_encrypted")
       .eq("user_id", user.id)
