@@ -53,13 +53,15 @@ CHROMIUM_PARA_PRUEBAS=/opt/pw-browsers/chromium node scripts/smoke-paginas.mjs
 - Importes siempre en **céntimos** (`*_cents`).
 - El build de prueba necesita las VITE_ falsas de arriba o la app no arranca.
 
-## Verifactu (estado: fases 0-2 hechas; siguiente fase 3)
+## Verifactu (estado: fases 0-3 hechas; siguiente fase 4)
 Plan completo en el doc del proyecto `claude/plan-verifactu.md`.
 - Solo modalidad VERI*FACTU, con el certificado de cada usuario (`_shared/verifactu-certificado.ts`).
 - Registro oficial en `fiscal_records.registro` (jsonb con nombres del XSD); huella SHA-256 mayúsculas; cadena por `orden`. Registros **inmutables** salvo campos `envio_*`, `estado_envio`, `csv_respuesta_aeat`.
 - XML: `_shared/verifactu-xml.ts` · SOAP/respuesta: `_shared/verifactu-soap.ts` · envío: función `verifactu-enviar` (cron cada minuto; `{"modo":"prueba"}` manda registros de prueba sin guardarlos).
 - `VERIFACTU_ENTORNO` sin definir = **pruebas** (prewww1.aeat.es). Producción solo en fase 4.
-- ImporteTotal = base + IVA (sin IRPF). F1 con destinatario; F2 sin identificar ≤ 400 €; R1/R5 por diferencias; S1 o N2.
+- ImporteTotal = base + IVA (sin IRPF). F1 con destinatario; F2 sin identificar ≤ 400 €; rectificativas por diferencias según la causa que elige el usuario (descuento/cancelación/error de IVA → R1; otro → R4; de una F2 → R5); S1 o N2.
+- Cada envío a la AEAT se guarda entero en `verifactu_envios` (inmutable; `fiscal_records.envio_id`). Conservación tras la baja: 6 años.
+- Batería contra la AEAT de pruebas: función `verifactu-bateria` (paso 1 y 2, sufijo nuevo cada vez, encadenando con `ultimo`).
 - Pruebas: `supabase/pruebas/verifactu-registro.sql`, `src/test/verifactu-*.test.ts`.
 
 ## Pendiente conocido

@@ -69,7 +69,7 @@ const GarantiasPage: React.FC = () => (
       <Lista>
         <li>Una factura emitida queda bloqueada: para corregirla se emite una rectificativa, como exige la ley.</li>
         <li>Un cliente con facturas no se puede borrar, ni por error ni a través de la API.</li>
-        <li>Si te das de baja, antes te ofrecemos descargar todas tus facturas. Después conservamos las facturas y los registros fiscales los 4 años que obliga la ley, y el resto se borra.</li>
+        <li>Si te das de baja, antes te ofrecemos descargar todas tus facturas. Después conservamos las facturas y los registros fiscales 6 años (lo que exigen Hacienda y el Código de Comercio), y el resto se borra.</li>
       </Lista>
     </Seccion>
 

@@ -8,6 +8,7 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { NewInvoice, Invoice, RecurringInvoice } from '@/types';
 import { formatCurrency, formatearFecha } from '@/lib/utils';
+import { CAUSAS_RECTIFICACION, tipoRectificativa, type CausaRectificacion } from '@/lib/verifactu/causaRectificacion';
 import { esClienteExtranjero, mencionSinIva, motivoSinIvaDeCliente } from '@/lib/ivaClientes';
 import { problemaRegistroFiscal } from '@/lib/verifactu/comprobarFactura';
 import AvisoNifFactura from '@/components/AvisoNifFactura';
@@ -146,6 +147,8 @@ const InvoicesPage: React.FC = () => {
   const [modo, setModo] = useState<ModoFactura>('crear');
   const [facturaBase, setFacturaBase] = useState<Invoice | null>(null);
   const [motivo, setMotivo] = useState('');
+  // Causa de la rectificativa: decide si Hacienda la registra como R1 o R4.
+  const [causa, setCausa] = useState<CausaRectificacion | null>(null);
   const [guardando, setGuardando] = useState(false);
   const esCorreccion = modo === 'rectificar' || modo === 'anular';
   const [searchTerm, setSearchTerm] = useState('');
@@ -269,6 +272,10 @@ const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets
 
     if (modo === 'rectificar' || modo === 'anular') {
       if (!facturaBase) return;
+      if (!causa) {
+        addToast('Elige la causa de la rectificación.', 'error');
+        return;
+      }
       if (!motivo.trim()) {
         addToast('Indica el motivo.', 'error');
         return;
@@ -279,7 +286,7 @@ const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets
       }
       setGuardando(true);
       try {
-        const nueva = await rectificarFactura(facturaBase.id, modo === 'anular' ? [] : invoiceItems, motivo);
+        const nueva = await rectificarFactura(facturaBase.id, modo === 'anular' ? [] : invoiceItems, motivo, causa);
         addToast(`Factura rectificativa ${nueva.invoice_number} creada (${formatCurrency(nueva.total_cents)}).`, 'success');
         handleCloseInvoiceModal();
       } catch (error) {
@@ -356,6 +363,7 @@ const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets
     setModo(nuevoModo);
     setFacturaBase(inv);
     setMotivo('');
+    setCausa(null);
     setNewInvoice({
       client_id: inv.client_id,
       project_id: inv.project_id || '',
@@ -931,6 +939,35 @@ const handleSelectBudget = (budgetId: string) => {
               value={newInvoice.due_date}
               onChange={(e) => setNewInvoice({ ...newInvoice, due_date: e.target.value })}
             />
+          )}
+
+          {esCorreccion && (
+            <fieldset>
+              <legend className="block text-sm font-medium text-gray-400 mb-1">Causa {modo === 'anular' ? 'de la anulación' : 'de la rectificación'}</legend>
+              <div className="space-y-1.5">
+                {CAUSAS_RECTIFICACION.map(c => (
+                  <label key={c.valor} className={`flex items-start gap-2 rounded-md border px-3 py-2 cursor-pointer ${causa === c.valor ? 'border-primary-500 bg-primary-500/10' : 'border-gray-700 bg-gray-800'}`}>
+                    <input
+                      type="radio"
+                      name="causa-rectificacion"
+                      value={c.valor}
+                      checked={causa === c.valor}
+                      onChange={() => setCausa(c.valor)}
+                      className="mt-1"
+                    />
+                    <span>
+                      <span className="block text-sm text-white">{c.texto}</span>
+                      <span className="block text-xs text-gray-400">{c.ayuda}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              {causa && facturaBase && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Se registrará en Hacienda como rectificativa {tipoRectificativa(causa, fiscalRecords.find(r => r.invoice_id === facturaBase.id && r.record_type === 'alta')?.tipo_factura)}.
+                </p>
+              )}
+            </fieldset>
           )}
 
           {esCorreccion && (

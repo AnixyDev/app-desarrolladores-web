@@ -127,8 +127,8 @@ begin
     v_res := v_res || E'\n  OK    10) fecha futura: rechazada';
   end;
 
-  -- 11) Rectificativa: R1 por diferencias, con la factura rectificada.
-  select id into f6 from public.crear_factura_rectificativa(f2, '[{"description":"Mantenimiento","quantity":1,"price_cents":4000}]', 'Precio mal puesto');
+  -- 11) Rectificativa por descuento: R1 por diferencias, con la factura rectificada.
+  select id into f6 from public.crear_factura_rectificativa_causa(f2, '[{"description":"Mantenimiento","quantity":1,"price_cents":4000}]', 'Descuento posterior', 'descuento');
   r := public.generate_fiscal_record(f6);
   if r.tipo_factura = 'R1' and r.registro->>'TipoRectificativa' = 'I'
      and r.registro->'FacturasRectificadas'->0->>'NumSerieFactura' = 'F-2026-0002'

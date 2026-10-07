@@ -21,6 +21,9 @@
 //     rechazo: se guarda ese estado (resultadoDeLinea).
 //   - AVISOS por correo (verifactu-avisos.ts): registros rechazados, y
 //     certificado que falta, caduca o la AEAT no acepta (como mucho uno al día).
+//   - Cada envío se guarda ENTERO en verifactu_envios: XML enviado y respuesta
+//     íntegra de la AEAT (lo pidió la gestoría), enlazado desde cada registro
+//     (fiscal_records.envio_id).
 //
 // Modo «prueba» (solo con la clave de servicio): genera registros de prueba de
 // la cuenta de administración SIN guardarlos (verifactu_registros_de_prueba) y
@@ -60,9 +63,12 @@ interface RegistroPendiente {
   envio_intentos?: number;
 }
 
+/** Lo que de verdad viajó: se guarda en verifactu_envios si hubo respuesta HTTP. */
+interface Intercambio { peticion: string; httpStatus: number; respuesta: string }
+
 type ResultadoEnvio =
-  | { tipo: 'respuesta'; respuesta: Extract<RespuestaAeat, { tipo: 'respuesta' }> }
-  | { tipo: 'error'; codigo: string | null; mensaje: string; reintentar: boolean };
+  | { tipo: 'respuesta'; respuesta: Extract<RespuestaAeat, { tipo: 'respuesta' }>; intercambio: Intercambio }
+  | { tipo: 'error'; codigo: string | null; mensaje: string; reintentar: boolean; intercambio?: Intercambio };
 
 /** Envía un lote (mismo emisor) y devuelve lo que contestó la AEAT, o el error. */
 async function enviarLote(admin: any, userId: string, lote: RegistroPendiente[]): Promise<ResultadoEnvio> {
@@ -87,14 +93,15 @@ async function enviarLote(admin: any, userId: string, lote: RegistroPendiente[])
       signal: AbortSignal.timeout(30_000),
     } as RequestInit);
     const texto = await resp.text();
+    const intercambio: Intercambio = { peticion: cuerpo, httpStatus: resp.status, respuesta: texto };
     const r = leerRespuesta(texto);
     if (r.tipo === 'fallo') {
       const mensaje = resp.status === 401 || resp.status === 403
         ? `La AEAT no acepta el certificado digital (HTTP ${resp.status}).`
         : r.mensaje;
-      return { tipo: 'error', codigo: r.codigo ?? String(resp.status), mensaje, reintentar: true };
+      return { tipo: 'error', codigo: r.codigo ?? String(resp.status), mensaje, reintentar: true, intercambio };
     }
-    return { tipo: 'respuesta', respuesta: r };
+    return { tipo: 'respuesta', respuesta: r, intercambio };
   } catch (e) {
     return { tipo: 'error', codigo: 'CONEXION', mensaje: 'No se ha podido conectar con la AEAT: ' + String((e as Error)?.message ?? e).slice(0, 300), reintentar: true };
   } finally {
@@ -126,6 +133,20 @@ async function avisar(admin: any, userId: string, correo: { asunto: string; html
     console.error(`[verifactu-enviar] aviso a ${userId}:`, (e as Error)?.message ?? e);
     return false;
   }
+}
+
+/** Guarda el envío completo y devuelve su id (null si no se pudo: no bloquea el resto). */
+async function guardarEnvio(
+  admin: any, userId: string, nif: string, numRegistros: number, i: Intercambio,
+  extra: { estado: string | null; csv: string | null; codigo: string | null },
+): Promise<string | null> {
+  const { data, error } = await admin.from('verifactu_envios').insert({
+    user_id: userId, nif_emisor: nif, entorno: ENTORNO, num_registros: numRegistros,
+    http_status: i.httpStatus, estado_envio: extra.estado, csv: extra.csv, codigo_error: extra.codigo,
+    peticion_xml: i.peticion, respuesta_xml: i.respuesta,
+  }).select('id').single();
+  if (error) { console.error(`[verifactu-enviar] no se pudo guardar el envío de ${userId}:`, error.message); return null; }
+  return data.id;
 }
 
 async function nombreDe(admin: any, userId: string): Promise<string> {
@@ -178,9 +199,13 @@ async function procesarPendientes(admin: any) {
 
     if (resultado.tipo === 'error') {
       const intentos = Math.max(...lote.map((r) => r.envio_intentos ?? 0)) + 1;
+      const envioId = resultado.intercambio
+        ? await guardarEnvio(admin, userId, nif, lote.length, resultado.intercambio, { estado: null, csv: null, codigo: resultado.codigo })
+        : null;
       await admin.from('fiscal_records').update({
         envio_intentos: intentos, envio_ultimo_intento: ahora.toISOString(),
         envio_error_codigo: resultado.codigo, envio_error_descripcion: resultado.mensaje,
+        ...(envioId ? { envio_id: envioId } : {}),
       }).in('id', lote.map((r) => r.id));
       await admin.from('verifactu_control_envio').upsert({
         user_id: userId,
@@ -203,6 +228,7 @@ async function procesarPendientes(admin: any) {
     }
 
     const r = resultado.respuesta;
+    const envioId = await guardarEnvio(admin, userId, nif, lote.length, resultado.intercambio, { estado: r.estadoEnvio, csv: r.csv, codigo: null });
     const rechazados: RegistroRechazado[] = [];
     for (const reg of lote) {
       const linea = lineaDe(r.lineas, reg);
@@ -210,6 +236,7 @@ async function procesarPendientes(admin: any) {
         await admin.from('fiscal_records').update({
           envio_intentos: (reg.envio_intentos ?? 0) + 1, envio_ultimo_intento: ahora.toISOString(),
           envio_error_codigo: 'SIN_RESPUESTA', envio_error_descripcion: 'La AEAT no ha devuelto el resultado de este registro: se reenviará.',
+          ...(envioId ? { envio_id: envioId } : {}),
         }).eq('id', reg.id);
         continue;
       }
@@ -222,6 +249,7 @@ async function procesarPendientes(admin: any) {
         envio_error_descripcion: res.descripcionError,
         csv_respuesta_aeat: r.csv,
         envio_aceptado_en: res.estado === 'rechazado' ? null : ahora.toISOString(),
+        ...(envioId ? { envio_id: envioId } : {}),
       }).eq('id', reg.id);
       if (res.estado === 'rechazado') rechazados.push({ numero: reg.numero_factura, codigo: res.codigoError, error: res.descripcionError });
     }
@@ -260,7 +288,7 @@ Deno.serve(async (req) => {
       return json({
         entorno: ENTORNO,
         registros: (registros as any[]).map((r, i) => ({ tipo: r.record_type, numero: r.numero_factura, tipoFactura: r.registro.TipoFactura ?? null, huellaOk: huellasOk[i] })),
-        resultado,
+        resultado: { ...resultado, intercambio: undefined },
       });
     }
 

@@ -176,6 +176,8 @@ export interface Invoice {
   rectifies_invoice_id?: string | null;
   is_rectified?: boolean;
   motivo_rectificacion?: string | null;
+  /** Causa de la rectificativa (decide R1 o R4 en Verifactu). */
+  causa_rectificacion?: 'descuento' | 'cancelacion' | 'error_iva' | 'otro' | null;
   notes?: string | null;
   budget_id?: string | null;
   /** Recordatorios de cobro automáticos para esta factura (por defecto, sí). */

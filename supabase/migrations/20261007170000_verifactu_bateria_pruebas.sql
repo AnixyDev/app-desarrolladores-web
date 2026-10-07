@@ -5,7 +5,7 @@
 -- verifactu_bateria_de_prueba(usuario, sufijo) crea en la cuenta indicada un
 -- cliente y una factura por cada caso real de un desarrollador autónomo, genera
 -- sus registros oficiales con las MISMAS funciones que usa la app
--- (registrar_factura_fiscal, crear_factura_rectificativa,
+-- (registrar_factura_fiscal, crear_factura_rectificativa_causa,
 -- generate_fiscal_cancellation, subsanar_registro_fiscal), los devuelve y DESHACE
 -- todo. No queda nada en la base de datos. La función verifactu-bateria los
 -- envía a la AEAT de pruebas.
@@ -97,19 +97,27 @@ begin
     v_casos := v_casos || jsonb_build_object(v_pre || '07', 'nif_fuera_de_censo');
 
     -- 8. Rectificativa (abono total) de la 1: R1 por diferencias, importes negativos.
-    select * into v_rect from public.crear_factura_rectificativa(
-      (select id from public.invoices where user_id = p_user and invoice_number = v_pre || '01'), '[]'::jsonb, 'Prueba: abono total');
+    select * into v_rect from public.crear_factura_rectificativa_causa(
+      (select id from public.invoices where user_id = p_user and invoice_number = v_pre || '01'), '[]'::jsonb, 'Prueba: abono total', 'cancelacion');
     update public.invoices set invoice_number = v_pre || '08' where id = v_rect.id;
     perform public.registrar_factura_fiscal(v_rect.id, p_user);
     v_casos := v_casos || jsonb_build_object(v_pre || '08', 'rectificativa_r1_abono_total');
 
     -- 9. Rectificativa parcial de la simplificada: R5 (de 100 € a 80 €).
-    select * into v_rect from public.crear_factura_rectificativa(
+    select * into v_rect from public.crear_factura_rectificativa_causa(
       (select id from public.invoices where user_id = p_user and invoice_number = v_pre || '06'),
-      '[{"description":"Arreglo (prueba, precio corregido)","quantity":1,"price_cents":8000}]'::jsonb, 'Prueba: precio corregido');
+      '[{"description":"Arreglo (prueba, precio corregido)","quantity":1,"price_cents":8000}]'::jsonb, 'Prueba: precio corregido', 'otro');
     update public.invoices set invoice_number = v_pre || '09' where id = v_rect.id;
     perform public.registrar_factura_fiscal(v_rect.id, p_user);
     v_casos := v_casos || jsonb_build_object(v_pre || '09', 'rectificativa_r5');
+
+    -- 12. Rectificativa por «otro motivo» de la de fuera de la UE: R4 (gestoría), N2 negativo.
+    select * into v_rect from public.crear_factura_rectificativa_causa(
+      (select id from public.invoices where user_id = p_user and invoice_number = v_pre || '04'),
+      '[{"description":"App móvil (prueba, horas corregidas)","quantity":1,"price_cents":60000}]'::jsonb, 'Prueba: horas mal contadas', 'otro');
+    update public.invoices set invoice_number = v_pre || '12' where id = v_rect.id;
+    perform public.registrar_factura_fiscal(v_rect.id, p_user);
+    v_casos := v_casos || jsonb_build_object(v_pre || '12', 'rectificativa_r4');
 
     -- 10. Factura que la batería estropea a propósito (cuota mal calculada) para
     --     comprobar el rechazo y la subsanación.
