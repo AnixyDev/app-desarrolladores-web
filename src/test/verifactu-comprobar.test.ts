@@ -5,7 +5,7 @@ import { problemaRegistroFiscal, normalizarNif } from '@/lib/verifactu/comprobar
 
 const HOY = '2026-10-07';
 const perfil = { tax_id: '12345678z', business_name: 'Estudio', full_name: 'Ana' };
-const es = { name: 'Cliente', company: '', tax_id: 'B-1234567-8', tipo_fiscal: 'nacional' as const, nif_iva: null, pais: null };
+const es = { name: 'Cliente', company: '', tax_id: 'B-1234567-4', tipo_fiscal: 'nacional' as const, nif_iva: null, pais: null };
 const f = (subtotal: number, iva = 21, fecha = HOY) => ({ issue_date: fecha, subtotal_cents: subtotal, tax_percent: iva });
 
 describe('comprobación previa al registro fiscal', () => {
@@ -43,6 +43,11 @@ describe('comprobación previa al registro fiscal', () => {
     const us = { ...es, tipo_fiscal: 'fuera_ue' as const, tax_id: 'X1234567', pais: 'US' };
     expect(problemaRegistroFiscal(f(80000, 0), us, perfil, HOY)).toBeNull();
     expect(problemaRegistroFiscal(f(80000, 0), { ...us, pais: null }, perfil, HOY)).toMatch(/país/);
+  });
+
+  it('NIF con la letra o el dígito de control mal: no (la AEAT lo rechazaría)', () => {
+    expect(problemaRegistroFiscal(f(1000), { ...es, tax_id: 'B12345678' }, perfil, HOY)).toMatch(/revisa que esté bien escrito/);
+    expect(problemaRegistroFiscal(f(1000), es, { ...perfil, tax_id: '12345678A' }, HOY)).toMatch(/Tu NIF/);
   });
 
   it('tipo de IVA que Hacienda no admite', () => {

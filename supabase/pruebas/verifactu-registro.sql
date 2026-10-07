@@ -20,7 +20,7 @@ begin
   values (v_yo, 'verifactu-prueba@example.com', now(), now(), 'authenticated', 'authenticated', '{"full_name":"Prueba Verifactu"}');
   update public.profiles set plan = 'Pro', tax_id = '12345678z', business_name = 'Estudio de Prueba' where id = v_yo;
 
-  insert into public.clients (user_id, name, email, tax_id) values (v_yo, 'Cliente España', 'es@example.com', 'B-1234567-8') returning id into c_es;
+  insert into public.clients (user_id, name, email, tax_id) values (v_yo, 'Cliente España', 'es@example.com', 'B-1234567-4') returning id into c_es;
   insert into public.clients (user_id, name, email) values (v_yo, 'Particular sin NIF', 'p@example.com') returning id into c_sin_nif;
   insert into public.clients (user_id, name, email, tipo_fiscal, nif_iva) values (v_yo, 'Empresa Francia', 'fr@example.com', 'empresa_ue', 'FR12345678901') returning id into c_ue;
   insert into public.clients (user_id, name, email, tipo_fiscal, pais, es_particular, tax_id) values (v_yo, 'Particular EE. UU.', 'us@example.com', 'fuera_ue', 'US', true, 'X1234567') returning id into c_fuera;
@@ -61,7 +61,7 @@ begin
   if r1.tipo_factura = 'F1' and r1.importe_total_cents = 121000 and r1.cuota_total_cents = 21000
      and r1.nif_emisor = '12345678Z' and r1.hash ~ '^[0-9A-F]{64}$'
      and r1.registro->'Encadenamiento'->>'PrimerRegistro' = 'S'
-     and r1.registro->'Destinatarios'->0->>'NIF' = 'B12345678'
+     and r1.registro->'Destinatarios'->0->>'NIF' = 'B12345674'
      and r1.registro->'Desglose'->0->>'CalificacionOperacion' = 'S1'
      and r1.registro->'Desglose'->0->>'TipoImpositivo' = '21.00'
      and r1.registro->>'ImporteTotal' = '1210.00'

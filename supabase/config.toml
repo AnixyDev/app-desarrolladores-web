@@ -485,3 +485,8 @@ verify_jwt = false
 
 [functions.verifactu-enviar]
 verify_jwt = false
+
+# Verifactu, fase 3: batería de casos contra la AEAT de PRUEBAS. Solo la clave
+# de servicio (comprobada dentro); en producción responde 400.
+[functions.verifactu-bateria]
+verify_jwt = false

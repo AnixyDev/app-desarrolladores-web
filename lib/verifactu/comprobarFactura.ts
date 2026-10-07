@@ -6,6 +6,7 @@
 // Si cambian las reglas en la migración verifactu_registro_oficial, cambiarlas
 // también aquí (src/test/verifactu-comprobar.test.ts).
 import type { Client, Profile } from '@/types';
+import { nifEspanolValido } from './nif';
 
 export const TIPOS_IVA_VALIDOS = [2, 4, 5, 7.5, 10, 21];
 export const LIMITE_SIMPLIFICADA_CENTS = 40000; // 400 € con IVA
@@ -37,7 +38,7 @@ export function problemaRegistroFiscal(
 ): string | null {
   const nif = normalizarNif(perfil?.tax_id);
   if (!nif) return 'Falta tu NIF. Rellénalo en Ajustes → Perfil antes de emitir facturas.';
-  if (!/^[0-9A-Z]{9}$/.test(nif)) return `Tu NIF («${perfil?.tax_id}») no es válido: debe tener 9 caracteres. Corrígelo en Ajustes → Perfil.`;
+  if (!/^[0-9A-Z]{9}$/.test(nif) || !nifEspanolValido(nif)) return `Tu NIF («${perfil?.tax_id}») no es válido: revisa que esté bien escrito, con su letra. Corrígelo en Ajustes → Perfil.`;
   if (!(perfil?.business_name?.trim() || perfil?.full_name?.trim())) return 'Falta tu nombre o razón social en Ajustes → Perfil.';
 
   if (factura.issue_date > hoy) return 'La fecha de la factura no puede ser posterior a hoy.';
@@ -63,7 +64,7 @@ export function problemaRegistroFiscal(
     const pais = cliente.pais ?? (tipo === 'nacional' ? 'ES' : null);
     if (doc) {
       if (!pais) return `Indica el país de «${nombre}» en su ficha.`;
-      if (pais === 'ES' && !/^[0-9A-Z]{9}$/.test(doc)) return `El NIF de «${nombre}» no es válido: debe tener 9 caracteres.`;
+      if (pais === 'ES' && !nifEspanolValido(doc)) return `El NIF de «${nombre}» no es válido: revisa que esté bien escrito, con su letra (edita su ficha).`;
       identificado = true;
     }
   }

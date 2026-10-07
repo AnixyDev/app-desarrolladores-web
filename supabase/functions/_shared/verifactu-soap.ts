@@ -47,6 +47,9 @@ export function bloques(xml: string, nombre: string): string[] {
 export type EstadoEnvio = 'Correcto' | 'ParcialmenteCorrecto' | 'Incorrecto';
 export type EstadoRegistro = 'Correcto' | 'AceptadoConErrores' | 'Incorrecto';
 
+/** Estado en que la AEAT tiene guardado un registro que se le envía repetido. */
+export type EstadoDuplicado = 'Correcta' | 'AceptadaConErrores' | 'Anulada';
+
 export interface LineaRespuesta {
   numSerie: string;
   fecha: string;
@@ -54,7 +57,8 @@ export interface LineaRespuesta {
   estado: EstadoRegistro;
   codigoError: string | null;
   descripcionError: string | null;
-  duplicado: boolean;
+  /** Solo si la AEAT lo rechaza por duplicado (3000): cómo tiene guardado el original. */
+  duplicado: { estado: EstadoDuplicado; codigoError: string | null; descripcionError: string | null } | null;
 }
 
 export type RespuestaAeat =
@@ -75,14 +79,22 @@ export function leerRespuesta(xml: string): RespuestaAeat {
   }
   const lineas = bloques(cuerpo, 'RespuestaLinea').map((l): LineaRespuesta => {
     const id = bloques(l, 'IDFactura')[0] ?? '';
+    // El bloque RegistroDuplicado repite CodigoErrorRegistro/DescripcionErrorRegistro
+    // (los del original): se lee aparte para no confundirlos con los de la línea.
+    const dup = bloques(l, 'RegistroDuplicado')[0];
+    const propia = dup === undefined ? l : l.replace(/<(?:[\w.-]+:)?RegistroDuplicado(?:\s[^>]*)?>[\s\S]*?<\/(?:[\w.-]+:)?RegistroDuplicado>/, '');
     return {
       numSerie: etiqueta(id, 'NumSerieFactura') ?? '',
       fecha: etiqueta(id, 'FechaExpedicionFactura') ?? '',
-      operacion: etiqueta(l, 'TipoOperacion') ?? '',
-      estado: (etiqueta(l, 'EstadoRegistro') ?? 'Incorrecto') as EstadoRegistro,
-      codigoError: etiqueta(l, 'CodigoErrorRegistro'),
-      descripcionError: etiqueta(l, 'DescripcionErrorRegistro'),
-      duplicado: bloques(l, 'RegistroDuplicado').length > 0,
+      operacion: etiqueta(propia, 'TipoOperacion') ?? '',
+      estado: (etiqueta(propia, 'EstadoRegistro') ?? 'Incorrecto') as EstadoRegistro,
+      codigoError: etiqueta(propia, 'CodigoErrorRegistro'),
+      descripcionError: etiqueta(propia, 'DescripcionErrorRegistro'),
+      duplicado: dup === undefined ? null : {
+        estado: (etiqueta(dup, 'EstadoRegistroDuplicado') ?? 'Correcta') as EstadoDuplicado,
+        codigoError: etiqueta(dup, 'CodigoErrorRegistro'),
+        descripcionError: etiqueta(dup, 'DescripcionErrorRegistro'),
+      },
     };
   });
   const espera = Number(etiqueta(cuerpo, 'TiempoEsperaEnvio'));
@@ -101,6 +113,35 @@ export const ESTADO_GUARDADO: Record<EstadoRegistro, 'aceptado' | 'aceptado_con_
   AceptadoConErrores: 'aceptado_con_errores',
   Incorrecto: 'rechazado',
 };
+
+export type EstadoGuardado = 'aceptado' | 'aceptado_con_errores' | 'rechazado';
+
+/** Código de la AEAT para «Registro de facturación duplicado». */
+export const CODIGO_DUPLICADO = '3000';
+
+/**
+ * Qué se guarda en el registro según su línea de respuesta.
+ *
+ * Duplicado (3000): la AEAT YA tiene ese registro — pasa cuando un envío llegó
+ * pero se perdió la respuesta (corte de red, tiempo agotado) y se reenvía. No
+ * es un rechazo: se guarda el estado del original que devuelve la AEAT
+ * (comprobado en el entorno de pruebas el 07/10/2026).
+ */
+export function resultadoDeLinea(linea: LineaRespuesta): {
+  estado: EstadoGuardado; codigoError: string | null; descripcionError: string | null;
+} {
+  if (linea.estado === 'Incorrecto' && linea.codigoError === CODIGO_DUPLICADO && linea.duplicado) {
+    const d = linea.duplicado;
+    if (d.estado === 'AceptadaConErrores') {
+      return { estado: 'aceptado_con_errores', codigoError: d.codigoError, descripcionError: `Ya estaba registrado en la AEAT, con este aviso: ${d.descripcionError ?? 'sin detalle'}` };
+    }
+    return {
+      estado: 'aceptado', codigoError: null,
+      descripcionError: d.estado === 'Anulada' ? 'Ya estaba registrado en la AEAT, que lo tiene como anulado.' : null,
+    };
+  }
+  return { estado: ESTADO_GUARDADO[linea.estado] ?? 'rechazado', codigoError: linea.codigoError, descripcionError: linea.descripcionError };
+}
 
 /**
  * Busca la línea de respuesta de un registro guardado (número de factura +

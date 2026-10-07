@@ -15,6 +15,13 @@
 //     los registros siguen pendientes y se reintenta más tarde (cada vez más
 //     espaciado, hasta una hora). La factura ya está emitida: no se bloquea.
 //
+// Fase 3 (07/10/2026), tras la batería contra la AEAT de pruebas:
+//   - DUPLICADO (3000): si un envío llegó pero se perdió la respuesta, al
+//     reenviarlo la AEAT dice «duplicado» y cómo lo tiene guardado. No es un
+//     rechazo: se guarda ese estado (resultadoDeLinea).
+//   - AVISOS por correo (verifactu-avisos.ts): registros rechazados, y
+//     certificado que falta, caduca o la AEAT no acepta (como mucho uno al día).
+//
 // Modo «prueba» (solo con la clave de servicio): genera registros de prueba de
 // la cuenta de administración SIN guardarlos (verifactu_registros_de_prueba) y
 // los envía, para comprobar el circuito completo contra la AEAT.
@@ -29,9 +36,12 @@ import { esLlamadaDelServicio } from '../_shared/llamada-servicio.ts';
 import { xmlEnvio, huellaDeRegistro } from '../_shared/verifactu-xml.ts';
 import {
   URL_VERIFACTU, MAX_REGISTROS_POR_ENVIO, ESPERA_POR_DEFECTO_SEGUNDOS,
-  sobreSoap, leerRespuesta, lineaDe, ESTADO_GUARDADO, type EntornoVerifactu, type RespuestaAeat,
+  sobreSoap, leerRespuesta, lineaDe, resultadoDeLinea, type EntornoVerifactu, type RespuestaAeat,
 } from '../_shared/verifactu-soap.ts';
 import { certificadoDe, ErrorCertificado } from '../_shared/verifactu-certificado.ts';
+import {
+  esErrorDeCertificado, hayQueAvisar, correoRechazo, correoCertificado, type RegistroRechazado,
+} from '../_shared/verifactu-avisos.ts';
 
 const json = (cuerpo: unknown, status = 200) =>
   new Response(JSON.stringify(cuerpo, null, 1), { status, headers: { 'Content-Type': 'application/json' } });
@@ -95,6 +105,34 @@ async function enviarLote(admin: any, userId: string, lote: RegistroPendiente[])
 /** Espera antes de reintentar tras un error: 1, 2, 4… minutos, hasta una hora. */
 const esperaTrasError = (intentos: number) => Math.min(60 * 2 ** Math.max(0, intentos), 3600);
 
+const DESDE_AVISOS = 'alertas@devfreelancer.app';
+
+/** Envía un correo al usuario por la cuenta de Resend de la plataforma. Nunca lanza. */
+async function avisar(admin: any, userId: string, correo: { asunto: string; html: string }): Promise<boolean> {
+  const clave = Deno.env.get('RESEND_API_KEY');
+  if (!clave) { console.error('[verifactu-enviar] RESEND_API_KEY no configurada: aviso sin enviar'); return false; }
+  try {
+    const { data: perfil } = await admin.from('profiles').select('email').eq('id', userId).maybeSingle();
+    if (!perfil?.email) return false;
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${clave}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: `DevFreelancer <${DESDE_AVISOS}>`, to: [perfil.email], subject: correo.asunto, html: correo.html }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) console.error(`[verifactu-enviar] aviso a ${userId}: Resend HTTP ${r.status}`);
+    return r.ok;
+  } catch (e) {
+    console.error(`[verifactu-enviar] aviso a ${userId}:`, (e as Error)?.message ?? e);
+    return false;
+  }
+}
+
+async function nombreDe(admin: any, userId: string): Promise<string> {
+  const { data } = await admin.from('profiles').select('full_name, business_name').eq('id', userId).maybeSingle();
+  return String(data?.full_name || data?.business_name || '').trim().split(/\s+/)[0] ?? '';
+}
+
 async function procesarPendientes(admin: any) {
   const inicio = Date.now();
   const { data: pendientes, error } = await admin.from('fiscal_records')
@@ -105,7 +143,7 @@ async function procesarPendientes(admin: any) {
   if (error) throw error;
   if (!pendientes?.length) return { usuarios: 0, enviados: 0 };
 
-  const { data: controles } = await admin.from('verifactu_control_envio').select('user_id, siguiente_envio_en');
+  const { data: controles } = await admin.from('verifactu_control_envio').select('user_id, siguiente_envio_en, ultimo_aviso, ultimo_aviso_en');
   const siguiente = new Map<string, number>((controles ?? []).map((c: any) => [c.user_id, new Date(c.siguiente_envio_en).getTime()]));
 
   const porUsuario = new Map<string, RegistroPendiente[]>();
@@ -150,11 +188,22 @@ async function procesarPendientes(admin: any) {
         ultimo_error: resultado.mensaje, actualizado_en: ahora.toISOString(),
       });
       console.error(`[verifactu-enviar] ${userId}: ${resultado.codigo} ${resultado.mensaje}`);
+
+      // Certificado: el usuario tiene que hacer algo. Un aviso al día como mucho.
+      if (esErrorDeCertificado(resultado.codigo)) {
+        const motivo = `certificado:${resultado.codigo}`;
+        const control = controles?.find((c: any) => c.user_id === userId);
+        if (hayQueAvisar(motivo, control ? { motivo: control.ultimo_aviso, en: control.ultimo_aviso_en } : null, ahora)
+            && await avisar(admin, userId, correoCertificado(await nombreDe(admin, userId), resultado.mensaje, registros.length))) {
+          await admin.from('verifactu_control_envio').update({ ultimo_aviso: motivo, ultimo_aviso_en: ahora.toISOString() }).eq('user_id', userId);
+        }
+      }
       resumen.push({ userId, registros: lote.length, error: resultado.codigo });
       continue;
     }
 
     const r = resultado.respuesta;
+    const rechazados: RegistroRechazado[] = [];
     for (const reg of lote) {
       const linea = lineaDe(r.lineas, reg);
       if (!linea) {
@@ -164,16 +213,20 @@ async function procesarPendientes(admin: any) {
         }).eq('id', reg.id);
         continue;
       }
-      const estado = ESTADO_GUARDADO[linea.estado] ?? 'rechazado';
+      const res = resultadoDeLinea(linea);
       await admin.from('fiscal_records').update({
-        estado_envio: estado,
+        estado_envio: res.estado,
         envio_intentos: (reg.envio_intentos ?? 0) + 1,
         envio_ultimo_intento: ahora.toISOString(),
-        envio_error_codigo: linea.codigoError,
-        envio_error_descripcion: linea.descripcionError,
+        envio_error_codigo: res.codigoError,
+        envio_error_descripcion: res.descripcionError,
         csv_respuesta_aeat: r.csv,
-        envio_aceptado_en: estado === 'rechazado' ? null : ahora.toISOString(),
+        envio_aceptado_en: res.estado === 'rechazado' ? null : ahora.toISOString(),
       }).eq('id', reg.id);
+      if (res.estado === 'rechazado') rechazados.push({ numero: reg.numero_factura, codigo: res.codigoError, error: res.descripcionError });
+    }
+    if (rechazados.length) {
+      await avisar(admin, userId, correoRechazo(await nombreDe(admin, userId), rechazados));
     }
     await admin.from('verifactu_control_envio').upsert({
       user_id: userId,

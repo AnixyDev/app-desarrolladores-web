@@ -2,6 +2,8 @@
 // Registro fiscal Veri*Factu completo: cada registro de alta/anulación
 // generado, con su huella encadenada. Solo lectura — nada aquí se puede
 // editar ni borrar, ni desde la UI ni desde la base de datos (RLS).
+// Fase 3: si la AEAT rechaza un registro, «Corregir y reenviar» genera uno
+// nuevo de la misma factura (subsanación) con los datos ya corregidos.
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -11,10 +13,10 @@ import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import { ShieldCheckIcon, RefreshCwIcon, DownloadIcon } from '@/components/icons/Icon';
 import { formatCurrency, formatearFecha } from '@/lib/utils';
-import { estadoEnvio } from '@/lib/verifactu/estadoEnvio';
+import { estadoEnvio, sePuedeCorregir } from '@/lib/verifactu/estadoEnvio';
 
 const FiscalCompliancePage: React.FC = () => {
-  const { fiscalRecords, profile, verifyFiscalChain } = useAppStore(useShallow(s => ({ fiscalRecords: s.fiscalRecords, profile: s.profile, verifyFiscalChain: s.verifyFiscalChain })));
+  const { fiscalRecords, profile, verifyFiscalChain, subsanarRegistroFiscal } = useAppStore(useShallow(s => ({ fiscalRecords: s.fiscalRecords, profile: s.profile, verifyFiscalChain: s.verifyFiscalChain, subsanarRegistroFiscal: s.subsanarRegistroFiscal })));
   const { addToast } = useToast();
   const [verifying, setVerifying] = useState(false);
   const [verifyResult, setVerifyResult] = useState<{ valid: boolean; brokenAt?: string } | null>(null);
@@ -24,6 +26,24 @@ const FiscalCompliancePage: React.FC = () => {
     () => [...fiscalRecords].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
     [fiscalRecords]
   );
+
+  // Registros ya subsanados por otro (no hay nada pendiente con ellos).
+  const corregidos = useMemo(() => new Set(fiscalRecords.map(r => r.subsana_registro_id).filter(Boolean) as string[]), [fiscalRecords]);
+  const porCorregir = useMemo(() => fiscalRecords.filter(r => sePuedeCorregir(r, fiscalRecords)), [fiscalRecords]);
+  const rechazadosPorCorregir = porCorregir.filter(r => r.estado_envio === 'rechazado').length;
+  const [corrigiendo, setCorrigiendo] = useState<string | null>(null);
+
+  const handleCorregir = async (id: string, numero: string) => {
+    setCorrigiendo(id);
+    try {
+      await subsanarRegistroFiscal(id);
+      addToast(`Factura ${numero}: registro corregido. Se envía a Hacienda en un minuto.`, 'success');
+    } catch (e) {
+      addToast((e as Error).message || 'No se ha podido corregir el registro.', 'error');
+    } finally {
+      setCorrigiendo(null);
+    }
+  };
 
   const handleVerify = async () => {
     setVerifying(true);
@@ -79,6 +99,18 @@ const FiscalCompliancePage: React.FC = () => {
         </div>
       </div>
 
+      {rechazadosPorCorregir > 0 && (
+        <div role="alert" className="p-4 rounded-lg text-sm bg-red-900/20 border border-red-800 text-red-300 space-y-1">
+          <p className="font-semibold">
+            Hacienda ha rechazado {rechazadosPorCorregir === 1 ? '1 registro' : `${rechazadosPorCorregir} registros`}.
+          </p>
+          <p>
+            Las facturas siguen siendo válidas, pero hay que volver a enviarlas. Mira el motivo en la columna «Estado envío»
+            (casi siempre es el NIF del cliente: corrígelo en su ficha) y después pulsa «Corregir y reenviar».
+          </p>
+        </div>
+      )}
+
       {verifyResult && (
         <div className={`p-4 rounded-lg text-sm ${verifyResult.valid ? 'bg-green-900/20 border border-green-800 text-green-300' : 'bg-red-900/20 border border-red-800 text-red-300'}`}>
           {verifyResult.valid
@@ -123,12 +155,26 @@ const FiscalCompliancePage: React.FC = () => {
                       <td className="p-3 text-gray-400 capitalize">{r.modalidad.replace('_', ' ')}</td>
                       <td className="p-3 align-top">
                         {(() => {
-                          const e = estadoEnvio(r);
+                          const e = estadoEnvio(r, corregidos.has(r.id));
                           return (
                             <div className="space-y-1 max-w-[260px]">
                               <span className={`inline-block px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${e.clase}`}>{e.texto}</span>
+                              {r.subsana_registro_id && <p className="text-xs text-gray-400">Corrección de un envío anterior</p>}
                               {e.detalle && <p className="text-xs text-gray-400 break-words">{e.detalle}</p>}
                               {r.csv_respuesta_aeat && <p className="text-xs text-gray-500 font-mono" title="Código seguro de verificación del envío">CSV {r.csv_respuesta_aeat}</p>}
+                              {sePuedeCorregir(r, fiscalRecords) && (
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="mt-1"
+                                  onClick={() => handleCorregir(r.id, r.numero_factura)}
+                                  disabled={corrigiendo !== null}
+                                  aria-label={`Corregir y reenviar el registro de la factura ${r.numero_factura}`}
+                                >
+                                  {corrigiendo === r.id ? <RefreshCwIcon className="w-4 h-4 animate-spin mr-2" /> : <RefreshCwIcon className="w-4 h-4 mr-2" />}
+                                  Corregir y reenviar
+                                </Button>
+                              )}
                             </div>
                           );
                         })()}
