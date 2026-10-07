@@ -35,9 +35,10 @@ describe('garantías', () => {
   it('no declara que cumple Verifactu mientras falte la firma y el envío a la AEAT', () => {
     render(<MemoryRouter><GarantiasPage /></MemoryRouter>);
     expect(screen.getByText('Tus datos son tuyos')).toBeTruthy();
-    expect(screen.getAllByText('En desarrollo').length).toBe(2);
+    expect(screen.getAllByText('En desarrollo').length).toBe(1);
     const texto = document.body.textContent ?? '';
-    expect(texto).toMatch(/La publicaremos\s+en esta página cuando el programa cumpla entero/);
+    expect(texto).toMatch(/Se publicará en\s+esta página cuando esté firmada/);
+    expect(texto).toMatch(/Agencia Tributaria real/);
   });
 
   it('la ruta existe y se enlaza desde el pie, la portada y Precios', () => {

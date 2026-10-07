@@ -226,6 +226,7 @@ const PUBLICAS = {
   '/privacy':                            /Política de privacidad/,   // misma página que /privacidad
   '/privacidad':                         /Política de privacidad/,
   '/garantias':                          /Tus datos son tuyos/,
+  '/declaracion-responsable':            /se publicará aquí cuando esté/,   // sin sesión: aún sin firmar
   '/aviso-legal':                        /Aviso legal/,
   '/cookies':                            /Política de cookies/,
   '/terms':                              /Términos y condiciones/,
