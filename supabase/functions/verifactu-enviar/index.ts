@@ -29,8 +29,10 @@
 // la cuenta de administración SIN guardarlos (verifactu_registros_de_prueba) y
 // los envía, para comprobar el circuito completo contra la AEAT.
 //
-// Entorno: VERIFACTU_ENTORNO = 'produccion' para la AEAT real; cualquier otro
-// valor (o ninguno) usa el entorno de PRUEBAS. Hasta la fase 4, pruebas.
+// Entorno (fase 4, 07/10/2026): cada registro lleva el suyo (fiscal_records.entorno,
+// el de su cuenta al crearse: profiles.verifactu_entorno). Los de 'produccion'
+// solo salen hacia la AEAT real si VERIFACTU_PRODUCCION_PERMITIDA = 'si'; si
+// no, esperan pendientes. El modo prueba y la batería van siempre a pruebas.
 //
 // RECUERDA: esta función NO se despliega con `git push`.
 // deno-lint-ignore-file no-explicit-any
@@ -49,7 +51,8 @@ import {
 const json = (cuerpo: unknown, status = 200) =>
   new Response(JSON.stringify(cuerpo, null, 1), { status, headers: { 'Content-Type': 'application/json' } });
 
-const ENTORNO: EntornoVerifactu = Deno.env.get('VERIFACTU_ENTORNO') === 'produccion' ? 'produccion' : 'pruebas';
+/** Candado general de la AEAT real: sin él, nada sale hacia producción. */
+const PRODUCCION_PERMITIDA = Deno.env.get('VERIFACTU_PRODUCCION_PERMITIDA') === 'si';
 const TIEMPO_MAXIMO_MS = 45_000;
 
 interface RegistroPendiente {
@@ -61,6 +64,7 @@ interface RegistroPendiente {
   nombre_emisor: string;
   registro: Record<string, unknown>;
   envio_intentos?: number;
+  entorno?: EntornoVerifactu | null;
 }
 
 /** Lo que de verdad viajó: se guarda en verifactu_envios si hubo respuesta HTTP. */
@@ -71,7 +75,7 @@ type ResultadoEnvio =
   | { tipo: 'error'; codigo: string | null; mensaje: string; reintentar: boolean; intercambio?: Intercambio };
 
 /** Envía un lote (mismo emisor) y devuelve lo que contestó la AEAT, o el error. */
-async function enviarLote(admin: any, userId: string, lote: RegistroPendiente[]): Promise<ResultadoEnvio> {
+async function enviarLote(admin: any, userId: string, lote: RegistroPendiente[], entorno: EntornoVerifactu): Promise<ResultadoEnvio> {
   let cert;
   try {
     cert = await certificadoDe(admin, userId);
@@ -85,7 +89,7 @@ async function enviarLote(admin: any, userId: string, lote: RegistroPendiente[])
 
   const client = (Deno as any).createHttpClient({ cert: cert.cert, key: cert.key });
   try {
-    const resp = await fetch(URL_VERIFACTU[ENTORNO], {
+    const resp = await fetch(URL_VERIFACTU[entorno], {
       method: 'POST',
       headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: '' },
       body: cuerpo,
@@ -137,11 +141,11 @@ async function avisar(admin: any, userId: string, correo: { asunto: string; html
 
 /** Guarda el envío completo y devuelve su id (null si no se pudo: no bloquea el resto). */
 async function guardarEnvio(
-  admin: any, userId: string, nif: string, numRegistros: number, i: Intercambio,
+  admin: any, userId: string, nif: string, entorno: EntornoVerifactu, numRegistros: number, i: Intercambio,
   extra: { estado: string | null; csv: string | null; codigo: string | null },
 ): Promise<string | null> {
   const { data, error } = await admin.from('verifactu_envios').insert({
-    user_id: userId, nif_emisor: nif, entorno: ENTORNO, num_registros: numRegistros,
+    user_id: userId, nif_emisor: nif, entorno, num_registros: numRegistros,
     http_status: i.httpStatus, estado_envio: extra.estado, csv: extra.csv, codigo_error: extra.codigo,
     peticion_xml: i.peticion, respuesta_xml: i.respuesta,
   }).select('id').single();
@@ -157,7 +161,7 @@ async function nombreDe(admin: any, userId: string): Promise<string> {
 async function procesarPendientes(admin: any) {
   const inicio = Date.now();
   const { data: pendientes, error } = await admin.from('fiscal_records')
-    .select('id, user_id, record_type, numero_factura, nif_emisor, nombre_emisor, registro, envio_intentos')
+    .select('id, user_id, record_type, numero_factura, nif_emisor, nombre_emisor, registro, envio_intentos, entorno')
     .eq('estado_envio', 'pendiente').eq('modalidad', 'verifactu')
     .order('user_id').order('orden')
     .limit(5000);
@@ -168,7 +172,10 @@ async function procesarPendientes(admin: any) {
   const siguiente = new Map<string, number>((controles ?? []).map((c: any) => [c.user_id, new Date(c.siguiente_envio_en).getTime()]));
 
   const porUsuario = new Map<string, RegistroPendiente[]>();
+  let esperandoProduccion = 0;
   for (const r of pendientes as RegistroPendiente[]) {
+    if (r.entorno !== 'pruebas' && r.entorno !== 'produccion') continue;
+    if (r.entorno === 'produccion' && !PRODUCCION_PERMITIDA) { esperandoProduccion++; continue; }
     if (!porUsuario.has(r.user_id)) porUsuario.set(r.user_id, []);
     porUsuario.get(r.user_id)!.push(r);
   }
@@ -178,9 +185,10 @@ async function procesarPendientes(admin: any) {
     if (Date.now() - inicio > TIEMPO_MAXIMO_MS) break;
     if ((siguiente.get(userId) ?? 0) > Date.now()) continue;
 
-    // Un envío = un emisor y hasta 1.000 registros, en orden de cadena.
+    // Un envío = un emisor, un entorno y hasta 1.000 registros, en orden de cadena.
     const nif = registros[0].nif_emisor;
-    const candidatos = registros.filter((r) => r.nif_emisor === nif).slice(0, MAX_REGISTROS_POR_ENVIO);
+    const entorno = registros[0].entorno as EntornoVerifactu;
+    const candidatos = registros.filter((r) => r.nif_emisor === nif && r.entorno === entorno).slice(0, MAX_REGISTROS_POR_ENVIO);
 
     // Integridad: la huella guardada tiene que salir de su propio contenido.
     const lote: RegistroPendiente[] = [];
@@ -195,12 +203,12 @@ async function procesarPendientes(admin: any) {
     if (!lote.length) continue;
 
     const ahora = new Date();
-    const resultado = await enviarLote(admin, userId, lote);
+    const resultado = await enviarLote(admin, userId, lote, entorno);
 
     if (resultado.tipo === 'error') {
       const intentos = Math.max(...lote.map((r) => r.envio_intentos ?? 0)) + 1;
       const envioId = resultado.intercambio
-        ? await guardarEnvio(admin, userId, nif, lote.length, resultado.intercambio, { estado: null, csv: null, codigo: resultado.codigo })
+        ? await guardarEnvio(admin, userId, nif, entorno, lote.length, resultado.intercambio, { estado: null, csv: null, codigo: resultado.codigo })
         : null;
       await admin.from('fiscal_records').update({
         envio_intentos: intentos, envio_ultimo_intento: ahora.toISOString(),
@@ -223,12 +231,12 @@ async function procesarPendientes(admin: any) {
           await admin.from('verifactu_control_envio').update({ ultimo_aviso: motivo, ultimo_aviso_en: ahora.toISOString() }).eq('user_id', userId);
         }
       }
-      resumen.push({ userId, registros: lote.length, error: resultado.codigo });
+      resumen.push({ userId, entorno, registros: lote.length, error: resultado.codigo });
       continue;
     }
 
     const r = resultado.respuesta;
-    const envioId = await guardarEnvio(admin, userId, nif, lote.length, resultado.intercambio, { estado: r.estadoEnvio, csv: r.csv, codigo: null });
+    const envioId = await guardarEnvio(admin, userId, nif, entorno, lote.length, resultado.intercambio, { estado: r.estadoEnvio, csv: r.csv, codigo: null });
     const rechazados: RegistroRechazado[] = [];
     for (const reg of lote) {
       const linea = lineaDe(r.lineas, reg);
@@ -261,9 +269,10 @@ async function procesarPendientes(admin: any) {
       siguiente_envio_en: new Date(ahora.getTime() + (r.esperaSegundos || ESPERA_POR_DEFECTO_SEGUNDOS) * 1000).toISOString(),
       ultimo_error: null, actualizado_en: ahora.toISOString(),
     });
-    resumen.push({ userId, registros: lote.length, estadoEnvio: r.estadoEnvio });
+    resumen.push({ userId, entorno, registros: lote.length, estadoEnvio: r.estadoEnvio });
   }
-  return { usuarios: porUsuario.size, envios: resumen };
+  if (esperandoProduccion) console.warn(`[verifactu-enviar] ${esperandoProduccion} registro(s) de la AEAT real esperan: falta VERIFACTU_PRODUCCION_PERMITIDA=si`);
+  return { usuarios: porUsuario.size, envios: resumen, esperandoProduccion };
 }
 
 Deno.serve(async (req) => {
@@ -277,22 +286,21 @@ Deno.serve(async (req) => {
   try {
     if (modo === 'prueba') {
       // Circuito completo con registros de prueba de la cuenta de administración,
-      // que no se guardan en ningún sitio. Solo para el entorno de pruebas.
-      if (ENTORNO !== 'pruebas') return json({ error: 'El modo prueba solo funciona contra el entorno de pruebas.' }, 400);
+      // que no se guardan en ningún sitio. Siempre contra el entorno de pruebas.
       const { data: perfil, error: e1 } = await admin.from('profiles').select('id').eq('role', 'Admin').limit(1).maybeSingle();
       if (e1 || !perfil) return json({ error: 'Sin cuenta de administración' }, 500);
       const { data: registros, error: e2 } = await admin.rpc('verifactu_registros_de_prueba', { p_user: perfil.id });
       if (e2) return json({ error: 'No se pudieron generar los registros de prueba: ' + e2.message }, 500);
       const huellasOk = await Promise.all((registros as any[]).map(async (r) => (await huellaDeRegistro(r.registro)) === r.registro.Huella));
-      const resultado = await enviarLote(admin, perfil.id, registros as RegistroPendiente[]);
+      const resultado = await enviarLote(admin, perfil.id, registros as RegistroPendiente[], 'pruebas');
       return json({
-        entorno: ENTORNO,
+        entorno: 'pruebas',
         registros: (registros as any[]).map((r, i) => ({ tipo: r.record_type, numero: r.numero_factura, tipoFactura: r.registro.TipoFactura ?? null, huellaOk: huellasOk[i] })),
         resultado: { ...resultado, intercambio: undefined },
       });
     }
 
-    return json({ entorno: ENTORNO, ...(await procesarPendientes(admin)) });
+    return json({ produccionPermitida: PRODUCCION_PERMITIDA, ...(await procesarPendientes(admin)) });
   } catch (e) {
     console.error('[verifactu-enviar]', e);
     return json({ error: String((e as Error)?.message ?? e).slice(0, 500) }, 500);

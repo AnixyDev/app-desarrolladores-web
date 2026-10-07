@@ -84,7 +84,8 @@ const GarantiasPage: React.FC = () => (
         <Estado hecho>El PDF lleva el código QR de verificación de la Agencia Tributaria.</Estado>
         <Estado hecho>Bloqueo de facturas emitidas, rectificativas y comprobación de la cadena de registros.</Estado>
         <Estado hecho>Envío automático de cada registro con tu certificado digital, probado con todos los tipos de factura en el entorno de pruebas de la Agencia Tributaria.</Estado>
-        <Estado hecho={false}>Modalidad VERI*FACTU en Ajustes, envío a la Agencia Tributaria real y declaración responsable firmada.</Estado>
+        <Estado hecho>Solo modalidad VERI*FACTU: cada registro se envía a la Agencia Tributaria, que lo custodia.</Estado>
+        <Estado hecho={false}>Envío a la Agencia Tributaria real y declaración responsable firmada.</Estado>
       </ul>
       <p>
         La ley pide al fabricante del programa una <strong>declaración responsable</strong> de que cumple. Se publicará en{' '}

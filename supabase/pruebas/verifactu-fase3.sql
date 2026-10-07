@@ -29,7 +29,7 @@ begin
   insert into auth.users (id, email, created_at, updated_at, aud, role, raw_user_meta_data) values
     (v_yo, 'verifactu-f3@example.com', now(), now(), 'authenticated', 'authenticated', '{"full_name":"Prueba Fase Tres"}'),
     (v_otro, 'verifactu-f3-otro@example.com', now(), now(), 'authenticated', 'authenticated', '{"full_name":"Otra Cuenta"}');
-  update public.profiles set plan = 'Pro', tax_id = '12345678Z', business_name = 'Estudio', veri_factu_modality = 'verifactu' where id = v_yo;
+  update public.profiles set plan = 'Pro', tax_id = '12345678Z', business_name = 'Estudio', veri_factu_modality = 'verifactu', verifactu_entorno = 'pruebas' where id = v_yo;
 
   -- Un cliente con la letra del NIF mal y otro bien.
   insert into public.clients (user_id, name, email, tax_id) values (v_yo, 'Cliente Mal', 'mal@example.com', 'B12345678') returning id into c_mal;

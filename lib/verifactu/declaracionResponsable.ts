@@ -69,8 +69,6 @@ export const DECLARACION_RESPONSABLE = {
  * punto cuando esté hecho; con la lista vacía, Ana revisa y firma.
  */
 export const PENDIENTE_ANTES_DE_FIRMAR: readonly string[] = [
-  'Ajustes ofrece todavía la modalidad «No Veri*Factu» (sin firma de registros ni registro de eventos): hay que dejar solo VERI*FACTU.',
-  'Interruptor para enviar a la Agencia Tributaria real, cuenta por cuenta.',
   'Dirección postal completa del productor (con número) y alta como autónoma.',
   'Visto bueno de la gestoría al texto.',
 ];

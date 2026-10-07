@@ -1,5 +1,5 @@
 // services/pdfService.ts
-import type { Invoice, Client, Profile, Receipt, Contract } from '@/types';
+import type { Invoice, Client, Profile, Receipt, Contract, FiscalRecord } from '@/types';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
 import { mencionSinIva } from '@/lib/ivaClientes';
 import jsPDF from 'jspdf';
@@ -38,7 +38,29 @@ export interface FiscalPdfData {
    */
   nifEmisor?: string;
   importeTotalCents?: number;
+  /**
+   * Entorno de la AEAT al que va el registro (fase 4, 07/10/2026). El QR de
+   * un registro de pruebas apunta al cotejo de pruebas. Un registro interno
+   * (sin entorno: la cuenta aún no envía) no lleva QR: ver datosFiscalesPdf.
+   */
+  entorno?: 'pruebas' | 'produccion';
 }
+
+/**
+ * Datos del QR a partir del registro de alta de la factura, o null si no hay
+ * que pintarlo: sin registro, o registro interno (la cuenta todavía no envía
+ * a la AEAT; un QR que la AEAT no puede cotejar sería engañoso).
+ */
+export const datosFiscalesPdf = (registro: Pick<FiscalRecord, 'modalidad' | 'hash' | 'nif_emisor' | 'importe_total_cents' | 'entorno'> | null | undefined): FiscalPdfData | null => {
+  if (!registro || (registro.entorno !== 'pruebas' && registro.entorno !== 'produccion')) return null;
+  return {
+    modalidad: registro.modalidad,
+    hash: registro.hash,
+    nifEmisor: registro.nif_emisor,
+    importeTotalCents: registro.importe_total_cents,
+    entorno: registro.entorno,
+  };
+};
 
 // URL de cotejo AEAT (producción). Formato y parámetros (nif, numserie,
 // fecha DD-MM-AAAA, importe con punto decimal) según la Orden HAC/1177/2024.
@@ -51,6 +73,8 @@ export interface FiscalPdfData {
 // servicio de cotejo", versión 0.5.0 (10/12/2025), apartado de URLs: el
 // dominio de producción es www2.agenciatributaria.gob.es (antes aquí .es).
 const AEAT_QR_BASE = 'https://www2.agenciatributaria.gob.es/wlpl/TIKE-CONT';
+/** Cotejo del entorno de pruebas (comprobado el 07/10/2026 con PRUEBA-B073-01). */
+export const AEAT_QR_VALIDAR_PRUEBAS = 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR';
 export const AEAT_QR_SERVICIO: Record<FiscalPdfData['modalidad'], string> = {
   verifactu: `${AEAT_QR_BASE}/ValidarQR`,
   no_verifactu: `${AEAT_QR_BASE}/ValidarQRNoVerifactu`,
@@ -76,6 +100,7 @@ export const construirUrlQrTributario = (datos: {
   fechaEmision: string;
   totalCents: number;
   modalidad: FiscalPdfData['modalidad'];
+  entorno?: FiscalPdfData['entorno'];
 }): string => {
   const params = new URLSearchParams({
     nif: datos.nif || '',
@@ -83,7 +108,10 @@ export const construirUrlQrTributario = (datos: {
     fecha: fechaParaQr(datos.fechaEmision),
     importe: (datos.totalCents / 100).toFixed(2),
   });
-  return `${AEAT_QR_SERVICIO[datos.modalidad]}?${params.toString()}`;
+  const servicio = datos.entorno === 'pruebas' && datos.modalidad === 'verifactu'
+    ? AEAT_QR_VALIDAR_PRUEBAS
+    : AEAT_QR_SERVICIO[datos.modalidad];
+  return `${servicio}?${params.toString()}`;
 };
 
 async function buildInvoiceQrDataUrl(profile: Profile, invoice: Invoice, fiscal: FiscalPdfData): Promise<string> {
@@ -93,6 +121,7 @@ async function buildInvoiceQrDataUrl(profile: Profile, invoice: Invoice, fiscal:
     fechaEmision: invoice.issue_date,
     totalCents: fiscal.importeTotalCents ?? invoice.total_cents,
     modalidad: fiscal.modalidad,
+    entorno: fiscal.entorno,
   });
   // Nivel de corrección M e ISO/IEC 18004, como exige la Orden HAC/1177/2024.
   return QRCode.toDataURL(qrUrl, { errorCorrectionLevel: 'M', margin: 2, width: 400 });

@@ -17,7 +17,7 @@ import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIco
 import { useToast } from '@/hooks/useToast';
 import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal';
 import CreateRecurringInvoiceModal from '@/components/modals/CreateRecurringInvoiceModal';
-import { generateInvoicePdf, generateInvoicePdfBase64 } from '@/services/pdfService';
+import { datosFiscalesPdf, generateInvoicePdf, generateInvoicePdfBase64 } from '@/services/pdfService';
 import { sendEmail, sendDocumentEmail } from '@/services/emailService';
 import { confirmar } from '@/hooks/useConfirmar';
 
@@ -442,9 +442,9 @@ const handleSelectBudget = (budgetId: string) => {
   // Busca el registro fiscal (huella) de esta factura, si el cumplimiento
   // Veri*Factu está activo — se usa para pintar el QR tributario en el PDF.
   const getFiscalDataForInvoice = (invoiceId: string) => {
-    const record = fiscalRecords.find(r => r.invoice_id === invoiceId && r.record_type === 'alta');
-    if (!record) return null;
-    return { modalidad: record.modalidad, hash: record.hash, nifEmisor: record.nif_emisor, importeTotalCents: record.importe_total_cents };
+    // El último alta (si se subsanó, el reenviado). Sin entorno = registro interno: sin QR.
+    const altas = fiscalRecords.filter(r => r.invoice_id === invoiceId && r.record_type === 'alta');
+    return datosFiscalesPdf(altas[altas.length - 1]);
   };
 
   // Genera y descarga el PDF de la factura usando el servicio ya existente en el proyecto
