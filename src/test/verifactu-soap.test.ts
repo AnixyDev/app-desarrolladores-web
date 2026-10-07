@@ -7,16 +7,23 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { sobreSoap, leerRespuesta, lineaDe, ESTADO_GUARDADO } from '../../supabase/functions/_shared/verifactu-soap';
+import { sobreSoap, leerRespuesta, lineaDe, resultadoDeLinea, ESTADO_GUARDADO } from '../../supabase/functions/_shared/verifactu-soap';
 
 const NS_R = 'https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/RespuestaSuministro.xsd';
 const NS_I = 'https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd';
 
-const linea = (num: string, op: string, estado: string, error?: [string, string]) =>
+const linea = (num: string, op: string, estado: string, error?: [string, string], duplicado?: string) =>
   `<tikR:RespuestaLinea><tikR:IDFactura><tik:IDEmisorFactura>74870299D</tik:IDEmisorFactura><tik:NumSerieFactura>${num}</tik:NumSerieFactura><tik:FechaExpedicionFactura>07-10-2026</tik:FechaExpedicionFactura></tikR:IDFactura>`
   + `<tikR:Operacion><tik:TipoOperacion>${op}</tik:TipoOperacion></tikR:Operacion><tikR:EstadoRegistro>${estado}</tikR:EstadoRegistro>`
   + (error ? `<tikR:CodigoErrorRegistro>${error[0]}</tikR:CodigoErrorRegistro><tikR:DescripcionErrorRegistro>${error[1]}</tikR:DescripcionErrorRegistro>` : '')
+  + (duplicado ?? '')
   + '</tikR:RespuestaLinea>';
+
+// Duplicado tal como lo devolvió la AEAT de pruebas el 07/10/2026 (batería, paso 2).
+const duplicado = (estado: string, error?: [string, string]) =>
+  `<tikR:RegistroDuplicado><tik:IdPeticionRegistroDuplicado>20261007121511822032</tik:IdPeticionRegistroDuplicado><tik:EstadoRegistroDuplicado>${estado}</tik:EstadoRegistroDuplicado>`
+  + (error ? `<tik:CodigoErrorRegistro>${error[0]}</tik:CodigoErrorRegistro><tik:DescripcionErrorRegistro>${error[1]}</tik:DescripcionErrorRegistro>` : '')
+  + '</tikR:RegistroDuplicado>';
 
 const RESPUESTA = `<tikR:RespuestaRegFactuSistemaFacturacion xmlns:tikR="${NS_R}" xmlns:tik="${NS_I}">`
   + '<tikR:CSV>A-ABCDEF123456</tikR:CSV>'
@@ -26,6 +33,8 @@ const RESPUESTA = `<tikR:RespuestaRegFactuSistemaFacturacion xmlns:tikR="${NS_R}
   + linea('F-2', 'Alta', 'AceptadoConErrores', ['1104', 'El NIF del destinatario no está identificado &amp; revisado'])
   + linea('F-3', 'Alta', 'Incorrecto', ['1100', 'Valor o tipo incorrecto'])
   + linea('F-2', 'Anulacion', 'Correcto')
+  + linea('F-4', 'Alta', 'Incorrecto', ['3000', 'Registro de facturación duplicado.'], duplicado('AceptadaConErrores', ['2007', 'No debe informarse como primer registro.']))
+  + linea('F-5', 'Alta', 'Incorrecto', ['3000', 'Registro de facturación duplicado.'], duplicado('Correcta'))
   + '</tikR:RespuestaRegFactuSistemaFacturacion>';
 
 const hayXmllint = (() => { try { execFileSync('xmllint', ['--version'], { stdio: 'ignore' }); return true; } catch { return false; } })();
@@ -49,7 +58,7 @@ describe('respuesta de la AEAT', () => {
     expect(r.csv).toBe('A-ABCDEF123456');
     expect(r.estadoEnvio).toBe('ParcialmenteCorrecto');
     expect(r.esperaSegundos).toBe(60);
-    expect(r.lineas).toHaveLength(4);
+    expect(r.lineas).toHaveLength(6);
     expect(r.lineas[1]).toMatchObject({ numSerie: 'F-2', estado: 'AceptadoConErrores', codigoError: '1104' });
     expect(r.lineas[1].descripcionError).toContain('& revisado');
   });
@@ -60,6 +69,20 @@ describe('respuesta de la AEAT', () => {
     expect(lineaDe(r.lineas, { record_type: 'anulacion', numero_factura: 'F-2' })?.estado).toBe('Correcto');
     expect(lineaDe(r.lineas, { record_type: 'alta', numero_factura: 'F-2' })?.estado).toBe('AceptadoConErrores');
     expect(ESTADO_GUARDADO.Incorrecto).toBe('rechazado');
+  });
+
+  it('duplicado (3000): la AEAT ya lo tiene; se guarda como lo tiene ella, no como rechazado', () => {
+    const r = leerRespuesta(RESPUESTA);
+    if (r.tipo !== 'respuesta') throw new Error('debería ser respuesta');
+    const conErrores = lineaDe(r.lineas, { record_type: 'alta', numero_factura: 'F-4' })!;
+    // Los códigos del original no se confunden con los de la línea.
+    expect(conErrores).toMatchObject({ codigoError: '3000', duplicado: { estado: 'AceptadaConErrores', codigoError: '2007' } });
+    expect(resultadoDeLinea(conErrores)).toMatchObject({ estado: 'aceptado_con_errores', codigoError: '2007' });
+    const correcta = lineaDe(r.lineas, { record_type: 'alta', numero_factura: 'F-5' })!;
+    expect(resultadoDeLinea(correcta)).toEqual({ estado: 'aceptado', codigoError: null, descripcionError: null });
+    // Un rechazo normal sigue siendo rechazo.
+    expect(resultadoDeLinea(lineaDe(r.lineas, { record_type: 'alta', numero_factura: 'F-3' })!).estado).toBe('rechazado');
+    expect(lineaDe(r.lineas, { record_type: 'alta', numero_factura: 'F-1' })!.duplicado).toBeNull();
   });
 
   it('un SoapFault rechaza el envío entero y se lee su código', () => {

@@ -63,3 +63,20 @@ Desde una Edge Function de Supabase (`supabase-edge-runtime-1.77.0`, compatible 
 
 Conclusión: **el envío puede vivir en Supabase**; no hace falta un servidor aparte.
 La función temporal `aeat-prueba-conexion` quedó desactivada (responde 410) y se puede borrar desde el panel.
+
+## Fase 3: lo que hace de verdad la AEAT de pruebas (07/10/2026)
+
+Batería `verifactu-bateria` (registros generados con las funciones reales de
+la base de datos), 31 registros en 5 envíos con el certificado FNMT de Ana:
+
+| Caso | Respuesta de la AEAT | Qué hace la app |
+|---|---|---|
+| F1 nacional 21 %, con y sin IRPF; empresa UE (N2, IDOtro 02); fuera de la UE empresa (N2, 04) y particular (N2, 03); F2 simplificada; R1 abono total; R5; anulación | **Correcto** | — |
+| NIF del cliente con letra correcta pero **fuera del censo** | **Incorrecto 1239** (rechazo) | Botón «Corregir y reenviar»: alta nueva con `Subsanacion=S` y `RechazoPrevio=X` → **Correcto** |
+| Alta ya aceptada que se reenvía corregida | — | `Subsanacion=S` (sin RechazoPrevio) → **Correcto** |
+| Reenvío de un alta que la AEAT ya tiene (respuesta perdida) | **Incorrecto 3000** + bloque `RegistroDuplicado` con el estado del original (`Correcta`, `AceptadaConErrores`, `Anulada`) | Se guarda el estado del original, no «rechazado» |
+| Anular una factura que la AEAT no tiene | **Incorrecto 3002** | `SinRegistroPrevio=S` → **Correcto** |
+| `PrimerRegistro=S` cuando la AEAT ya tiene registros de ese NIF y sistema | **AceptadoConErrores 2007** | Solo pasa si la cadena se reinicia (no debe pasar) |
+| Cuota de IVA mal calculada (30 € sobre 100 € al 21 %) | **Correcto** (¡no la valida!) | La cuota la calcula siempre la base de datos |
+
+Tiempo de espera entre envíos devuelto: 60 s.

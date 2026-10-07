@@ -92,7 +92,7 @@ const ESQUEMA = {
  tasks:"id=t,user_id=t,project_id=t,description=t,status=t?,invoice_id=t?,created_at=d?",
  team_members:"id=t,user_id=t,name=t,email=t,role=t,status=t,invited_on=d?,hourly_rate_cents=i?,created_at=d?,accepted_user_id=t?",
  time_entries:"id=t,user_id=t,project_id=t,description=t?,start_time=d,end_time=d?,duration_seconds=i,invoice_id=t?,created_at=d?,logged_by=t?",
- fiscal_records:"id=t,user_id=t,invoice_id=t,record_type=t,nif_emisor=t,nombre_emisor=t,numero_factura=t,fecha_expedicion=d,tipo_factura=t,importe_total_cents=i,hash_anterior=t?,hash=t,hash_input=t,modalidad=t,estado_envio=t,created_at=d,cuota_total_cents=i?,fecha_hora_huso=t?,orden=i?",
+ fiscal_records:"id=t,user_id=t,invoice_id=t,record_type=t,nif_emisor=t,nombre_emisor=t,numero_factura=t,fecha_expedicion=d,tipo_factura=t,importe_total_cents=i,hash_anterior=t?,hash=t,hash_input=t,modalidad=t,estado_envio=t,created_at=d,cuota_total_cents=i?,fecha_hora_huso=t?,orden=i?,registro=j,envio_intentos=i,envio_ultimo_intento=d?,envio_error_codigo=t?,envio_error_descripcion=t?,envio_aceptado_en=d?,subsana_registro_id=t?",
  job_applications:"id=t,job_id=t,applicant_id=t,status=t?,created_at=d?",
  referrals:"id=t,referrer_id=t,referred_user_id=t,referred_user_name=t?,join_date=d?,status=t?,commission_cents=i?,created_at=d?,user_id=t?,stripe_session_id=t?",
  comisiones_afiliado:"id=t,referral_id=t,referrer_id=t,stripe_invoice_id=t,base_cents=i,comision_cents=i,created_at=d,pago_id=t?",

@@ -89,6 +89,8 @@ export interface FiscalRecord {
   envio_error_codigo?: string | null;
   envio_error_descripcion?: string | null;
   envio_aceptado_en?: string | null;
+  /** Fase 3: el registro de alta que este subsana (se reenvió tras corregir los datos). */
+  subsana_registro_id?: string | null;
 }
 
 export interface Client {

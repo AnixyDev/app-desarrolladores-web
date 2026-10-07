@@ -54,6 +54,8 @@ export interface FinanceSlice {
   fetchReceipts: () => Promise<void>;
   fetchFiscalRecords: () => Promise<void>;
   verifyFiscalChain: () => Promise<{ valid: boolean; brokenAt?: string }>;
+  /** Vuelve a enviar a la AEAT un registro rechazado (o con errores) tras corregir los datos. */
+  subsanarRegistroFiscal: (registroId: string) => Promise<void>;
   updateVeriFactuSettings: (enabled: boolean, modality: 'verifactu' | 'no_verifactu') => Promise<void>;
 
   addInvoice: (invoiceData: NewInvoiceInput, timeEntryIdsToBill?: string[]) => Promise<void>;
@@ -199,6 +201,19 @@ export const createFinanceSlice: StateCreator<AppState, [], [], FinanceSlice> = 
 
     const broken = (data || []).find((r: any) => !r.is_valid);
     return broken ? { valid: false, brokenAt: broken.numero_factura } : { valid: true };
+  },
+
+  // Fase 3 de Verifactu: la AEAT rechazó el registro (casi siempre por un dato
+  // del cliente, p. ej. NIF fuera del censo). El usuario corrige la ficha y
+  // aquí se genera un registro nuevo de la misma factura, marcado como
+  // subsanación, que verifactu-enviar manda en el minuto siguiente.
+  subsanarRegistroFiscal: async (registroId) => {
+    const { data, error } = await supabase.rpc('subsanar_registro_fiscal', { p_registro_id: registroId });
+    if (error) {
+      console.error('Error corrigiendo el registro fiscal:', error);
+      throw new Error(error.message);
+    }
+    set(state => ({ fiscalRecords: [...state.fiscalRecords, data as FiscalRecord] }));
   },
 
   updateVeriFactuSettings: async (enabled, modality) => {
