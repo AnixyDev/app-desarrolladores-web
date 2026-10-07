@@ -482,3 +482,6 @@ verify_jwt = false
 
 [functions.weekly-profitability-alert]
 verify_jwt = false
+
+[functions.verifactu-enviar]
+verify_jwt = false

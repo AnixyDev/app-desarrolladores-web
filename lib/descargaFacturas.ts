@@ -45,7 +45,7 @@ export async function archivosDeFacturas(p: DatosZipFacturas): Promise<{ archivo
     p.alAvanzar?.(i, p.facturas.length);
     if (!c) { sinCliente.push(f.invoice_number); continue; }
     const registro = p.registrosFiscales.find(r => r.invoice_id === f.id && r.record_type === 'alta');
-    const b64 = await generateInvoicePdfBase64(f, c, p.perfil, registro ? { modalidad: registro.modalidad, hash: registro.hash } : null, {
+    const b64 = await generateInvoicePdfBase64(f, c, p.perfil, registro ? { modalidad: registro.modalidad, hash: registro.hash, nifEmisor: registro.nif_emisor, importeTotalCents: registro.importe_total_cents } : null, {
       rectificaA: p.facturas.find(o => o.id === f.rectifies_invoice_id)?.invoice_number,
     });
     let nombre = `facturas/${nombreSeguro(f.invoice_number)}.pdf`;

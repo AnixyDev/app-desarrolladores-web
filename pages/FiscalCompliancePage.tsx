@@ -11,6 +11,7 @@ import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import { ShieldCheckIcon, RefreshCwIcon, DownloadIcon } from '@/components/icons/Icon';
 import { formatCurrency, formatearFecha } from '@/lib/utils';
+import { estadoEnvio } from '@/lib/verifactu/estadoEnvio';
 
 const FiscalCompliancePage: React.FC = () => {
   const { fiscalRecords, profile, verifyFiscalChain } = useAppStore(useShallow(s => ({ fiscalRecords: s.fiscalRecords, profile: s.profile, verifyFiscalChain: s.verifyFiscalChain })));
@@ -19,7 +20,8 @@ const FiscalCompliancePage: React.FC = () => {
   const [verifyResult, setVerifyResult] = useState<{ valid: boolean; brokenAt?: string } | null>(null);
 
   const sortedRecords = useMemo(
-    () => [...fiscalRecords].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    // En orden de cadena: varios registros de la misma operación comparten created_at.
+    () => [...fiscalRecords].sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0) || new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
     [fiscalRecords]
   );
 
@@ -119,7 +121,18 @@ const FiscalCompliancePage: React.FC = () => {
                       <td className="p-3 text-gray-400 whitespace-nowrap">{formatearFecha(r.fecha_expedicion)}</td>
                       <td className="p-3 text-right text-white">{formatCurrency(r.importe_total_cents)}</td>
                       <td className="p-3 text-gray-400 capitalize">{r.modalidad.replace('_', ' ')}</td>
-                      <td className="p-3 text-gray-400 capitalize">{r.estado_envio.replace(/_/g, ' ')}</td>
+                      <td className="p-3 align-top">
+                        {(() => {
+                          const e = estadoEnvio(r);
+                          return (
+                            <div className="space-y-1 max-w-[260px]">
+                              <span className={`inline-block px-2 py-0.5 rounded-full text-xs whitespace-nowrap ${e.clase}`}>{e.texto}</span>
+                              {e.detalle && <p className="text-xs text-gray-400 break-words">{e.detalle}</p>}
+                              {r.csv_respuesta_aeat && <p className="text-xs text-gray-500 font-mono" title="Código seguro de verificación del envío">CSV {r.csv_respuesta_aeat}</p>}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="p-3 font-mono text-xs text-gray-500 max-w-[160px] truncate" title={r.hash}>{r.hash}</td>
                     </tr>
                   ))}

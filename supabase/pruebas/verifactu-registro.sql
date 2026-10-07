@@ -1,4 +1,4 @@
--- Verifactu, fase 1: registro de facturación con el formato oficial (07/10/2026).
+-- Verifactu, fases 1 y 2: registro de facturación con el formato oficial (07/10/2026).
 --
 -- CÓMO SE LANZA: pégalo entero en el editor SQL de Supabase, o
 --   supabase db query --file supabase/pruebas/verifactu-registro.sql
@@ -162,13 +162,24 @@ begin
 
   execute 'reset role';
 
-  -- 15) Si alguien manipula un registro, la cadena lo detecta.
+  -- 15) Ni el servidor puede cambiar la huella ni el contenido (fase 2).
+  begin
+    update public.fiscal_records set hash = 'X' where invoice_id = f1;
+    v_res := v_res || E'\n  FALLA 15) el servidor ha cambiado una huella'; v_f := v_f + 1;
+  exception when insufficient_privilege then
+    v_res := v_res || E'\n  OK    15) ni el servidor puede cambiar una huella';
+  end;
+  update public.fiscal_records set estado_envio = 'aceptado', envio_intentos = 1 where invoice_id = f1;
+
+  -- 16) Si alguien manipula un registro saltándose todo, la cadena lo detecta.
+  set local session_replication_role = replica;
   update public.fiscal_records set hash_input = replace(hash_input, 'Desarrollo', 'X'), importe_total_cents = 1 where invoice_id = f1;
   update public.fiscal_records set hash = 'A' || substr(hash, 2) where invoice_id = f3;
+  set local session_replication_role = origin;
   perform set_config('request.jwt.claims', json_build_object('sub', v_yo, 'role', 'authenticated')::text, true);
   select count(*) into v_n from public.verify_fiscal_chain(v_yo) where not is_valid;
-  if v_n >= 1 then v_res := v_res || E'\n  OK    15) una huella manipulada se detecta';
-  else v_res := v_res || E'\n  FALLA 15) no se detecta la manipulación'; v_f := v_f + 1; end if;
+  if v_n >= 1 then v_res := v_res || E'\n  OK    16) una huella manipulada se detecta';
+  else v_res := v_res || E'\n  FALLA 16) no se detecta la manipulación'; v_f := v_f + 1; end if;
 
   raise exception E'VERIFACTU REGISTRO — % fallo(s)\n%\n\n(la transaccion se ha deshecho: no queda nada de esta prueba)', v_f, v_res;
 end $$;
