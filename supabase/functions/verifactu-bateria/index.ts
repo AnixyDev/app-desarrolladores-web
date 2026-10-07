@@ -7,8 +7,8 @@
 // (verifactu_bateria_de_prueba, que lo deshace todo) y aquí se envían en pasos,
 // con el certificado de la cuenta de administración:
 //   paso 1: un registro por caso real (nacional, IRPF, UE, fuera de la UE,
-//           particular, simplificada, NIF fuera del censo, rectificativas R1 y
-//           R5, anulación) y uno estropeado a propósito (cuota mal calculada);
+//           particular, simplificada, NIF fuera del censo, rectificativas R1, R4
+//           y R5, anulación) y uno estropeado a propósito (cuota mal calculada);
 //   paso 2: duplicado, subsanación del rechazado, subsanación de uno aceptado y
 //           anulación de una factura que la AEAT no tiene, tal como los genera
 //           la base de datos (subsanar_registro_fiscal, generate_fiscal_cancellation).
@@ -49,7 +49,7 @@ function caso(registros: Generado[], nombre: string): Generado {
 function registrosDelPaso(paso: number, g: Generado[]): AEnviar[] {
   if (paso === 1) {
     const normales = ['nacional_21', 'nacional_21_irpf', 'empresa_ue_sin_iva', 'fuera_ue_empresa', 'fuera_ue_particular',
-      'simplificada', 'nif_fuera_de_censo', 'rectificativa_r1_abono_total', 'rectificativa_r5']
+      'simplificada', 'nif_fuera_de_censo', 'rectificativa_r1_abono_total', 'rectificativa_r5', 'rectificativa_r4']
       .map((n) => ({ ...caso(g, n), etiqueta: n }));
     const mal = caso(g, 'para_rechazo');
     mal.registro.Desglose[0].CuotaRepercutida = '30.00';

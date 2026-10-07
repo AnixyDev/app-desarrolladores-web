@@ -67,8 +67,8 @@ begin
   select * into v_arch from public.archivo_fiscal_cuentas_eliminadas where user_id = v_u;
   if found and jsonb_array_length(v_arch.facturas) = 1 and jsonb_array_length(v_arch.registros_fiscales) = 1
      and jsonb_array_length(v_arch.cobros) = 1 and v_arch.clientes->0->>'tax_id' = 'B00000000'
-     and v_arch.emisor->>'nif' = '00000000T' and v_arch.conservar_hasta = make_date(extract(year from current_date)::int + 4, 12, 31)
-  then v_res := v_res || E'\nOK  2 facturas, registro fiscal, cobro y cliente archivados 4 años';
+     and v_arch.emisor->>'nif' = '00000000T' and v_arch.conservar_hasta = make_date(extract(year from current_date)::int + 6, 12, 31)
+  then v_res := v_res || E'\nOK  2 facturas, registro fiscal, cobro y cliente archivados 6 años';
   else v_res := v_res || E'\nMAL 2 archivo fiscal incompleto'; v_fallos := v_fallos + 1; end if;
 
   -- 3) lo ajeno sigue, desenganchado

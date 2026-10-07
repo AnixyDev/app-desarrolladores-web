@@ -1,4 +1,5 @@
 import { useToast } from '@/hooks/useToast';
+import type { CausaRectificacion } from '@/lib/verifactu/causaRectificacion';
 import { StateCreator } from 'zustand';
 import {
   Invoice,
@@ -62,7 +63,7 @@ export interface FinanceSlice {
   /** Editar una factura SIN registro fiscal (las bloqueadas se rectifican). */
   updateInvoice: (id: string, cambios: InvoiceEditInput) => Promise<void>;
   /** Factura rectificativa por diferencias. Sin líneas = abono total (anulación). */
-  rectificarFactura: (id: string, items: InvoiceItem[], motivo: string) => Promise<Invoice>;
+  rectificarFactura: (id: string, items: InvoiceItem[], motivo: string, causa: CausaRectificacion) => Promise<Invoice>;
   deleteInvoice: (id: string) => Promise<void>;
   /** Activa o desactiva los recordatorios de cobro automáticos de una factura. */
   cambiarRecordatoriosFactura: (id: string, activos: boolean) => Promise<void>;
@@ -326,11 +327,13 @@ addInvoice: async (invoiceData, timeEntryIdsToBill) => {
 
   // Rectificativa "por diferencias" (ver la migración facturas_rectificativas):
   // la hace la base de datos, que numera en la serie R y marca la original.
-  rectificarFactura: async (id, items, motivo) => {
-    const { data, error } = await supabase.rpc('crear_factura_rectificativa', {
+  // La causa decide si el registro de Hacienda es R1 o R4 (gestoría, 07/10/2026).
+  rectificarFactura: async (id, items, motivo, causa) => {
+    const { data, error } = await supabase.rpc('crear_factura_rectificativa_causa', {
       p_factura: id,
       p_items: items.map(i => ({ description: i.description, quantity: i.quantity, price_cents: i.price_cents })),
       p_motivo: motivo,
+      p_causa: causa,
     });
     if (error) { console.error('Error creando la rectificativa:', error); throw new Error(error.message); }
     let nueva = data as Invoice;

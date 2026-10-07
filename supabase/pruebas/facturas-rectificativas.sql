@@ -86,10 +86,11 @@ begin
     v_res := v_res || E'\n  OK    6) la misma factura no se rectifica dos veces';
   end;
 
-  -- 7) Registro fiscal de la rectificativa: tipo R1.
+  -- 7) Registro fiscal de la rectificativa sin causa elegida: R4, la opción
+  --    residual (desde el 07/10/2026 la app siempre pide la causa).
   perform public.generate_fiscal_record(v_r.id);
   select tipo_factura into v_txt from public.fiscal_records where invoice_id = v_r.id and record_type = 'alta';
-  if v_txt = 'R1' then v_res := v_res || E'\n  OK    7) registro fiscal de tipo R1';
+  if v_txt = 'R4' then v_res := v_res || E'\n  OK    7) rectificativa sin causa: registro de tipo R4';
   else v_res := v_res || E'\n  FALLA 7) tipo ' || coalesce(v_txt, 'null'); v_f := v_f + 1; end if;
 
   -- 8) Rectificar la rectificativa sin líneas = abono total de ella.

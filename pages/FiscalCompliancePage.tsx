@@ -57,7 +57,7 @@ const FiscalCompliancePage: React.FC = () => {
 
   // Exporta el registro completo tal cual — cumple con el requisito de
   // poder poner los registros a disposición de la Administración si se
-  // solicitan (se deben conservar 4 años).
+  // solicitan (se conservan 6 años).
   const handleExport = () => {
     const payload = {
       exportado_en: new Date().toISOString(),

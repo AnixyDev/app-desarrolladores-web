@@ -57,7 +57,7 @@ export async function borrarClienteConConfirmacion(d: DatosBorrarCliente): Promi
       titulo: 'Este cliente no se puede borrar',
       mensaje:
         `${d.cliente.name} tiene ${plural(d.facturas.length, 'factura emitida', 'facturas emitidas')}, y las facturas ` +
-        'hay que conservarlas (en España, al menos 4 años). Siguen guardadas aquí; si quieres tu propia copia, descárgalas. ' +
+        'hay que conservarlas (en España, hasta 6 años). Siguen guardadas aquí; si quieres tu propia copia, descárgalas. ' +
         'Si solo quieres corregir sus datos, edita la ficha.',
       textoConfirmar: 'Descargar sus facturas',
       textoCancelar: 'Cerrar',
