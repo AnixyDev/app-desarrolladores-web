@@ -2,7 +2,7 @@
 //
 // Regla de esta página: solo lo que es cierto HOY y se puede comprobar en el
 // código o en producción. Lo que falta se dice que falta (Verifactu). La
-// declaración responsable del RD 1007/2023 NO se publica hasta que el
+// declaración responsable del RD 1007/2023 (/declaracion-responsable) NO se publica hasta que el
 // software cumpla entero: firmarla antes sería declarar algo falso
 // (art. 201 bis LGT, 150.000 € por ejercicio al productor).
 import React from 'react';
@@ -10,7 +10,7 @@ import { Link } from 'react-router-dom';
 import PaginaLegal, { Lista, Seccion } from '@/components/legal/PaginaLegal';
 import { DATOS_LEGALES as D } from '@/lib/datosLegales';
 
-export const FECHA_GARANTIAS = '6 de octubre de 2026';
+export const FECHA_GARANTIAS = '7 de octubre de 2026';
 
 const Estado: React.FC<{ hecho: boolean; children: React.ReactNode }> = ({ hecho, children }) => (
   <li className="flex gap-3">
@@ -83,13 +83,14 @@ const GarantiasPage: React.FC = () => (
         <Estado hecho>Cada factura genera un registro con huella digital (SHA-256) encadenada a la anterior.</Estado>
         <Estado hecho>El PDF lleva el código QR de verificación de la Agencia Tributaria.</Estado>
         <Estado hecho>Bloqueo de facturas emitidas, rectificativas y comprobación de la cadena de registros.</Estado>
-        <Estado hecho={false}>Firma electrónica de cada registro y registro de eventos del sistema (modalidad «No Veri*Factu»).</Estado>
-        <Estado hecho={false}>Envío automático de cada registro a la Agencia Tributaria (modalidad «Veri*Factu»).</Estado>
+        <Estado hecho>Envío automático de cada registro con tu certificado digital, probado con todos los tipos de factura en el entorno de pruebas de la Agencia Tributaria.</Estado>
+        <Estado hecho>Solo modalidad VERI*FACTU: cada registro se envía a la Agencia Tributaria, que lo custodia.</Estado>
+        <Estado hecho={false}>Envío a la Agencia Tributaria real y declaración responsable firmada.</Estado>
       </ul>
       <p>
-        La ley pide al fabricante del programa una <strong>declaración responsable</strong> de que cumple. La publicaremos
-        en esta página cuando el programa cumpla entero, no antes. Estamos trabajando para tenerlo antes de que sea
-        obligatorio y lo anunciaremos aquí.
+        La ley pide al fabricante del programa una <strong>declaración responsable</strong> de que cumple. Se publicará en{' '}
+        <Link to="/declaracion-responsable">esta página</Link> cuando esté firmada, y entonces se activará el envío a la
+        Agencia Tributaria real. Lo anunciaremos aquí.
       </p>
       <p>
         Mientras tanto, si tu actividad te obliga a cumplir ya, consúltalo con tu gestoría. Y recuerda que puedes exportar tus

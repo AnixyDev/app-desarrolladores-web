@@ -57,6 +57,8 @@ export interface Profile {
   // fecha límite (autónomos: 1 julio 2027).
   veri_factu_enabled?: boolean;
   veri_factu_modality?: 'verifactu' | 'no_verifactu';
+  /** Adónde se envían sus registros (lo cambia solo el servidor). Fase 4 de Verifactu. */
+  verifactu_entorno?: 'sin_envio' | 'pruebas' | 'produccion';
 }
 
 export interface FiscalRecord {
@@ -91,6 +93,8 @@ export interface FiscalRecord {
   envio_aceptado_en?: string | null;
   /** Fase 3: el registro de alta que este subsana (se reenvió tras corregir los datos). */
   subsana_registro_id?: string | null;
+  /** Fase 4: entorno de la AEAT al que va (null = registro interno, no se envía). */
+  entorno?: 'pruebas' | 'produccion' | null;
 }
 
 export interface Client {

@@ -3,7 +3,7 @@
 // Mismos PDFs que Facturas → Descargar (con su QR tributario) y un CSV
 // resumen para abrir en una hoja de cálculo.
 import type { Invoice, Client, Profile, FiscalRecord } from '@/types';
-import { generateInvoicePdfBase64 } from '@/services/pdfService';
+import { datosFiscalesPdf, generateInvoicePdfBase64 } from '@/services/pdfService';
 import { crearZip, type ArchivoZip } from '@/lib/zip';
 
 const base64ABytes = (b64: string) => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
@@ -44,8 +44,8 @@ export async function archivosDeFacturas(p: DatosZipFacturas): Promise<{ archivo
     const c = p.cliente(f.client_id);
     p.alAvanzar?.(i, p.facturas.length);
     if (!c) { sinCliente.push(f.invoice_number); continue; }
-    const registro = p.registrosFiscales.find(r => r.invoice_id === f.id && r.record_type === 'alta');
-    const b64 = await generateInvoicePdfBase64(f, c, p.perfil, registro ? { modalidad: registro.modalidad, hash: registro.hash, nifEmisor: registro.nif_emisor, importeTotalCents: registro.importe_total_cents } : null, {
+    const altas = p.registrosFiscales.filter(r => r.invoice_id === f.id && r.record_type === 'alta');
+    const b64 = await generateInvoicePdfBase64(f, c, p.perfil, datosFiscalesPdf(altas[altas.length - 1]), {
       rectificaA: p.facturas.find(o => o.id === f.rectifies_invoice_id)?.invoice_number,
     });
     let nombre = `facturas/${nombreSeguro(f.invoice_number)}.pdf`;

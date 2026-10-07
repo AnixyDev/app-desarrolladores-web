@@ -53,12 +53,14 @@ CHROMIUM_PARA_PRUEBAS=/opt/pw-browsers/chromium node scripts/smoke-paginas.mjs
 - Importes siempre en **céntimos** (`*_cents`).
 - El build de prueba necesita las VITE_ falsas de arriba o la app no arranca.
 
-## Verifactu (estado: fases 0-3 hechas; siguiente fase 4)
+## Verifactu (estado: fases 0-3 hechas; fase 4 preparada, sin firmar ni activar)
 Plan completo en el doc del proyecto `claude/plan-verifactu.md`.
 - Solo modalidad VERI*FACTU, con el certificado de cada usuario (`_shared/verifactu-certificado.ts`).
 - Registro oficial en `fiscal_records.registro` (jsonb con nombres del XSD); huella SHA-256 mayúsculas; cadena por `orden`. Registros **inmutables** salvo campos `envio_*`, `estado_envio`, `csv_respuesta_aeat`.
 - XML: `_shared/verifactu-xml.ts` · SOAP/respuesta: `_shared/verifactu-soap.ts` · envío: función `verifactu-enviar` (cron cada minuto; `{"modo":"prueba"}` manda registros de prueba sin guardarlos).
-- `VERIFACTU_ENTORNO` sin definir = **pruebas** (prewww1.aeat.es). Producción solo en fase 4.
+- Solo VERI*FACTU (No Veri*Factu eliminado). Envío por cuenta: `profiles.verifactu_entorno` (`sin_envio` por defecto · `pruebas` · `produccion`), lo cambia SOLO el servidor con `verifactu_cambiar_entorno(user, entorno)` (exige NIF y certificado). Cada registro guarda su `entorno` (null = interno, no se envía, sin QR); cada entorno tiene su propia cadena (al encender: PrimerRegistro=S).
+- AEAT real: además hace falta el secreto `VERIFACTU_PRODUCCION_PERMITIDA=si` en las funciones; sin él, los registros de producción esperan.
+- Declaración responsable: `lib/verifactu/declaracionResponsable.ts` (`firmada: false` = borrador, solo lo ve Admin en /declaracion-responsable).
 - ImporteTotal = base + IVA (sin IRPF). F1 con destinatario; F2 sin identificar ≤ 400 €; rectificativas por diferencias según la causa que elige el usuario (descuento/cancelación/error de IVA → R1; otro → R4; de una F2 → R5); S1 o N2.
 - Cada envío a la AEAT se guarda entero en `verifactu_envios` (inmutable; `fiscal_records.envio_id`). Conservación tras la baja: 6 años.
 - Batería contra la AEAT de pruebas: función `verifactu-bateria` (paso 1 y 2, sufijo nuevo cada vez, encadenando con `ultimo`).

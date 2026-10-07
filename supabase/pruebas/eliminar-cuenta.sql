@@ -26,7 +26,7 @@ begin
   insert into public.invoices (user_id, client_id, invoice_number, issue_date, due_date, items, subtotal_cents, tax_percent, total_cents, paid, fiscal_locked)
   values (v_u, v_cli, 'INV-2026-0001', '2026-09-01', '2026-10-01', '[]', 10000, 21, 12100, false, true) returning id into v_fac;
   insert into public.fiscal_records (user_id, invoice_id, record_type, tipo_factura, numero_factura, fecha_expedicion, importe_total_cents, nif_emisor, nombre_emisor, hash, hash_input, modalidad, estado_envio)
-  values (v_u, v_fac, 'alta', 'F1', 'INV-2026-0001', '2026-09-01', 12100, '00000000T', 'Baja Prueba SL', 'x', 'x', 'no_verifactu', 'no_aplica');
+  values (v_u, v_fac, 'alta', 'F1', 'INV-2026-0001', '2026-09-01', 12100, '00000000T', 'Baja Prueba SL', 'x', 'x', 'verifactu', 'no_aplica');
   insert into public.payments (user_id, invoice_id, amount_cents, paid_at) values (v_u, v_fac, 5000, now());
   insert into public.budgets (user_id, client_id, description) values (v_u, v_cli, 'Presupuesto');
   insert into public.tasks (user_id, project_id, description) values (v_u, v_proy, 'Tarea');
