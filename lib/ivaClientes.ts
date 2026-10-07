@@ -28,10 +28,23 @@ export const MENCIONES_SIN_IVA: Record<MotivoSinIva, string> = {
     'Inversión del sujeto pasivo. Operación no sujeta al IVA español (art. 69.Uno.1º Ley 37/1992); el IVA lo liquida el destinatario.',
   no_sujeta_fuera_ue:
     'Operación no sujeta al IVA español por reglas de localización (art. 69.Uno.1º Ley 37/1992).',
+  // Particular de fuera de la UE: la regla es la del art. 69.Dos (servicios
+  // de consultoría, ingeniería, informáticos y electrónicos), no la de empresas.
+  no_sujeta_fuera_ue_particular:
+    'Operación no sujeta al IVA español por reglas de localización (art. 69.Dos Ley 37/1992).',
 };
 
 export const esClienteExtranjero = (tipo?: TipoFiscalCliente | null): boolean =>
   tipo === 'empresa_ue' || tipo === 'fuera_ue';
+
+/** El mismo motivo que pone la base de datos (invoices_validar_motivo_sin_iva) para una factura sin IVA. */
+export const motivoSinIvaDeCliente = (
+  cliente?: { tipo_fiscal?: TipoFiscalCliente | null; es_particular?: boolean | null } | null,
+): MotivoSinIva | null => {
+  if (cliente?.tipo_fiscal === 'empresa_ue') return 'inversion_sujeto_pasivo_ue';
+  if (cliente?.tipo_fiscal === 'fuera_ue') return cliente.es_particular ? 'no_sujeta_fuera_ue_particular' : 'no_sujeta_fuera_ue';
+  return null;
+};
 
 /** Mención legal a imprimir en la factura, o null si lleva IVA o no hay motivo. */
 export const mencionSinIva = (motivo?: MotivoSinIva | null): string | null =>

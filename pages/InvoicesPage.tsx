@@ -8,7 +8,8 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { NewInvoice, Invoice, RecurringInvoice } from '@/types';
 import { formatCurrency, formatearFecha } from '@/lib/utils';
-import { esClienteExtranjero, mencionSinIva } from '@/lib/ivaClientes';
+import { esClienteExtranjero, mencionSinIva, motivoSinIvaDeCliente } from '@/lib/ivaClientes';
+import { problemaRegistroFiscal } from '@/lib/verifactu/comprobarFactura';
 import AvisoNifFactura from '@/components/AvisoNifFactura';
 import { supabase } from '@/lib/supabaseClient';
 import { PlusIcon as Plus, DownloadIcon as Download, TrashIcon as Trash, SendIcon as Send, SearchIcon as Search, RepeatIcon as Repeat, DollarSignIcon, LinkIcon, ExternalLinkIcon, EditIcon, RefreshCwIcon, XCircleIcon, BellIcon } from '@/components/icons/Icon';
@@ -315,6 +316,20 @@ const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets
         return;
       }
 
+      // Las mismas reglas que aplicará el registro fiscal, antes de crearla.
+      const fechaEmision = new Date().toISOString().split('T')[0];
+      if (profile?.veri_factu_enabled) {
+        const problema = problemaRegistroFiscal(
+          { issue_date: fechaEmision, subtotal_cents: invoicePreview.subtotal, tax_percent: taxPercent },
+          clients.find(c => c.id === newInvoice.client_id),
+          profile,
+        );
+        if (problema) {
+          addToast(problema, 'error');
+          return;
+        }
+      }
+
       const payload = {
         ...newInvoice,
         items: invoiceItems,
@@ -322,7 +337,7 @@ const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets
         irpf_percent: irpfPercent,
         project_id: newInvoice.project_id || null,
         notes: newInvoice.notes || null,
-        issue_date: new Date().toISOString().split('T')[0],
+        issue_date: fechaEmision,
         budget_id: sourceBudgetId || null,
         contract_id: sourceContractId || null,
       };
@@ -383,7 +398,7 @@ const { budgets, contracts } = useAppStore(useShallow(s => ({ budgets: s.budgets
   };
   const tipoFiscalElegido = tipoFiscalDe(newInvoice.client_id);
   const mencionPrevista = esClienteExtranjero(tipoFiscalElegido) && taxPercent === 0
-    ? mencionSinIva(tipoFiscalElegido === 'empresa_ue' ? 'inversion_sujeto_pasivo_ue' : 'no_sujeta_fuera_ue')
+    ? mencionSinIva(motivoSinIvaDeCliente(clients.find(c => c.id === newInvoice.client_id)))
     : null;
 
   const availableBudgets = useMemo(() => {

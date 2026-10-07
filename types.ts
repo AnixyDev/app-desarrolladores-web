@@ -77,6 +77,12 @@ export interface FiscalRecord {
   estado_envio: 'no_aplica' | 'pendiente' | 'enviado' | 'aceptado' | 'aceptado_con_errores' | 'rechazado';
   csv_respuesta_aeat: string | null;
   created_at: string;
+  /** Desde la fase 1 de Verifactu (07/10/2026). */
+  cuota_total_cents?: number | null;
+  fecha_hora_huso?: string | null;
+  /** Contenido completo del registro con los nombres de campo del XSD de la AEAT. */
+  registro?: Record<string, unknown>;
+  orden?: number;
 }
 
 export interface Client {
@@ -99,10 +105,14 @@ export interface Client {
   tipo_fiscal?: TipoFiscalCliente;
   /** NIF-IVA europeo (prefijo de país + número). Obligatorio para empresa_ue. */
   nif_iva?: string | null;
+  /** Código ISO de país (ES, FR, US…). Obligatorio fuera de la UE; para el resto, España si no se indica. */
+  pais?: string | null;
+  /** Particular (no empresa ni autónomo): cambia la mención legal fuera de la UE y el tipo de documento en el registro fiscal. */
+  es_particular?: boolean;
 }
 
 export type TipoFiscalCliente = 'nacional' | 'empresa_ue' | 'fuera_ue';
-export type MotivoSinIva = 'inversion_sujeto_pasivo_ue' | 'no_sujeta_fuera_ue';
+export type MotivoSinIva = 'inversion_sujeto_pasivo_ue' | 'no_sujeta_fuera_ue' | 'no_sujeta_fuera_ue_particular';
 
 export interface Project {
   id: string;
@@ -348,7 +358,7 @@ export interface ProjectMessage {
   created_at: string;
 }
 export interface Notification { id: string; message: string; link?: string; isRead: boolean; createdAt: string; }
-export interface NewClient { name: string; email: string; company?: string; phone?: string; tax_id?: string; address?: string; tipo_fiscal?: TipoFiscalCliente; nif_iva?: string | null; }
+export interface NewClient { name: string; email: string; company?: string; phone?: string; tax_id?: string; address?: string; tipo_fiscal?: TipoFiscalCliente; nif_iva?: string | null; pais?: string | null; es_particular?: boolean; }
 export interface GoogleJwtPayload { email: string; name?: string; picture?: string; sub: string; }
 export interface TeamMembership {
   membershipId: string;

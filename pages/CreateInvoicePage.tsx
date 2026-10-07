@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, lazy, Suspense } from 'rea
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
+import { problemaRegistroFiscal } from '@/lib/verifactu/comprobarFactura';
 import Card, { CardContent, CardHeader, CardFooter } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -11,7 +12,7 @@ import { PlusIcon, TrashIcon, SparklesIcon, RepeatIcon } from '@/components/icon
 import { useToast } from '@/hooks/useToast';
 import { generateItemsForDocument, AI_CREDIT_COSTS } from '@/services/geminiService';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
-import { esClienteExtranjero, mencionSinIva } from '@/lib/ivaClientes';
+import { esClienteExtranjero, mencionSinIva, motivoSinIvaDeCliente } from '@/lib/ivaClientes';
 import AvisoNifFactura from '@/components/AvisoNifFactura';
 
 // Carga diferida — el modal de créditos solo se descarga si el usuario lo necesita
@@ -113,7 +114,7 @@ const CreateInvoicePage: React.FC = () => {
   }, [tipoFiscal, extranjero]);
 
   const mencionPrevista = extranjero && Number(newInvoice.tax_percent) === 0
-    ? mencionSinIva(tipoFiscal === 'empresa_ue' ? 'inversion_sujeto_pasivo_ue' : 'no_sujeta_fuera_ue')
+    ? mencionSinIva(motivoSinIvaDeCliente(clienteSeleccionado))
     : null;
 
   // ── Handlers ─────────────────────────────────────────────────────────────────
@@ -156,6 +157,25 @@ const CreateInvoicePage: React.FC = () => {
     e.preventDefault();
 
     try {
+      // Con el cumplimiento fiscal activo, las mismas reglas que aplicará
+      // Hacienda (y la base de datos al registrarla), antes de crearla. En una
+      // recurrente se comprueba ya: cada factura se emitirá sola, sin nadie delante.
+      if (profile?.veri_factu_enabled) {
+        const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date());
+        const problema = problemaRegistroFiscal(
+          {
+            issue_date: newInvoice.isRecurring ? hoy : newInvoice.issue_date,
+            subtotal_cents: newInvoice.items.reduce((s, i) => s + i.price_cents * i.quantity, 0),
+            tax_percent: newInvoice.tax_percent,
+          },
+          clients.find((c) => c.id === newInvoice.client_id),
+          profile,
+        );
+        if (problema) {
+          addToast(problema, 'error');
+          return;
+        }
+      }
       if (newInvoice.isRecurring) {
         await addRecurringInvoice({
           client_id: newInvoice.client_id,

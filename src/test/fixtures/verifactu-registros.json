@@ -1,0 +1,360 @@
+[
+ {
+  "tipo": "alta:F1",
+  "registro": {
+   "Huella": "1E07ABB25B820837A55F379C90540300A1C9F93705B330DC5C6318A81E6343C6",
+   "Desglose": [
+    {
+     "ClaveRegimen": "01",
+     "TipoImpositivo": "21.00",
+     "CuotaRepercutida": "210.00",
+     "CalificacionOperacion": "S1",
+     "BaseImponibleOimporteNoSujeto": "1000.00"
+    }
+   ],
+   "IDFactura": {
+    "IDEmisorFactura": "12345678Z",
+    "NumSerieFactura": "F-2026-0001",
+    "FechaExpedicionFactura": "06-10-2026"
+   },
+   "IDVersion": "1.0",
+   "CuotaTotal": "210.00",
+   "TipoHuella": "01",
+   "TipoFactura": "F1",
+   "ImporteTotal": "1210.00",
+   "Destinatarios": [
+    {
+     "NIF": "B12345678",
+     "NombreRazon": "Cliente España"
+    }
+   ],
+   "Encadenamiento": {
+    "PrimerRegistro": "S"
+   },
+   "NombreRazonEmisor": "Estudio de Prueba",
+   "SistemaInformatico": {
+    "NIF": "74870299D",
+    "Version": "1.0",
+    "NombreRazon": "Ana Fernández Rodríguez",
+    "NumeroInstalacion": "4d206226-7850-4ae3-b4b4-ecc156dc52cf",
+    "IdSistemaInformatico": "DF",
+    "IndicadorMultiplesOT": "S",
+    "TipoUsoPosibleMultiOT": "S",
+    "NombreSistemaInformatico": "DevFreelancer",
+    "TipoUsoPosibleSoloVerifactu": "S"
+   },
+   "DescripcionOperacion": "Desarrollo web",
+   "FechaHoraHusoGenRegistro": "2026-10-06T20:22:26+02:00"
+  },
+  "hash_input": "IDEmisorFactura=12345678Z&NumSerieFactura=F-2026-0001&FechaExpedicionFactura=06-10-2026&TipoFactura=F1&CuotaTotal=210.00&ImporteTotal=1210.00&Huella=&FechaHoraHusoGenRegistro=2026-10-06T20:22:26+02:00"
+ },
+ {
+  "tipo": "alta:F1",
+  "registro": {
+   "Huella": "60B9733EFAE5EA8B2AB8366F44D49707B12E4D064505C1F0967966D4E35454CD",
+   "Desglose": [
+    {
+     "ClaveRegimen": "01",
+     "TipoImpositivo": "21.00",
+     "CuotaRepercutida": "10.50",
+     "CalificacionOperacion": "S1",
+     "BaseImponibleOimporteNoSujeto": "50.00"
+    }
+   ],
+   "IDFactura": {
+    "IDEmisorFactura": "12345678Z",
+    "NumSerieFactura": "F-2026-0002",
+    "FechaExpedicionFactura": "06-10-2026"
+   },
+   "IDVersion": "1.0",
+   "CuotaTotal": "10.50",
+   "TipoHuella": "01",
+   "TipoFactura": "F1",
+   "ImporteTotal": "60.50",
+   "Destinatarios": [
+    {
+     "NIF": "B12345678",
+     "NombreRazon": "Cliente España"
+    }
+   ],
+   "Encadenamiento": {
+    "RegistroAnterior": {
+     "Huella": "1E07ABB25B820837A55F379C90540300A1C9F93705B330DC5C6318A81E6343C6",
+     "IDEmisorFactura": "12345678Z",
+     "NumSerieFactura": "F-2026-0001",
+     "FechaExpedicionFactura": "06-10-2026"
+    }
+   },
+   "NombreRazonEmisor": "Estudio de Prueba",
+   "SistemaInformatico": {
+    "NIF": "74870299D",
+    "Version": "1.0",
+    "NombreRazon": "Ana Fernández Rodríguez",
+    "NumeroInstalacion": "4d206226-7850-4ae3-b4b4-ecc156dc52cf",
+    "IdSistemaInformatico": "DF",
+    "IndicadorMultiplesOT": "S",
+    "TipoUsoPosibleMultiOT": "S",
+    "NombreSistemaInformatico": "DevFreelancer",
+    "TipoUsoPosibleSoloVerifactu": "S"
+   },
+   "DescripcionOperacion": "Mantenimiento",
+   "FechaHoraHusoGenRegistro": "2026-10-06T20:22:26+02:00"
+  },
+  "hash_input": "IDEmisorFactura=12345678Z&NumSerieFactura=F-2026-0002&FechaExpedicionFactura=06-10-2026&TipoFactura=F1&CuotaTotal=10.50&ImporteTotal=60.50&Huella=1E07ABB25B820837A55F379C90540300A1C9F93705B330DC5C6318A81E6343C6&FechaHoraHusoGenRegistro=2026-10-06T20:22:26+02:00"
+ },
+ {
+  "tipo": "alta:F1",
+  "registro": {
+   "Huella": "084EE1EEC17A545BCB6C8D66F1FA64F0A892958108D6C70E701CF7CE31CD5D35",
+   "Desglose": [
+    {
+     "ClaveRegimen": "01",
+     "CalificacionOperacion": "N2",
+     "BaseImponibleOimporteNoSujeto": "600.00"
+    }
+   ],
+   "IDFactura": {
+    "IDEmisorFactura": "12345678Z",
+    "NumSerieFactura": "F-2026-0003",
+    "FechaExpedicionFactura": "06-10-2026"
+   },
+   "IDVersion": "1.0",
+   "CuotaTotal": "0.00",
+   "TipoHuella": "01",
+   "TipoFactura": "F1",
+   "ImporteTotal": "600.00",
+   "Destinatarios": [
+    {
+     "IDOtro": {
+      "ID": "FR12345678901",
+      "IDType": "02"
+     },
+     "NombreRazon": "Empresa Francia"
+    }
+   ],
+   "Encadenamiento": {
+    "RegistroAnterior": {
+     "Huella": "60B9733EFAE5EA8B2AB8366F44D49707B12E4D064505C1F0967966D4E35454CD",
+     "IDEmisorFactura": "12345678Z",
+     "NumSerieFactura": "F-2026-0002",
+     "FechaExpedicionFactura": "06-10-2026"
+    }
+   },
+   "NombreRazonEmisor": "Estudio de Prueba",
+   "SistemaInformatico": {
+    "NIF": "74870299D",
+    "Version": "1.0",
+    "NombreRazon": "Ana Fernández Rodríguez",
+    "NumeroInstalacion": "4d206226-7850-4ae3-b4b4-ecc156dc52cf",
+    "IdSistemaInformatico": "DF",
+    "IndicadorMultiplesOT": "S",
+    "TipoUsoPosibleMultiOT": "S",
+    "NombreSistemaInformatico": "DevFreelancer",
+    "TipoUsoPosibleSoloVerifactu": "S"
+   },
+   "DescripcionOperacion": "API",
+   "FechaHoraHusoGenRegistro": "2026-10-06T20:22:26+02:00"
+  },
+  "hash_input": "IDEmisorFactura=12345678Z&NumSerieFactura=F-2026-0003&FechaExpedicionFactura=06-10-2026&TipoFactura=F1&CuotaTotal=0.00&ImporteTotal=600.00&Huella=60B9733EFAE5EA8B2AB8366F44D49707B12E4D064505C1F0967966D4E35454CD&FechaHoraHusoGenRegistro=2026-10-06T20:22:26+02:00"
+ },
+ {
+  "tipo": "alta:F1",
+  "registro": {
+   "Huella": "2D23A669393EBBC543EF5B56D12BFBAD06F41BC885BAD032D43A6219A00F959B",
+   "Desglose": [
+    {
+     "ClaveRegimen": "01",
+     "CalificacionOperacion": "N2",
+     "BaseImponibleOimporteNoSujeto": "800.00"
+    }
+   ],
+   "IDFactura": {
+    "IDEmisorFactura": "12345678Z",
+    "NumSerieFactura": "F-2026-0004",
+    "FechaExpedicionFactura": "06-10-2026"
+   },
+   "IDVersion": "1.0",
+   "CuotaTotal": "0.00",
+   "TipoHuella": "01",
+   "TipoFactura": "F1",
+   "ImporteTotal": "800.00",
+   "Destinatarios": [
+    {
+     "IDOtro": {
+      "ID": "X1234567",
+      "IDType": "03",
+      "CodigoPais": "US"
+     },
+     "NombreRazon": "Particular EE. UU."
+    }
+   ],
+   "Encadenamiento": {
+    "RegistroAnterior": {
+     "Huella": "084EE1EEC17A545BCB6C8D66F1FA64F0A892958108D6C70E701CF7CE31CD5D35",
+     "IDEmisorFactura": "12345678Z",
+     "NumSerieFactura": "F-2026-0003",
+     "FechaExpedicionFactura": "06-10-2026"
+    }
+   },
+   "NombreRazonEmisor": "Estudio de Prueba",
+   "SistemaInformatico": {
+    "NIF": "74870299D",
+    "Version": "1.0",
+    "NombreRazon": "Ana Fernández Rodríguez",
+    "NumeroInstalacion": "4d206226-7850-4ae3-b4b4-ecc156dc52cf",
+    "IdSistemaInformatico": "DF",
+    "IndicadorMultiplesOT": "S",
+    "TipoUsoPosibleMultiOT": "S",
+    "NombreSistemaInformatico": "DevFreelancer",
+    "TipoUsoPosibleSoloVerifactu": "S"
+   },
+   "DescripcionOperacion": "App",
+   "FechaHoraHusoGenRegistro": "2026-10-06T20:22:26+02:00"
+  },
+  "hash_input": "IDEmisorFactura=12345678Z&NumSerieFactura=F-2026-0004&FechaExpedicionFactura=06-10-2026&TipoFactura=F1&CuotaTotal=0.00&ImporteTotal=800.00&Huella=084EE1EEC17A545BCB6C8D66F1FA64F0A892958108D6C70E701CF7CE31CD5D35&FechaHoraHusoGenRegistro=2026-10-06T20:22:26+02:00"
+ },
+ {
+  "tipo": "alta:F2",
+  "registro": {
+   "Huella": "BB3FFF83026639DA7B032192001D9063B94A8983F0F6A317A56C15093D4E153B",
+   "Desglose": [
+    {
+     "ClaveRegimen": "01",
+     "TipoImpositivo": "21.00",
+     "CuotaRepercutida": "63.00",
+     "CalificacionOperacion": "S1",
+     "BaseImponibleOimporteNoSujeto": "300.00"
+    }
+   ],
+   "IDFactura": {
+    "IDEmisorFactura": "12345678Z",
+    "NumSerieFactura": "F-2026-0005",
+    "FechaExpedicionFactura": "06-10-2026"
+   },
+   "IDVersion": "1.0",
+   "CuotaTotal": "63.00",
+   "TipoHuella": "01",
+   "TipoFactura": "F2",
+   "ImporteTotal": "363.00",
+   "Encadenamiento": {
+    "RegistroAnterior": {
+     "Huella": "2D23A669393EBBC543EF5B56D12BFBAD06F41BC885BAD032D43A6219A00F959B",
+     "IDEmisorFactura": "12345678Z",
+     "NumSerieFactura": "F-2026-0004",
+     "FechaExpedicionFactura": "06-10-2026"
+    }
+   },
+   "NombreRazonEmisor": "Estudio de Prueba",
+   "SistemaInformatico": {
+    "NIF": "74870299D",
+    "Version": "1.0",
+    "NombreRazon": "Ana Fernández Rodríguez",
+    "NumeroInstalacion": "4d206226-7850-4ae3-b4b4-ecc156dc52cf",
+    "IdSistemaInformatico": "DF",
+    "IndicadorMultiplesOT": "S",
+    "TipoUsoPosibleMultiOT": "S",
+    "NombreSistemaInformatico": "DevFreelancer",
+    "TipoUsoPosibleSoloVerifactu": "S"
+   },
+   "DescripcionOperacion": "Arreglo",
+   "FechaHoraHusoGenRegistro": "2026-10-06T20:22:26+02:00"
+  },
+  "hash_input": "IDEmisorFactura=12345678Z&NumSerieFactura=F-2026-0005&FechaExpedicionFactura=06-10-2026&TipoFactura=F2&CuotaTotal=63.00&ImporteTotal=363.00&Huella=2D23A669393EBBC543EF5B56D12BFBAD06F41BC885BAD032D43A6219A00F959B&FechaHoraHusoGenRegistro=2026-10-06T20:22:26+02:00"
+ },
+ {
+  "tipo": "alta:R1",
+  "registro": {
+   "Huella": "767B333B217821EA611C500725DCA0BE1D1B29917C140DED74A527263C4885F8",
+   "Desglose": [
+    {
+     "ClaveRegimen": "01",
+     "TipoImpositivo": "21.00",
+     "CuotaRepercutida": "-2.10",
+     "CalificacionOperacion": "S1",
+     "BaseImponibleOimporteNoSujeto": "-10.00"
+    }
+   ],
+   "IDFactura": {
+    "IDEmisorFactura": "12345678Z",
+    "NumSerieFactura": "R-2026-0001",
+    "FechaExpedicionFactura": "06-10-2026"
+   },
+   "IDVersion": "1.0",
+   "CuotaTotal": "-2.10",
+   "TipoHuella": "01",
+   "TipoFactura": "R1",
+   "ImporteTotal": "-12.10",
+   "Destinatarios": [
+    {
+     "NIF": "B12345678",
+     "NombreRazon": "Cliente España"
+    }
+   ],
+   "Encadenamiento": {
+    "RegistroAnterior": {
+     "Huella": "BB3FFF83026639DA7B032192001D9063B94A8983F0F6A317A56C15093D4E153B",
+     "IDEmisorFactura": "12345678Z",
+     "NumSerieFactura": "F-2026-0005",
+     "FechaExpedicionFactura": "06-10-2026"
+    }
+   },
+   "NombreRazonEmisor": "Estudio de Prueba",
+   "TipoRectificativa": "I",
+   "SistemaInformatico": {
+    "NIF": "74870299D",
+    "Version": "1.0",
+    "NombreRazon": "Ana Fernández Rodríguez",
+    "NumeroInstalacion": "4d206226-7850-4ae3-b4b4-ecc156dc52cf",
+    "IdSistemaInformatico": "DF",
+    "IndicadorMultiplesOT": "S",
+    "TipoUsoPosibleMultiOT": "S",
+    "NombreSistemaInformatico": "DevFreelancer",
+    "TipoUsoPosibleSoloVerifactu": "S"
+   },
+   "DescripcionOperacion": "Anula: Mantenimiento; Mantenimiento",
+   "FacturasRectificadas": [
+    {
+     "IDEmisorFactura": "12345678Z",
+     "NumSerieFactura": "F-2026-0002",
+     "FechaExpedicionFactura": "06-10-2026"
+    }
+   ],
+   "FechaHoraHusoGenRegistro": "2026-10-06T20:22:26+02:00"
+  },
+  "hash_input": "IDEmisorFactura=12345678Z&NumSerieFactura=R-2026-0001&FechaExpedicionFactura=06-10-2026&TipoFactura=R1&CuotaTotal=-2.10&ImporteTotal=-12.10&Huella=BB3FFF83026639DA7B032192001D9063B94A8983F0F6A317A56C15093D4E153B&FechaHoraHusoGenRegistro=2026-10-06T20:22:26+02:00"
+ },
+ {
+  "tipo": "anulacion:F2",
+  "registro": {
+   "Huella": "70563FBC367BCE5D500C45AFA224584148F231FA8EA59060B163339F8961F3C9",
+   "IDFactura": {
+    "IDEmisorFacturaAnulada": "12345678Z",
+    "NumSerieFacturaAnulada": "F-2026-0005",
+    "FechaExpedicionFacturaAnulada": "06-10-2026"
+   },
+   "IDVersion": "1.0",
+   "TipoHuella": "01",
+   "Encadenamiento": {
+    "RegistroAnterior": {
+     "Huella": "767B333B217821EA611C500725DCA0BE1D1B29917C140DED74A527263C4885F8",
+     "IDEmisorFactura": "12345678Z",
+     "NumSerieFactura": "R-2026-0001",
+     "FechaExpedicionFactura": "06-10-2026"
+    }
+   },
+   "SistemaInformatico": {
+    "NIF": "74870299D",
+    "Version": "1.0",
+    "NombreRazon": "Ana Fernández Rodríguez",
+    "NumeroInstalacion": "4d206226-7850-4ae3-b4b4-ecc156dc52cf",
+    "IdSistemaInformatico": "DF",
+    "IndicadorMultiplesOT": "S",
+    "TipoUsoPosibleMultiOT": "S",
+    "NombreSistemaInformatico": "DevFreelancer",
+    "TipoUsoPosibleSoloVerifactu": "S"
+   },
+   "FechaHoraHusoGenRegistro": "2026-10-06T20:22:26+02:00"
+  },
+  "hash_input": "IDEmisorFacturaAnulada=12345678Z&NumSerieFacturaAnulada=F-2026-0005&FechaExpedicionFacturaAnulada=06-10-2026&Huella=767B333B217821EA611C500725DCA0BE1D1B29917C140DED74A527263C4885F8&FechaHoraHusoGenRegistro=2026-10-06T20:22:26+02:00"
+ }
+]
