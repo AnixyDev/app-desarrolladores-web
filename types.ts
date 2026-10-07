@@ -83,6 +83,12 @@ export interface FiscalRecord {
   /** Contenido completo del registro con los nombres de campo del XSD de la AEAT. */
   registro?: Record<string, unknown>;
   orden?: number;
+  /** Envío a la AEAT, desde la fase 2 de Verifactu (07/10/2026). */
+  envio_intentos?: number;
+  envio_ultimo_intento?: string | null;
+  envio_error_codigo?: string | null;
+  envio_error_descripcion?: string | null;
+  envio_aceptado_en?: string | null;
 }
 
 export interface Client {

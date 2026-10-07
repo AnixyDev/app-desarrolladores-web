@@ -436,7 +436,7 @@ const handleSelectBudget = (budgetId: string) => {
   const getFiscalDataForInvoice = (invoiceId: string) => {
     const record = fiscalRecords.find(r => r.invoice_id === invoiceId && r.record_type === 'alta');
     if (!record) return null;
-    return { modalidad: record.modalidad, hash: record.hash };
+    return { modalidad: record.modalidad, hash: record.hash, nifEmisor: record.nif_emisor, importeTotalCents: record.importe_total_cents };
   };
 
   // Genera y descarga el PDF de la factura usando el servicio ya existente en el proyecto

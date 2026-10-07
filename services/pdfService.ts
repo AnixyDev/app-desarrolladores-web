@@ -30,6 +30,14 @@ function resolveAutoTable(): (doc: jsPDF, options: any) => void {
 export interface FiscalPdfData {
   modalidad: 'verifactu' | 'no_verifactu';
   hash: string;
+  /**
+   * NIF e importe tal como constan en el registro fiscal (07/10/2026). El QR
+   * se coteja con el registro enviado a la AEAT: el importe es base + IVA, sin
+   * restar la retención de IRPF (el total a pagar de la factura sí la resta),
+   * y el NIF va normalizado (sin espacios ni guiones).
+   */
+  nifEmisor?: string;
+  importeTotalCents?: number;
 }
 
 // URL de cotejo AEAT (producción). Formato y parámetros (nif, numserie,
@@ -78,13 +86,13 @@ export const construirUrlQrTributario = (datos: {
   return `${AEAT_QR_SERVICIO[datos.modalidad]}?${params.toString()}`;
 };
 
-async function buildInvoiceQrDataUrl(profile: Profile, invoice: Invoice, modalidad: FiscalPdfData['modalidad']): Promise<string> {
+async function buildInvoiceQrDataUrl(profile: Profile, invoice: Invoice, fiscal: FiscalPdfData): Promise<string> {
   const qrUrl = construirUrlQrTributario({
-    nif: profile.tax_id || '',
-    numeroFactura: invoice.invoice_number,
+    nif: fiscal.nifEmisor || profile.tax_id || '',
+    numeroFactura: invoice.invoice_number.trim(),
     fechaEmision: invoice.issue_date,
-    totalCents: invoice.total_cents,
-    modalidad,
+    totalCents: fiscal.importeTotalCents ?? invoice.total_cents,
+    modalidad: fiscal.modalidad,
   });
   // Nivel de corrección M e ISO/IEC 18004, como exige la Orden HAC/1177/2024.
   return QRCode.toDataURL(qrUrl, { errorCorrectionLevel: 'M', margin: 2, width: 400 });
@@ -135,7 +143,7 @@ async function buildInvoicePdfDocument(
     let headerLeftX = 14;
     if (fiscalData) {
         try {
-            const qrDataUrl = await buildInvoiceQrDataUrl(profile, invoice, fiscalData.modalidad);
+            const qrDataUrl = await buildInvoiceQrDataUrl(profile, invoice, fiscalData);
             doc.setFontSize(10);
             doc.setFont('helvetica', 'normal');
             // Encima del QR y centrado respecto a él, como recomienda la AEAT.
