@@ -13,6 +13,7 @@ import { InvoiceItem, RecurringInvoice } from '@/types';
 import { PlusIcon, TrashIcon } from '@/components/icons/Icon';
 import { formatCurrency } from '@/lib/utils';
 import { esClienteExtranjero } from '@/lib/ivaClientes';
+import { problemaRegistroFiscal } from '@/lib/verifactu/comprobarFactura';
 
 interface CreateRecurringInvoiceModalProps {
   isOpen: boolean;
@@ -24,7 +25,7 @@ interface CreateRecurringInvoiceModalProps {
 const emptyItem: InvoiceItem = { description: '', quantity: 1, price_cents: 0 };
 
 const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = ({ isOpen, onClose, recurrente = null }) => {
-  const { clients, projects, addRecurringInvoice, updateRecurringInvoice } = useAppStore(useShallow(s => ({ clients: s.clients, projects: s.projects, addRecurringInvoice: s.addRecurringInvoice, updateRecurringInvoice: s.updateRecurringInvoice })));
+  const { clients, projects, profile, addRecurringInvoice, updateRecurringInvoice } = useAppStore(useShallow(s => ({ clients: s.clients, projects: s.projects, profile: s.profile, addRecurringInvoice: s.addRecurringInvoice, updateRecurringInvoice: s.updateRecurringInvoice })));
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -104,9 +105,22 @@ const CreateRecurringInvoiceModal: React.FC<CreateRecurringInvoiceModalProps> = 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!clientId) return;
+    setError(null);
+
+    // Con el cumplimiento fiscal activo, cada factura de la recurrente se
+    // registra sola en Hacienda sin nadie delante: si el cliente no está
+    // identificado (o falta un dato), se avisa ahora y no el día de emitirla.
+    if (profile?.veri_factu_enabled) {
+      const hoy = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date());
+      const problema = problemaRegistroFiscal(
+        { issue_date: hoy, subtotal_cents: totalCents, tax_percent: ivaAplicado },
+        clients.find((c) => c.id === clientId),
+        profile,
+      );
+      if (problema) { setError(problema); return; }
+    }
 
     setIsSubmitting(true);
-    setError(null);
     try {
       if (recurrente) {
         await updateRecurringInvoice(recurrente.id, {

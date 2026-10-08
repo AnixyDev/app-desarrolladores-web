@@ -54,3 +54,12 @@ describe('comprobación previa al registro fiscal', () => {
     expect(problemaRegistroFiscal(f(1000, 15), es, perfil, HOY)).toMatch(/no es un tipo válido/);
   });
 });
+
+describe('factura recurrente', () => {
+  it('el modal de recurrentes comprueba el cliente antes de guardar (se emitirá sin nadie delante)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const modal = readFileSync('components/modals/CreateRecurringInvoiceModal.tsx', 'utf8');
+    expect(modal).toMatch(/problemaRegistroFiscal\(/);
+    expect(modal).toMatch(/profile\?\.veri_factu_enabled/);
+  });
+});

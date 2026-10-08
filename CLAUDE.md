@@ -68,5 +68,4 @@ Plan completo en el doc del proyecto `claude/plan-verifactu.md`.
 
 ## Pendiente conocido
 - App.tsx re-renderiza las rutas ~12 veces por carga.
-- Factura recurrente: avisar si el cliente no está identificado.
 - Modo prueba de Verifactu: la AEAT avisa 2007 (ya existe primer registro) al repetir.
