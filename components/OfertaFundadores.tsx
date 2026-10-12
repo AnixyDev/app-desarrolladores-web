@@ -10,7 +10,13 @@ import { precioDe } from '../supabase/functions/_shared/catalogo-stripe';
  * Todo sale del servidor (plazas-fundadores): cuántas quedan, si la oferta
  * sigue abierta y hasta cuándo. Mientras carga, si falla, si no quedan plazas
  * o si la oferta ha cerrado, no se muestra nada: nunca un número inventado.
+ *
+ * El contador ("Quedan N de 50") y la barra solo aparecen cuando ya hay
+ * MINIMO_VENDIDAS_PARA_CONTADOR plazas vendidas de verdad. Antes se muestra
+ * solo la oferta, sin cifra.
  */
+export const MINIMO_VENDIDAS_PARA_CONTADOR = 5;
+
 interface Props {
   textoBoton: string;
   onElegir: () => void | Promise<void>;
@@ -37,6 +43,7 @@ const OfertaFundadores: React.FC<Props> = ({ textoBoton, onElegir, cargando = fa
 
   const ocupadas = plazas.total - plazas.restantes;
   const porcentaje = Math.min(100, Math.round((ocupadas / plazas.total) * 100));
+  const mostrarContador = ocupadas >= MINIMO_VENDIDAS_PARA_CONTADOR;
 
   return (
     <section
@@ -54,12 +61,20 @@ const OfertaFundadores: React.FC<Props> = ({ textoBoton, onElegir, cargando = fa
           </p>
         </div>
         <div className="w-full md:w-64 shrink-0 space-y-3">
-          <p className="text-sm font-semibold text-white" aria-live="polite">
-            Quedan {plazas.restantes} de {plazas.total} plazas
-          </p>
-          <div className="h-2 w-full rounded-full bg-gray-800" role="progressbar" aria-valuemin={0} aria-valuemax={plazas.total} aria-valuenow={ocupadas}>
-            <div className="h-2 rounded-full bg-primary-500" style={{ width: `${porcentaje}%` }} />
-          </div>
+          {mostrarContador ? (
+            <>
+              <p className="text-sm font-semibold text-white" aria-live="polite">
+                Quedan {plazas.restantes} de {plazas.total} plazas
+              </p>
+              <div className="h-2 w-full rounded-full bg-gray-800" role="progressbar" aria-valuemin={0} aria-valuemax={plazas.total} aria-valuenow={ocupadas}>
+                <div className="h-2 rounded-full bg-primary-500" style={{ width: `${porcentaje}%` }} />
+              </div>
+            </>
+          ) : (
+            <p className="text-sm font-semibold text-white">
+              Sé de los {plazas.total} primeros
+            </p>
+          )}
           <Button onClick={onElegir} disabled={cargando} className="w-full h-11 rounded-xl text-sm font-bold">
             {cargando ? <RefreshCwIcon className="w-5 h-5 animate-spin mx-auto" /> : textoBoton}
           </Button>

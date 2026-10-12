@@ -21,6 +21,22 @@ describe('OfertaFundadores', () => {
     expect(screen.getByText(/59€\/año/)).toBeTruthy();
   });
 
+  it('con menos de 5 plazas vendidas no enseña la cifra ni la barra', async () => {
+    obtenerPlazasFundadores.mockResolvedValue({ ...abierta, restantes: 46 }); // 4 vendidas
+    render(<OfertaFundadores textoBoton="Quiero mi plaza" onElegir={() => {}} />);
+    expect(await screen.findByText('Sé de los 50 primeros')).toBeTruthy();
+    expect(screen.queryByText(/Quedan/)).toBeNull();
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(screen.getByText('Quiero mi plaza')).toBeTruthy();
+  });
+
+  it('con 5 vendidas ya enseña el contador real', async () => {
+    obtenerPlazasFundadores.mockResolvedValue({ ...abierta, restantes: 45 });
+    render(<OfertaFundadores textoBoton="Quiero mi plaza" onElegir={() => {}} />);
+    expect(await screen.findByText('Quedan 45 de 50 plazas')).toBeTruthy();
+    expect(screen.getByRole('progressbar')).toBeTruthy();
+  });
+
   it('el botón llama a la acción', async () => {
     obtenerPlazasFundadores.mockResolvedValue(abierta);
     const onElegir = vi.fn();
