@@ -2,6 +2,7 @@
 import type { Invoice, Client, Profile, Receipt, Contract, FiscalRecord } from '@/types';
 import { formatCurrency, calculateInvoiceTotals } from '@/lib/utils';
 import { mencionSinIva } from '@/lib/ivaClientes';
+import type { Modelo130, Modelo303 } from '@/lib/modelosTrimestrales';
 import jsPDF from 'jspdf';
 import * as autoTableNamespace from 'jspdf-autotable';
 import QRCode from 'qrcode';
@@ -499,8 +500,10 @@ export const generateTaxReportPdf = (
     profile: Profile,
     year: number,
     quarter: number | 'annual',
-    irpfPercentage: number,
-    totals: TaxReportTotals
+    totals: TaxReportTotals,
+    // Borradores con casillas (lib/modelosTrimestrales). null en la vista anual;
+    // m130 null si el NIF es de una sociedad (no presenta el 130).
+    borradores: { m303: Modelo303; m130: Modelo130 | null } | null,
 ) => {
     const autoTable = resolveAutoTable();
     const doc = new jsPDF();
@@ -543,7 +546,7 @@ export const generateTaxReportPdf = (
     // --- Resumen general ---
     autoTable(doc, {
         startY: 68,
-        head: [['Resumen del trimestre', '']],
+        head: [['Resumen del periodo', '']],
         body: [
             ['Ingresos (base imponible)', formatCurrency(totals.totalIngresos)],
             ...(totals.baseSinIva ? [['   de ellos, sin IVA español (clientes de otro país)', formatCurrency(totals.baseSinIva)]] : []),
@@ -555,41 +558,61 @@ export const generateTaxReportPdf = (
         columnStyles: { 1: { halign: 'right' } },
     });
 
-    // --- Modelo 303 (IVA) ---
-    const y1 = (doc as any).lastAutoTable.finalY + 10;
-    autoTable(doc, {
-        startY: y1,
-        head: [['Modelo 303 · Liquidación de IVA', '']],
-        body: [
-            ['IVA Repercutido (+)', formatCurrency(totals.ivaRepercutido)],
-            ['IVA Soportado (-)', formatCurrency(totals.ivaSoportado)],
-            [
-                { content: totals.ivaAPagar >= 0 ? 'A INGRESAR' : 'A DEVOLVER', styles: { fontStyle: 'bold' } },
-                { content: formatCurrency(Math.abs(totals.ivaAPagar)), styles: { fontStyle: 'bold' } },
-            ],
-        ],
-        theme: 'striped',
-        headStyles: { fillColor: profile.pdf_color || '#d9009f' },
-        columnStyles: { 1: { halign: 'right' } },
-    });
+    const cabecera = { theme: 'striped' as const, headStyles: { fillColor: profile.pdf_color || '#d9009f' }, columnStyles: { 0: { cellWidth: 18 }, 2: { halign: 'right' as const } } };
+    const fila = (casilla: string, texto: string, cents: number) => [casilla, texto, formatCurrency(cents)];
+    const filaFinal = (casilla: string, texto: string, cents: number) => [
+        { content: casilla, styles: { fontStyle: 'bold' as const } },
+        { content: texto, styles: { fontStyle: 'bold' as const } },
+        { content: formatCurrency(cents), styles: { fontStyle: 'bold' as const } },
+    ];
 
-    // --- Modelo 130 (IRPF) ---
-    const y2 = (doc as any).lastAutoTable.finalY + 10;
-    autoTable(doc, {
-        startY: y2,
-        head: [[`Modelo 130 · Pago Fraccionado IRPF (${irpfPercentage}%)`, '']],
-        body: [
-            ['Cuota íntegra', formatCurrency(totals.beneficio > 0 ? totals.beneficio * (irpfPercentage / 100) : 0)],
-            ['Retenciones ya soportadas (-)', formatCurrency(totals.totalRetenciones)],
-            [
-                { content: 'A INGRESAR', styles: { fontStyle: 'bold' } },
-                { content: formatCurrency(totals.irpfAPagar), styles: { fontStyle: 'bold' } },
+    if (borradores) {
+        const { m303, m130 } = borradores;
+        // --- Modelo 303 (IVA) ---
+        autoTable(doc, {
+            ...cabecera,
+            startY: (doc as any).lastAutoTable.finalY + 10,
+            head: [['Casilla', `Modelo 303 · IVA del ${m303.trimestre}T ${m303.anio}`, 'Importe']],
+            body: [
+                ...m303.devengado.flatMap(l => [
+                    fila(l.casillas?.[0] ?? '—', `Base al ${l.tipo} %`, l.base),
+                    fila(l.casillas?.[2] ?? '—', `Cuota al ${l.tipo} %`, l.cuota),
+                ]),
+                fila('27', 'Total cuota devengada', m303.c27),
+                fila('28', 'Base de gastos con IVA', m303.c28),
+                fila('29', 'IVA soportado', m303.c29),
+                fila('45', 'Total a deducir', m303.c45),
+                fila('46', 'Resultado del régimen general', m303.c46),
+                ...(m303.c59 ? [fila('59', 'Servicios a empresas de la UE', m303.c59)] : []),
+                ...(m303.c120 ? [fila('120', 'No sujetas por reglas de localización', m303.c120)] : []),
+                ...(m303.c78 ? [fila('78', 'Compensación de trimestres anteriores', m303.c78)] : []),
+                filaFinal('71', m303.c71 >= 0 ? 'Resultado: A INGRESAR' : 'Resultado: A COMPENSAR / DEVOLVER', m303.c71),
             ],
-        ],
-        theme: 'striped',
-        headStyles: { fillColor: profile.pdf_color || '#d9009f' },
-        columnStyles: { 1: { halign: 'right' } },
-    });
+        });
+
+        // --- Modelo 130 (IRPF) ---
+        if (m130) {
+            autoTable(doc, {
+                ...cabecera,
+                startY: (doc as any).lastAutoTable.finalY + 10,
+                head: [['Casilla', `Modelo 130 · IRPF del ${m130.trimestre}T ${m130.anio} (acumulado desde el 1 de enero)`, 'Importe']],
+                body: [
+                    fila('01', 'Ingresos', m130.c01),
+                    fila('02', m130.dificilJustificacion ? `Gastos (incluye ${formatCurrency(m130.dificilJustificacion)} de difícil justificación)` : 'Gastos', m130.c02),
+                    fila('03', 'Rendimiento neto', m130.c03),
+                    fila('04', '20 % del rendimiento', m130.c04),
+                    fila('05', 'Pagado en trimestres anteriores', m130.c05),
+                    fila('06', 'Retenciones', m130.c06),
+                    fila('07', 'Pago fraccionado previo', m130.c07),
+                    fila('12', 'Total', m130.c12),
+                    fila('13', 'Minoración', m130.c13),
+                    fila('14', 'Diferencia', m130.c14),
+                    ...(m130.c15 ? [fila('15', 'Negativos de trimestres anteriores', m130.c15)] : []),
+                    filaFinal('19', m130.c19 > 0 ? 'Resultado: A INGRESAR' : 'Resultado', m130.c19),
+                ],
+            });
+        }
+    }
 
     // --- Footer ---
     doc.setFontSize(7);
