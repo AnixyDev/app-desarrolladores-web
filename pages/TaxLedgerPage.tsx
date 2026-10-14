@@ -1,26 +1,36 @@
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import Card, { CardContent, CardHeader } from '@/components/ui/Card';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useShallow } from 'zustand/react/shallow';
 import { formatCurrency, formatearFecha } from '@/lib/utils';
 import { BookIcon, AlertTriangleIcon, DownloadIcon, ZapIcon, FileTextIcon } from '@/components/icons/Icon';
-import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
 import { generateTaxReportPdf } from '@/services/pdfService';
 import { ETIQUETA_SIN_IVA, clasificarFacturas, totalesLibro } from '@/lib/libroFiscal';
+import { TIPO_PAGO_FRACCIONADO, esPersonaFisica, modelo130, modelo303, plazoTrimestre, type Trimestre } from '@/lib/modelosTrimestrales';
+import { useOpciones130 } from '@/hooks/useOpciones130';
+import { Borrador130, Borrador303 } from '@/components/fiscal/BorradoresModelos';
 
 const TaxLedgerPage: React.FC = () => {
     const { invoices, expenses, clients, profile } = useAppStore(useShallow(s => ({ invoices: s.invoices, expenses: s.expenses, clients: s.clients, profile: s.profile })));
-    const [year, setYear] = useState(new Date().getFullYear());
-    const [quarter, setQuarter] = useState<number | 'annual'>(Math.floor(new Date().getMonth() / 3) + 1);
-    const [irpfPercentage, setIrpfPercentage] = useState(20);
+    // ?anio=2026&trimestre=3 abre ese trimestre (enlace desde «Reserva para Hacienda» en Inicio).
+    const [params] = useSearchParams();
+    const anioUrl = Number(params.get('anio'));
+    const trimestreUrl = Number(params.get('trimestre'));
+    const [year, setYear] = useState(anioUrl >= 2000 && anioUrl <= 2100 ? anioUrl : new Date().getFullYear());
+    const [quarter, setQuarter] = useState<number | 'annual'>(
+        trimestreUrl >= 1 && trimestreUrl <= 4 ? trimestreUrl : Math.floor(new Date().getMonth() / 3) + 1,
+    );
+    const [opciones130, cambiarOpciones130] = useOpciones130(profile?.id, year, invoices, expenses);
 
     const availableYears = useMemo(() => {
         const allDates = [...invoices.map(i => i.issue_date), ...expenses.map(e => e.date)];
         const years = new Set(allDates.map(d => new Date(d).getFullYear()));
+        years.add(new Date().getFullYear());
+        years.add(year);
         return Array.from(years).sort((a, b) => b - a);
-    }, [invoices, expenses]);
+    }, [invoices, expenses, year]);
 
     const filteredData = useMemo(() => {
         // NUEVO: "Anual" cubre el año entero; un trimestre concreto sigue
@@ -53,9 +63,20 @@ const TaxLedgerPage: React.FC = () => {
     }, [invoices, expenses, year, quarter]);
     
     const totals = useMemo(
-        () => totalesLibro(filteredData.filteredInvoices, filteredData.filteredExpenses, irpfPercentage),
-        [filteredData, irpfPercentage],
+        () => totalesLibro(filteredData.filteredInvoices, filteredData.filteredExpenses, TIPO_PAGO_FRACCIONADO),
+        [filteredData],
     );
+
+    // Borradores del 303 y el 130 (solo por trimestre: el 130 es acumulado desde el 1 de enero).
+    const borradores = useMemo(() => {
+        if (quarter === 'annual') return null;
+        const t = quarter as Trimestre;
+        return {
+            m303: modelo303(invoices, expenses, year, t),
+            m130: modelo130(invoices, expenses, year, t, opciones130),
+            plazo: plazoTrimestre(year, t),
+        };
+    }, [invoices, expenses, year, quarter, opciones130]);
 
     const handleExportCSV = () => {
         const csvRows = [];
@@ -122,7 +143,7 @@ const TaxLedgerPage: React.FC = () => {
 
     const handleExportPDF = () => {
         if (!profile) return;
-        generateTaxReportPdf(profile, year, quarter, irpfPercentage, totals);
+        generateTaxReportPdf(profile, year, quarter, totals, borradores ? { m303: borradores.m303, m130: esPersonaFisica(profile.tax_id) ? borradores.m130 : null } : null);
     };
 
     // FIX / NUEVO: el Libro Fiscal no tenía ninguna restricción de plan —
@@ -201,21 +222,12 @@ const TaxLedgerPage: React.FC = () => {
                  <select aria-label="Año" value={year} onChange={e => setYear(Number(e.target.value))} className="px-3 py-2 border border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm bg-gray-800 text-white">
                     {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
-                <div className="w-32">
-                     <Input 
-                        label="Tipo IRPF (%)" 
-                        type="number" 
-                        value={irpfPercentage} 
-                        onChange={e => setIrpfPercentage(Number(e.target.value))}
-                        wrapperClassName="mb-0"
-                    />
-                </div>
             </div>
       </div>
       
       <Card>
         <CardHeader>
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2"><BookIcon className='w-5 h-5'/> Resumen Trimestral</h2>
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2"><BookIcon className='w-5 h-5'/> Resumen del periodo</h2>
         </CardHeader>
         <CardContent>
             <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center'>
@@ -240,59 +252,31 @@ const TaxLedgerPage: React.FC = () => {
                 </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                <div className='bg-gray-900 p-4 rounded-lg border border-gray-700 flex flex-col justify-between'>
-                    <div>
-                        <p className='text-sm text-gray-400 font-semibold mb-2'>Liquidación IVA (Modelo 303)</p>
-                        <div className="flex justify-between text-sm mb-1 text-gray-300">
-                            <span>Repercutido (+):</span>
-                            <span>{formatCurrency(totals.ivaRepercutido)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm mb-3 text-gray-300">
-                            <span>Soportado (-):</span>
-                            <span>{formatCurrency(totals.ivaSoportado)}</span>
-                        </div>
-                    </div>
-                    <div className="border-t border-gray-700 pt-2 flex justify-between items-center">
-                        <span className="text-gray-200 font-medium">A Pagar/Devolver:</span>
-                        <span className={`text-xl font-bold ${totals.ivaAPagar >= 0 ? 'text-red-400' : 'text-green-400'}`}>
-                            {formatCurrency(totals.ivaAPagar)}
-                        </span>
-                    </div>
-                </div>
-
-                <div className='bg-gray-900 p-4 rounded-lg border border-gray-700 flex flex-col justify-between'>
-                    <div>
-                        <p className='text-sm text-gray-400 font-semibold mb-2'>Pago Fraccionado IRPF (Modelo 130)</p>
-                        <div className="flex justify-between text-sm mb-1 text-gray-300">
-                            <span>Cuota ({irpfPercentage}% Beneficio):</span>
-                            <span>{formatCurrency(totals.beneficio > 0 ? totals.beneficio * (irpfPercentage/100) : 0)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm mb-3 text-gray-300">
-                            <span>Retenciones Previas (-):</span>
-                            <span>{formatCurrency(totals.totalRetenciones)}</span>
-                        </div>
-                    </div>
-                    <div className="border-t border-gray-700 pt-2 flex justify-between items-center">
-                        <span className="text-gray-200 font-medium">A Ingresar:</span>
-                        <span className="text-xl font-bold text-white">
-                            {formatCurrency(totals.irpfAPagar)}
-                        </span>
-                    </div>
-                </div>
-            </div>
-            
             <div className="mt-4 flex items-start p-3 bg-blue-900/20 border border-blue-800 rounded text-xs text-blue-300">
                 <AlertTriangleIcon className="w-4 h-4 mr-2 shrink-0 mt-0.5"/>
                 <p>
-                    Esto es una simulación basada en tus datos registrados.{' '}
                     {quarter === 'annual'
-                        ? 'Estás viendo el año completo — recuerda que el Modelo 130 se presenta trimestralmente, esta vista es solo para tener una visión de conjunto.'
-                        : 'Recuerda que para el Modelo 130 los importes son acumulativos anuales, aunque aquí se muestra una vista trimestral aislada para facilitar el control.'}
+                        ? 'Estás viendo el año completo. Elige un trimestre para ver los borradores del 303 y el 130 con sus casillas.'
+                        : 'Borradores calculados con tus facturas y gastos registrados. Revísalos antes de presentarlos: no sustituyen a tu gestoría.'}
                 </p>
             </div>
         </CardContent>
       </Card>
+
+      {borradores && profile && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          <Borrador303 m={borradores.m303} plazo={borradores.plazo} />
+          {/* Con NIF de sociedad, Borrador130 explica que no se presenta. */}
+          <Borrador130
+            m={borradores.m130}
+            plazo={borradores.plazo}
+            opciones={opciones130}
+            onCambiarOpciones={cambiarOpciones130}
+            facturas={invoices}
+            nif={profile.tax_id}
+          />
+        </div>
+      )}
 
       {filteredData.excludedInvoices.length > 0 && (
         <div className="p-4 bg-orange-900/20 border border-orange-800 rounded-lg">

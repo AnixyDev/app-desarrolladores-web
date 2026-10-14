@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Sparkles, TrendingUp, Users, Briefcase, Clock } from 'lucide-react';
 
 import { formatCurrency } from '@/lib/utils';
+import ReservaHaciendaCard from '@/components/dashboard/ReservaHaciendaCard';
 // Carga diferida — los gráficos no bloquean el chunk principal
 const IncomeExpenseChart = lazy(() => import('../components/charts/IncomeExpenseChart'));
 const WeeklyHoursChart   = lazy(() => import('../components/charts/WeeklyHoursChart'));
@@ -140,6 +141,9 @@ const DashboardPage: React.FC = () => {
           color="text-orange-400"
         />
       </div>
+
+      {/* Cuánto apartar para el IVA y el IRPF del trimestre */}
+      <ReservaHaciendaCard />
 
       {/* Gráfico principal + Inbox */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
